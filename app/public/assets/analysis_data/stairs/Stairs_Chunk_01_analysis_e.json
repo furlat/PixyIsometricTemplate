@@ -1,0 +1,2829 @@
+{
+  "image_path": "C:/Users/Tommaso/Documents/Dev/IsoSpriter/isometric_tiles/walls/Stairs_Chunk_01.png",
+  "total_width": 1076,
+  "total_height": 239,
+  "rows": 1,
+  "cols": 4,
+  "sprite_width": 269,
+  "sprite_height": 239,
+  "alpha_threshold": 0,
+  "upper_z_offset": 0,
+  "upper_lines_midpoint_mode": false,
+  "show_diamond_height": false,
+  "show_overlay": true,
+  "show_diamond_vertices": true,
+  "sprites": [
+    {
+      "sprite_index": 0,
+      "original_size": [
+        269,
+        239
+      ],
+      "asset_type": "stair",
+      "frame_upper_z_offset": 0,
+      "bbox": {
+        "x": 4,
+        "y": 4,
+        "width": 261,
+        "height": 231
+      },
+      "diamond_info": {
+        "diamond_height": 30.5,
+        "predicted_flat_height": 200.5,
+        "effective_height": 231.0,
+        "line_y": 204.5,
+        "diamond_width": 401.0,
+        "lower_z_offset": 200.5,
+        "upper_z_offset": 0.0,
+        "diamonds_z_offset": 100.0,
+        "lower_diamond": {
+          "north_vertex": {
+            "x": 64,
+            "y": 94
+          },
+          "south_vertex": {
+            "x": 64,
+            "y": 294
+          },
+          "east_vertex": {
+            "x": 264,
+            "y": 194
+          },
+          "west_vertex": {
+            "x": -136,
+            "y": 194
+          },
+          "center": {
+            "x": 64,
+            "y": 194
+          },
+          "z_offset": 0.0,
+          "north_east_midpoint": {
+            "x": 164,
+            "y": 144
+          },
+          "east_south_midpoint": {
+            "x": 164,
+            "y": 244
+          },
+          "south_west_midpoint": {
+            "x": -36,
+            "y": 244
+          },
+          "west_north_midpoint": {
+            "x": -36,
+            "y": 144
+          },
+          "sub_diamonds": {
+            "north": {
+              "quadrant": "north",
+              "north_vertex": {
+                "x": 64,
+                "y": 94
+              },
+              "south_vertex": {
+                "x": 64,
+                "y": 194
+              },
+              "east_vertex": {
+                "x": 164,
+                "y": 144
+              },
+              "west_vertex": {
+                "x": -36,
+                "y": 144
+              },
+              "center": {
+                "x": 64,
+                "y": 144
+              },
+              "is_walkable": false,
+              "edge_properties": {
+                "north_west": {
+                  "blocks_line_of_sight": true,
+                  "blocks_movement": true,
+                  "z_portal": null
+                },
+                "north_east": {
+                  "blocks_line_of_sight": true,
+                  "blocks_movement": true,
+                  "z_portal": null
+                },
+                "south_west": {
+                  "blocks_line_of_sight": true,
+                  "blocks_movement": true,
+                  "z_portal": null
+                },
+                "south_east": {
+                  "blocks_line_of_sight": true,
+                  "blocks_movement": true,
+                  "z_portal": null
+                }
+              }
+            },
+            "south": {
+              "quadrant": "south",
+              "north_vertex": {
+                "x": 64,
+                "y": 194
+              },
+              "south_vertex": {
+                "x": 64,
+                "y": 294
+              },
+              "east_vertex": {
+                "x": 164,
+                "y": 244
+              },
+              "west_vertex": {
+                "x": -36,
+                "y": 244
+              },
+              "center": {
+                "x": 64,
+                "y": 244
+              },
+              "is_walkable": null,
+              "edge_properties": {
+                "north_west": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "north_east": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": true,
+                  "z_portal": null
+                },
+                "south_west": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "south_east": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                }
+              }
+            },
+            "east": {
+              "quadrant": "east",
+              "north_vertex": {
+                "x": 164,
+                "y": 144
+              },
+              "south_vertex": {
+                "x": 164,
+                "y": 244
+              },
+              "east_vertex": {
+                "x": 264,
+                "y": 194
+              },
+              "west_vertex": {
+                "x": 64,
+                "y": 194
+              },
+              "center": {
+                "x": 164,
+                "y": 194
+              },
+              "is_walkable": false,
+              "edge_properties": {
+                "north_west": {
+                  "blocks_line_of_sight": true,
+                  "blocks_movement": true,
+                  "z_portal": null
+                },
+                "north_east": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": true,
+                  "z_portal": null
+                },
+                "south_west": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": true,
+                  "z_portal": null
+                },
+                "south_east": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": true,
+                  "z_portal": 60.0
+                }
+              }
+            },
+            "west": {
+              "quadrant": "west",
+              "north_vertex": {
+                "x": -36,
+                "y": 144
+              },
+              "south_vertex": {
+                "x": -36,
+                "y": 244
+              },
+              "east_vertex": {
+                "x": 64,
+                "y": 194
+              },
+              "west_vertex": {
+                "x": -136,
+                "y": 194
+              },
+              "center": {
+                "x": -36,
+                "y": 194
+              },
+              "is_walkable": null,
+              "edge_properties": {
+                "north_west": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "north_east": {
+                  "blocks_line_of_sight": true,
+                  "blocks_movement": true,
+                  "z_portal": null
+                },
+                "south_west": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "south_east": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                }
+              }
+            }
+          }
+        },
+        "upper_diamond": {
+          "north_vertex": {
+            "x": 64,
+            "y": -6
+          },
+          "south_vertex": {
+            "x": 64,
+            "y": 194
+          },
+          "east_vertex": {
+            "x": 264,
+            "y": 94
+          },
+          "west_vertex": {
+            "x": -136,
+            "y": 94
+          },
+          "center": {
+            "x": 64,
+            "y": 94
+          },
+          "z_offset": 100.0,
+          "north_east_midpoint": {
+            "x": 164,
+            "y": 44
+          },
+          "east_south_midpoint": {
+            "x": 164,
+            "y": 144
+          },
+          "south_west_midpoint": {
+            "x": -36,
+            "y": 144
+          },
+          "west_north_midpoint": {
+            "x": -36,
+            "y": 44
+          },
+          "sub_diamonds": {
+            "north": {
+              "quadrant": "north",
+              "north_vertex": {
+                "x": 64,
+                "y": -6
+              },
+              "south_vertex": {
+                "x": 64,
+                "y": 94
+              },
+              "east_vertex": {
+                "x": 164,
+                "y": 44
+              },
+              "west_vertex": {
+                "x": -36,
+                "y": 44
+              },
+              "center": {
+                "x": 64,
+                "y": 44
+              },
+              "is_walkable": true,
+              "edge_properties": {
+                "north_west": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "north_east": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": false,
+                  "z_portal": null
+                },
+                "south_west": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "south_east": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": 60.0
+                }
+              }
+            },
+            "south": {
+              "quadrant": "south",
+              "north_vertex": {
+                "x": 64,
+                "y": 94
+              },
+              "south_vertex": {
+                "x": 64,
+                "y": 194
+              },
+              "east_vertex": {
+                "x": 164,
+                "y": 144
+              },
+              "west_vertex": {
+                "x": -36,
+                "y": 144
+              },
+              "center": {
+                "x": 64,
+                "y": 144
+              },
+              "is_walkable": null,
+              "edge_properties": {
+                "north_west": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "north_east": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "south_west": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "south_east": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                }
+              }
+            },
+            "east": {
+              "quadrant": "east",
+              "north_vertex": {
+                "x": 164,
+                "y": 44
+              },
+              "south_vertex": {
+                "x": 164,
+                "y": 144
+              },
+              "east_vertex": {
+                "x": 264,
+                "y": 94
+              },
+              "west_vertex": {
+                "x": 64,
+                "y": 94
+              },
+              "center": {
+                "x": 164,
+                "y": 94
+              },
+              "is_walkable": false,
+              "edge_properties": {
+                "north_west": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "north_east": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "south_west": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "south_east": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                }
+              }
+            },
+            "west": {
+              "quadrant": "west",
+              "north_vertex": {
+                "x": -36,
+                "y": 44
+              },
+              "south_vertex": {
+                "x": -36,
+                "y": 144
+              },
+              "east_vertex": {
+                "x": 64,
+                "y": 94
+              },
+              "west_vertex": {
+                "x": -136,
+                "y": 94
+              },
+              "center": {
+                "x": -36,
+                "y": 94
+              },
+              "is_walkable": null,
+              "edge_properties": {
+                "north_west": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "north_east": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "south_west": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "south_east": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                }
+              }
+            }
+          }
+        },
+        "extra_diamonds": {
+          "mid_stairs": {
+            "north_vertex": {
+              "x": 65,
+              "y": 34
+            },
+            "south_vertex": {
+              "x": 65,
+              "y": 234
+            },
+            "east_vertex": {
+              "x": 265,
+              "y": 134
+            },
+            "west_vertex": {
+              "x": -135,
+              "y": 134
+            },
+            "center": {
+              "x": 65,
+              "y": 134
+            },
+            "z_offset": 60.0,
+            "north_east_midpoint": {
+              "x": 165,
+              "y": 84
+            },
+            "east_south_midpoint": {
+              "x": 165,
+              "y": 184
+            },
+            "south_west_midpoint": {
+              "x": -35,
+              "y": 184
+            },
+            "west_north_midpoint": {
+              "x": -35,
+              "y": 84
+            },
+            "sub_diamonds": {
+              "north": {
+                "quadrant": "north",
+                "north_vertex": {
+                  "x": 65,
+                  "y": 34
+                },
+                "south_vertex": {
+                  "x": 65,
+                  "y": 134
+                },
+                "east_vertex": {
+                  "x": 165,
+                  "y": 84
+                },
+                "west_vertex": {
+                  "x": -35,
+                  "y": 84
+                },
+                "center": {
+                  "x": 65,
+                  "y": 84
+                },
+                "is_walkable": false,
+                "edge_properties": {
+                  "north_west": {
+                    "blocks_line_of_sight": true,
+                    "blocks_movement": true,
+                    "z_portal": null
+                  },
+                  "north_east": {
+                    "blocks_line_of_sight": true,
+                    "blocks_movement": true,
+                    "z_portal": null
+                  },
+                  "south_west": {
+                    "blocks_line_of_sight": true,
+                    "blocks_movement": true,
+                    "z_portal": null
+                  },
+                  "south_east": {
+                    "blocks_line_of_sight": true,
+                    "blocks_movement": true,
+                    "z_portal": 100.0
+                  }
+                }
+              },
+              "south": {
+                "quadrant": "south",
+                "north_vertex": {
+                  "x": 65,
+                  "y": 134
+                },
+                "south_vertex": {
+                  "x": 65,
+                  "y": 234
+                },
+                "east_vertex": {
+                  "x": 165,
+                  "y": 184
+                },
+                "west_vertex": {
+                  "x": -35,
+                  "y": 184
+                },
+                "center": {
+                  "x": 65,
+                  "y": 184
+                },
+                "is_walkable": null,
+                "edge_properties": {
+                  "north_west": {
+                    "blocks_line_of_sight": null,
+                    "blocks_movement": null,
+                    "z_portal": null
+                  },
+                  "north_east": {
+                    "blocks_line_of_sight": null,
+                    "blocks_movement": null,
+                    "z_portal": null
+                  },
+                  "south_west": {
+                    "blocks_line_of_sight": null,
+                    "blocks_movement": null,
+                    "z_portal": null
+                  },
+                  "south_east": {
+                    "blocks_line_of_sight": null,
+                    "blocks_movement": null,
+                    "z_portal": null
+                  }
+                }
+              },
+              "east": {
+                "quadrant": "east",
+                "north_vertex": {
+                  "x": 165,
+                  "y": 84
+                },
+                "south_vertex": {
+                  "x": 165,
+                  "y": 184
+                },
+                "east_vertex": {
+                  "x": 265,
+                  "y": 134
+                },
+                "west_vertex": {
+                  "x": 65,
+                  "y": 134
+                },
+                "center": {
+                  "x": 165,
+                  "y": 134
+                },
+                "is_walkable": true,
+                "edge_properties": {
+                  "north_west": {
+                    "blocks_line_of_sight": true,
+                    "blocks_movement": true,
+                    "z_portal": null
+                  },
+                  "north_east": {
+                    "blocks_line_of_sight": null,
+                    "blocks_movement": false,
+                    "z_portal": null
+                  },
+                  "south_west": {
+                    "blocks_line_of_sight": null,
+                    "blocks_movement": null,
+                    "z_portal": null
+                  },
+                  "south_east": {
+                    "blocks_line_of_sight": null,
+                    "blocks_movement": null,
+                    "z_portal": 0.0
+                  }
+                }
+              },
+              "west": {
+                "quadrant": "west",
+                "north_vertex": {
+                  "x": -35,
+                  "y": 84
+                },
+                "south_vertex": {
+                  "x": -35,
+                  "y": 184
+                },
+                "east_vertex": {
+                  "x": 65,
+                  "y": 134
+                },
+                "west_vertex": {
+                  "x": -135,
+                  "y": 134
+                },
+                "center": {
+                  "x": -35,
+                  "y": 134
+                },
+                "is_walkable": null,
+                "edge_properties": {
+                  "north_west": {
+                    "blocks_line_of_sight": null,
+                    "blocks_movement": null,
+                    "z_portal": null
+                  },
+                  "north_east": {
+                    "blocks_line_of_sight": true,
+                    "blocks_movement": true,
+                    "z_portal": null
+                  },
+                  "south_west": {
+                    "blocks_line_of_sight": null,
+                    "blocks_movement": null,
+                    "z_portal": null
+                  },
+                  "south_east": {
+                    "blocks_line_of_sight": null,
+                    "blocks_movement": null,
+                    "z_portal": null
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "custom_keypoints": {}
+    },
+    {
+      "sprite_index": 1,
+      "original_size": [
+        269,
+        239
+      ],
+      "asset_type": "stair",
+      "frame_upper_z_offset": 0,
+      "bbox": {
+        "x": 4,
+        "y": 44,
+        "width": 261,
+        "height": 191
+      },
+      "diamond_info": {
+        "diamond_height": -9.5,
+        "predicted_flat_height": 200.5,
+        "effective_height": 191.0,
+        "line_y": 244.5,
+        "diamond_width": 401.0,
+        "lower_z_offset": 200.5,
+        "upper_z_offset": 0.0,
+        "diamonds_z_offset": 100.0,
+        "lower_diamond": {
+          "north_vertex": {
+            "x": 64,
+            "y": 44
+          },
+          "south_vertex": {
+            "x": 64,
+            "y": 244
+          },
+          "east_vertex": {
+            "x": 264,
+            "y": 144
+          },
+          "west_vertex": {
+            "x": -136,
+            "y": 144
+          },
+          "center": {
+            "x": 64,
+            "y": 144
+          },
+          "z_offset": 0.0,
+          "north_east_midpoint": {
+            "x": 164,
+            "y": 94
+          },
+          "east_south_midpoint": {
+            "x": 164,
+            "y": 194
+          },
+          "south_west_midpoint": {
+            "x": -36,
+            "y": 194
+          },
+          "west_north_midpoint": {
+            "x": -36,
+            "y": 94
+          },
+          "sub_diamonds": {
+            "north": {
+              "quadrant": "north",
+              "north_vertex": {
+                "x": 64,
+                "y": 44
+              },
+              "south_vertex": {
+                "x": 64,
+                "y": 144
+              },
+              "east_vertex": {
+                "x": 164,
+                "y": 94
+              },
+              "west_vertex": {
+                "x": -36,
+                "y": 94
+              },
+              "center": {
+                "x": 64,
+                "y": 94
+              },
+              "is_walkable": null,
+              "edge_properties": {
+                "north_west": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "north_east": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "south_west": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "south_east": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": true,
+                  "z_portal": null
+                }
+              }
+            },
+            "south": {
+              "quadrant": "south",
+              "north_vertex": {
+                "x": 64,
+                "y": 144
+              },
+              "south_vertex": {
+                "x": 64,
+                "y": 244
+              },
+              "east_vertex": {
+                "x": 164,
+                "y": 194
+              },
+              "west_vertex": {
+                "x": -36,
+                "y": 194
+              },
+              "center": {
+                "x": 64,
+                "y": 194
+              },
+              "is_walkable": false,
+              "edge_properties": {
+                "north_west": {
+                  "blocks_line_of_sight": true,
+                  "blocks_movement": true,
+                  "z_portal": null
+                },
+                "north_east": {
+                  "blocks_line_of_sight": true,
+                  "blocks_movement": true,
+                  "z_portal": null
+                },
+                "south_west": {
+                  "blocks_line_of_sight": true,
+                  "blocks_movement": true,
+                  "z_portal": null
+                },
+                "south_east": {
+                  "blocks_line_of_sight": true,
+                  "blocks_movement": true,
+                  "z_portal": null
+                }
+              }
+            },
+            "east": {
+              "quadrant": "east",
+              "north_vertex": {
+                "x": 164,
+                "y": 94
+              },
+              "south_vertex": {
+                "x": 164,
+                "y": 194
+              },
+              "east_vertex": {
+                "x": 264,
+                "y": 144
+              },
+              "west_vertex": {
+                "x": 64,
+                "y": 144
+              },
+              "center": {
+                "x": 164,
+                "y": 144
+              },
+              "is_walkable": false,
+              "edge_properties": {
+                "north_west": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": true,
+                  "z_portal": null
+                },
+                "north_east": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": true,
+                  "z_portal": 60.0
+                },
+                "south_west": {
+                  "blocks_line_of_sight": true,
+                  "blocks_movement": true,
+                  "z_portal": null
+                },
+                "south_east": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": true,
+                  "z_portal": null
+                }
+              }
+            },
+            "west": {
+              "quadrant": "west",
+              "north_vertex": {
+                "x": -36,
+                "y": 94
+              },
+              "south_vertex": {
+                "x": -36,
+                "y": 194
+              },
+              "east_vertex": {
+                "x": 64,
+                "y": 144
+              },
+              "west_vertex": {
+                "x": -136,
+                "y": 144
+              },
+              "center": {
+                "x": -36,
+                "y": 144
+              },
+              "is_walkable": null,
+              "edge_properties": {
+                "north_west": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "north_east": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "south_west": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "south_east": {
+                  "blocks_line_of_sight": true,
+                  "blocks_movement": true,
+                  "z_portal": null
+                }
+              }
+            }
+          }
+        },
+        "upper_diamond": {
+          "north_vertex": {
+            "x": 64,
+            "y": -56
+          },
+          "south_vertex": {
+            "x": 64,
+            "y": 144
+          },
+          "east_vertex": {
+            "x": 264,
+            "y": 44
+          },
+          "west_vertex": {
+            "x": -136,
+            "y": 44
+          },
+          "center": {
+            "x": 64,
+            "y": 44
+          },
+          "z_offset": 100.0,
+          "north_east_midpoint": {
+            "x": 164,
+            "y": -6
+          },
+          "east_south_midpoint": {
+            "x": 164,
+            "y": 94
+          },
+          "south_west_midpoint": {
+            "x": -36,
+            "y": 94
+          },
+          "west_north_midpoint": {
+            "x": -36,
+            "y": -6
+          },
+          "sub_diamonds": {
+            "north": {
+              "quadrant": "north",
+              "north_vertex": {
+                "x": 64,
+                "y": -56
+              },
+              "south_vertex": {
+                "x": 64,
+                "y": 44
+              },
+              "east_vertex": {
+                "x": 164,
+                "y": -6
+              },
+              "west_vertex": {
+                "x": -36,
+                "y": -6
+              },
+              "center": {
+                "x": 64,
+                "y": -6
+              },
+              "is_walkable": null,
+              "edge_properties": {
+                "north_west": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "north_east": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "south_west": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "south_east": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                }
+              }
+            },
+            "south": {
+              "quadrant": "south",
+              "north_vertex": {
+                "x": 64,
+                "y": 44
+              },
+              "south_vertex": {
+                "x": 64,
+                "y": 144
+              },
+              "east_vertex": {
+                "x": 164,
+                "y": 94
+              },
+              "west_vertex": {
+                "x": -36,
+                "y": 94
+              },
+              "center": {
+                "x": 64,
+                "y": 94
+              },
+              "is_walkable": true,
+              "edge_properties": {
+                "north_west": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "north_east": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "south_west": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "south_east": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": false,
+                  "z_portal": null
+                }
+              }
+            },
+            "east": {
+              "quadrant": "east",
+              "north_vertex": {
+                "x": 164,
+                "y": -6
+              },
+              "south_vertex": {
+                "x": 164,
+                "y": 94
+              },
+              "east_vertex": {
+                "x": 264,
+                "y": 44
+              },
+              "west_vertex": {
+                "x": 64,
+                "y": 44
+              },
+              "center": {
+                "x": 164,
+                "y": 44
+              },
+              "is_walkable": false,
+              "edge_properties": {
+                "north_west": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "north_east": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "south_west": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": 60.0
+                },
+                "south_east": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                }
+              }
+            },
+            "west": {
+              "quadrant": "west",
+              "north_vertex": {
+                "x": -36,
+                "y": -6
+              },
+              "south_vertex": {
+                "x": -36,
+                "y": 94
+              },
+              "east_vertex": {
+                "x": 64,
+                "y": 44
+              },
+              "west_vertex": {
+                "x": -136,
+                "y": 44
+              },
+              "center": {
+                "x": -36,
+                "y": 44
+              },
+              "is_walkable": null,
+              "edge_properties": {
+                "north_west": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "north_east": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "south_west": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "south_east": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                }
+              }
+            }
+          }
+        },
+        "extra_diamonds": {
+          "mid_stairs": {
+            "north_vertex": {
+              "x": 64,
+              "y": -16
+            },
+            "south_vertex": {
+              "x": 64,
+              "y": 184
+            },
+            "east_vertex": {
+              "x": 264,
+              "y": 84
+            },
+            "west_vertex": {
+              "x": -136,
+              "y": 84
+            },
+            "center": {
+              "x": 64,
+              "y": 84
+            },
+            "z_offset": 60.0,
+            "north_east_midpoint": {
+              "x": 164,
+              "y": 34
+            },
+            "east_south_midpoint": {
+              "x": 164,
+              "y": 134
+            },
+            "south_west_midpoint": {
+              "x": -36,
+              "y": 134
+            },
+            "west_north_midpoint": {
+              "x": -36,
+              "y": 34
+            },
+            "sub_diamonds": {
+              "north": {
+                "quadrant": "north",
+                "north_vertex": {
+                  "x": 64,
+                  "y": -16
+                },
+                "south_vertex": {
+                  "x": 64,
+                  "y": 84
+                },
+                "east_vertex": {
+                  "x": 164,
+                  "y": 34
+                },
+                "west_vertex": {
+                  "x": -36,
+                  "y": 34
+                },
+                "center": {
+                  "x": 64,
+                  "y": 34
+                },
+                "is_walkable": null,
+                "edge_properties": {
+                  "north_west": {
+                    "blocks_line_of_sight": null,
+                    "blocks_movement": null,
+                    "z_portal": null
+                  },
+                  "north_east": {
+                    "blocks_line_of_sight": null,
+                    "blocks_movement": null,
+                    "z_portal": null
+                  },
+                  "south_west": {
+                    "blocks_line_of_sight": null,
+                    "blocks_movement": null,
+                    "z_portal": null
+                  },
+                  "south_east": {
+                    "blocks_line_of_sight": null,
+                    "blocks_movement": null,
+                    "z_portal": null
+                  }
+                }
+              },
+              "south": {
+                "quadrant": "south",
+                "north_vertex": {
+                  "x": 64,
+                  "y": 84
+                },
+                "south_vertex": {
+                  "x": 64,
+                  "y": 184
+                },
+                "east_vertex": {
+                  "x": 164,
+                  "y": 134
+                },
+                "west_vertex": {
+                  "x": -36,
+                  "y": 134
+                },
+                "center": {
+                  "x": 64,
+                  "y": 134
+                },
+                "is_walkable": false,
+                "edge_properties": {
+                  "north_west": {
+                    "blocks_line_of_sight": true,
+                    "blocks_movement": true,
+                    "z_portal": null
+                  },
+                  "north_east": {
+                    "blocks_line_of_sight": true,
+                    "blocks_movement": true,
+                    "z_portal": null
+                  },
+                  "south_west": {
+                    "blocks_line_of_sight": true,
+                    "blocks_movement": true,
+                    "z_portal": null
+                  },
+                  "south_east": {
+                    "blocks_line_of_sight": true,
+                    "blocks_movement": true,
+                    "z_portal": null
+                  }
+                }
+              },
+              "east": {
+                "quadrant": "east",
+                "north_vertex": {
+                  "x": 164,
+                  "y": 34
+                },
+                "south_vertex": {
+                  "x": 164,
+                  "y": 134
+                },
+                "east_vertex": {
+                  "x": 264,
+                  "y": 84
+                },
+                "west_vertex": {
+                  "x": 64,
+                  "y": 84
+                },
+                "center": {
+                  "x": 164,
+                  "y": 84
+                },
+                "is_walkable": true,
+                "edge_properties": {
+                  "north_west": {
+                    "blocks_line_of_sight": null,
+                    "blocks_movement": null,
+                    "z_portal": null
+                  },
+                  "north_east": {
+                    "blocks_line_of_sight": null,
+                    "blocks_movement": null,
+                    "z_portal": 0.0
+                  },
+                  "south_west": {
+                    "blocks_line_of_sight": true,
+                    "blocks_movement": true,
+                    "z_portal": 100.0
+                  },
+                  "south_east": {
+                    "blocks_line_of_sight": null,
+                    "blocks_movement": false,
+                    "z_portal": null
+                  }
+                }
+              },
+              "west": {
+                "quadrant": "west",
+                "north_vertex": {
+                  "x": -36,
+                  "y": 34
+                },
+                "south_vertex": {
+                  "x": -36,
+                  "y": 134
+                },
+                "east_vertex": {
+                  "x": 64,
+                  "y": 84
+                },
+                "west_vertex": {
+                  "x": -136,
+                  "y": 84
+                },
+                "center": {
+                  "x": -36,
+                  "y": 84
+                },
+                "is_walkable": null,
+                "edge_properties": {
+                  "north_west": {
+                    "blocks_line_of_sight": null,
+                    "blocks_movement": null,
+                    "z_portal": null
+                  },
+                  "north_east": {
+                    "blocks_line_of_sight": null,
+                    "blocks_movement": null,
+                    "z_portal": null
+                  },
+                  "south_west": {
+                    "blocks_line_of_sight": null,
+                    "blocks_movement": null,
+                    "z_portal": null
+                  },
+                  "south_east": {
+                    "blocks_line_of_sight": true,
+                    "blocks_movement": true,
+                    "z_portal": null
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "custom_keypoints": {}
+    },
+    {
+      "sprite_index": 2,
+      "original_size": [
+        269,
+        239
+      ],
+      "asset_type": "stair",
+      "frame_upper_z_offset": 0,
+      "bbox": {
+        "x": 4,
+        "y": 44,
+        "width": 261,
+        "height": 191
+      },
+      "diamond_info": {
+        "diamond_height": -9.5,
+        "predicted_flat_height": 200.5,
+        "effective_height": 191.0,
+        "line_y": 244.5,
+        "diamond_width": 401.0,
+        "lower_z_offset": 200.5,
+        "upper_z_offset": 0.0,
+        "diamonds_z_offset": 100.0,
+        "lower_diamond": {
+          "north_vertex": {
+            "x": 64,
+            "y": 94
+          },
+          "south_vertex": {
+            "x": 64,
+            "y": 294
+          },
+          "east_vertex": {
+            "x": 264,
+            "y": 194
+          },
+          "west_vertex": {
+            "x": -136,
+            "y": 194
+          },
+          "center": {
+            "x": 64,
+            "y": 194
+          },
+          "z_offset": 0.0,
+          "north_east_midpoint": {
+            "x": 164,
+            "y": 144
+          },
+          "east_south_midpoint": {
+            "x": 164,
+            "y": 244
+          },
+          "south_west_midpoint": {
+            "x": -36,
+            "y": 244
+          },
+          "west_north_midpoint": {
+            "x": -36,
+            "y": 144
+          },
+          "sub_diamonds": {
+            "north": {
+              "quadrant": "north",
+              "north_vertex": {
+                "x": 64,
+                "y": 94
+              },
+              "south_vertex": {
+                "x": 64,
+                "y": 194
+              },
+              "east_vertex": {
+                "x": 164,
+                "y": 144
+              },
+              "west_vertex": {
+                "x": -36,
+                "y": 144
+              },
+              "center": {
+                "x": 64,
+                "y": 144
+              },
+              "is_walkable": false,
+              "edge_properties": {
+                "north_west": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": true,
+                  "z_portal": 60.0
+                },
+                "north_east": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": true,
+                  "z_portal": 60.0
+                },
+                "south_west": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": true,
+                  "z_portal": 60.0
+                },
+                "south_east": {
+                  "blocks_line_of_sight": true,
+                  "blocks_movement": true,
+                  "z_portal": null
+                }
+              }
+            },
+            "south": {
+              "quadrant": "south",
+              "north_vertex": {
+                "x": 64,
+                "y": 194
+              },
+              "south_vertex": {
+                "x": 64,
+                "y": 294
+              },
+              "east_vertex": {
+                "x": 164,
+                "y": 244
+              },
+              "west_vertex": {
+                "x": -36,
+                "y": 244
+              },
+              "center": {
+                "x": 64,
+                "y": 244
+              },
+              "is_walkable": null,
+              "edge_properties": {
+                "north_west": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "north_east": {
+                  "blocks_line_of_sight": true,
+                  "blocks_movement": true,
+                  "z_portal": null
+                },
+                "south_west": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "south_east": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                }
+              }
+            },
+            "east": {
+              "quadrant": "east",
+              "north_vertex": {
+                "x": 164,
+                "y": 144
+              },
+              "south_vertex": {
+                "x": 164,
+                "y": 244
+              },
+              "east_vertex": {
+                "x": 264,
+                "y": 194
+              },
+              "west_vertex": {
+                "x": 64,
+                "y": 194
+              },
+              "center": {
+                "x": 164,
+                "y": 194
+              },
+              "is_walkable": false,
+              "edge_properties": {
+                "north_west": {
+                  "blocks_line_of_sight": true,
+                  "blocks_movement": true,
+                  "z_portal": null
+                },
+                "north_east": {
+                  "blocks_line_of_sight": true,
+                  "blocks_movement": true,
+                  "z_portal": null
+                },
+                "south_west": {
+                  "blocks_line_of_sight": true,
+                  "blocks_movement": true,
+                  "z_portal": null
+                },
+                "south_east": {
+                  "blocks_line_of_sight": true,
+                  "blocks_movement": true,
+                  "z_portal": null
+                }
+              }
+            },
+            "west": {
+              "quadrant": "west",
+              "north_vertex": {
+                "x": -36,
+                "y": 144
+              },
+              "south_vertex": {
+                "x": -36,
+                "y": 244
+              },
+              "east_vertex": {
+                "x": 64,
+                "y": 194
+              },
+              "west_vertex": {
+                "x": -136,
+                "y": 194
+              },
+              "center": {
+                "x": -36,
+                "y": 194
+              },
+              "is_walkable": null,
+              "edge_properties": {
+                "north_west": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "north_east": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": true,
+                  "z_portal": null
+                },
+                "south_west": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "south_east": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                }
+              }
+            }
+          }
+        },
+        "upper_diamond": {
+          "north_vertex": {
+            "x": 64,
+            "y": -6
+          },
+          "south_vertex": {
+            "x": 64,
+            "y": 194
+          },
+          "east_vertex": {
+            "x": 264,
+            "y": 94
+          },
+          "west_vertex": {
+            "x": -136,
+            "y": 94
+          },
+          "center": {
+            "x": 64,
+            "y": 94
+          },
+          "z_offset": 100.0,
+          "north_east_midpoint": {
+            "x": 164,
+            "y": 44
+          },
+          "east_south_midpoint": {
+            "x": 164,
+            "y": 144
+          },
+          "south_west_midpoint": {
+            "x": -36,
+            "y": 144
+          },
+          "west_north_midpoint": {
+            "x": -36,
+            "y": 44
+          },
+          "sub_diamonds": {
+            "north": {
+              "quadrant": "north",
+              "north_vertex": {
+                "x": 64,
+                "y": -6
+              },
+              "south_vertex": {
+                "x": 64,
+                "y": 94
+              },
+              "east_vertex": {
+                "x": 164,
+                "y": 44
+              },
+              "west_vertex": {
+                "x": -36,
+                "y": 44
+              },
+              "center": {
+                "x": 64,
+                "y": 44
+              },
+              "is_walkable": false,
+              "edge_properties": {
+                "north_west": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "north_east": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "south_west": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "south_east": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": 60.0
+                }
+              }
+            },
+            "south": {
+              "quadrant": "south",
+              "north_vertex": {
+                "x": 64,
+                "y": 94
+              },
+              "south_vertex": {
+                "x": 64,
+                "y": 194
+              },
+              "east_vertex": {
+                "x": 164,
+                "y": 144
+              },
+              "west_vertex": {
+                "x": -36,
+                "y": 144
+              },
+              "center": {
+                "x": 64,
+                "y": 144
+              },
+              "is_walkable": null,
+              "edge_properties": {
+                "north_west": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "north_east": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "south_west": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "south_east": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                }
+              }
+            },
+            "east": {
+              "quadrant": "east",
+              "north_vertex": {
+                "x": 164,
+                "y": 44
+              },
+              "south_vertex": {
+                "x": 164,
+                "y": 144
+              },
+              "east_vertex": {
+                "x": 264,
+                "y": 94
+              },
+              "west_vertex": {
+                "x": 64,
+                "y": 94
+              },
+              "center": {
+                "x": 164,
+                "y": 94
+              },
+              "is_walkable": true,
+              "edge_properties": {
+                "north_west": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "north_east": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": false,
+                  "z_portal": null
+                },
+                "south_west": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "south_east": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": false,
+                  "z_portal": null
+                }
+              }
+            },
+            "west": {
+              "quadrant": "west",
+              "north_vertex": {
+                "x": -36,
+                "y": 44
+              },
+              "south_vertex": {
+                "x": -36,
+                "y": 144
+              },
+              "east_vertex": {
+                "x": 64,
+                "y": 94
+              },
+              "west_vertex": {
+                "x": -136,
+                "y": 94
+              },
+              "center": {
+                "x": -36,
+                "y": 94
+              },
+              "is_walkable": null,
+              "edge_properties": {
+                "north_west": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "north_east": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "south_west": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "south_east": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                }
+              }
+            }
+          }
+        },
+        "extra_diamonds": {
+          "mid_stairs": {
+            "north_vertex": {
+              "x": 64,
+              "y": 34
+            },
+            "south_vertex": {
+              "x": 64,
+              "y": 234
+            },
+            "east_vertex": {
+              "x": 264,
+              "y": 134
+            },
+            "west_vertex": {
+              "x": -136,
+              "y": 134
+            },
+            "center": {
+              "x": 64,
+              "y": 134
+            },
+            "z_offset": 60.0,
+            "north_east_midpoint": {
+              "x": 164,
+              "y": 84
+            },
+            "east_south_midpoint": {
+              "x": 164,
+              "y": 184
+            },
+            "south_west_midpoint": {
+              "x": -36,
+              "y": 184
+            },
+            "west_north_midpoint": {
+              "x": -36,
+              "y": 84
+            },
+            "sub_diamonds": {
+              "north": {
+                "quadrant": "north",
+                "north_vertex": {
+                  "x": 64,
+                  "y": 34
+                },
+                "south_vertex": {
+                  "x": 64,
+                  "y": 134
+                },
+                "east_vertex": {
+                  "x": 164,
+                  "y": 84
+                },
+                "west_vertex": {
+                  "x": -36,
+                  "y": 84
+                },
+                "center": {
+                  "x": 64,
+                  "y": 84
+                },
+                "is_walkable": true,
+                "edge_properties": {
+                  "north_west": {
+                    "blocks_line_of_sight": null,
+                    "blocks_movement": null,
+                    "z_portal": 0.0
+                  },
+                  "north_east": {
+                    "blocks_line_of_sight": null,
+                    "blocks_movement": false,
+                    "z_portal": 0.0
+                  },
+                  "south_west": {
+                    "blocks_line_of_sight": null,
+                    "blocks_movement": null,
+                    "z_portal": 0.0
+                  },
+                  "south_east": {
+                    "blocks_line_of_sight": true,
+                    "blocks_movement": true,
+                    "z_portal": 100.0
+                  }
+                }
+              },
+              "south": {
+                "quadrant": "south",
+                "north_vertex": {
+                  "x": 64,
+                  "y": 134
+                },
+                "south_vertex": {
+                  "x": 64,
+                  "y": 234
+                },
+                "east_vertex": {
+                  "x": 164,
+                  "y": 184
+                },
+                "west_vertex": {
+                  "x": -36,
+                  "y": 184
+                },
+                "center": {
+                  "x": 64,
+                  "y": 184
+                },
+                "is_walkable": null,
+                "edge_properties": {
+                  "north_west": {
+                    "blocks_line_of_sight": null,
+                    "blocks_movement": null,
+                    "z_portal": null
+                  },
+                  "north_east": {
+                    "blocks_line_of_sight": true,
+                    "blocks_movement": true,
+                    "z_portal": null
+                  },
+                  "south_west": {
+                    "blocks_line_of_sight": null,
+                    "blocks_movement": null,
+                    "z_portal": null
+                  },
+                  "south_east": {
+                    "blocks_line_of_sight": null,
+                    "blocks_movement": null,
+                    "z_portal": null
+                  }
+                }
+              },
+              "east": {
+                "quadrant": "east",
+                "north_vertex": {
+                  "x": 164,
+                  "y": 84
+                },
+                "south_vertex": {
+                  "x": 164,
+                  "y": 184
+                },
+                "east_vertex": {
+                  "x": 264,
+                  "y": 134
+                },
+                "west_vertex": {
+                  "x": 64,
+                  "y": 134
+                },
+                "center": {
+                  "x": 164,
+                  "y": 134
+                },
+                "is_walkable": false,
+                "edge_properties": {
+                  "north_west": {
+                    "blocks_line_of_sight": true,
+                    "blocks_movement": true,
+                    "z_portal": null
+                  },
+                  "north_east": {
+                    "blocks_line_of_sight": true,
+                    "blocks_movement": true,
+                    "z_portal": null
+                  },
+                  "south_west": {
+                    "blocks_line_of_sight": true,
+                    "blocks_movement": true,
+                    "z_portal": null
+                  },
+                  "south_east": {
+                    "blocks_line_of_sight": true,
+                    "blocks_movement": true,
+                    "z_portal": null
+                  }
+                }
+              },
+              "west": {
+                "quadrant": "west",
+                "north_vertex": {
+                  "x": -36,
+                  "y": 84
+                },
+                "south_vertex": {
+                  "x": -36,
+                  "y": 184
+                },
+                "east_vertex": {
+                  "x": 64,
+                  "y": 134
+                },
+                "west_vertex": {
+                  "x": -136,
+                  "y": 134
+                },
+                "center": {
+                  "x": -36,
+                  "y": 134
+                },
+                "is_walkable": null,
+                "edge_properties": {
+                  "north_west": {
+                    "blocks_line_of_sight": null,
+                    "blocks_movement": null,
+                    "z_portal": null
+                  },
+                  "north_east": {
+                    "blocks_line_of_sight": null,
+                    "blocks_movement": null,
+                    "z_portal": null
+                  },
+                  "south_west": {
+                    "blocks_line_of_sight": null,
+                    "blocks_movement": null,
+                    "z_portal": null
+                  },
+                  "south_east": {
+                    "blocks_line_of_sight": null,
+                    "blocks_movement": null,
+                    "z_portal": null
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "custom_keypoints": {}
+    },
+    {
+      "sprite_index": 3,
+      "original_size": [
+        269,
+        239
+      ],
+      "asset_type": "stair",
+      "frame_upper_z_offset": 0,
+      "bbox": {
+        "x": 4,
+        "y": 4,
+        "width": 261,
+        "height": 231
+      },
+      "diamond_info": {
+        "diamond_height": 30.5,
+        "predicted_flat_height": 200.5,
+        "effective_height": 231.0,
+        "line_y": 204.5,
+        "diamond_width": 401.0,
+        "lower_z_offset": 200.5,
+        "upper_z_offset": 0.0,
+        "diamonds_z_offset": 100.0,
+        "lower_diamond": {
+          "north_vertex": {
+            "x": 64,
+            "y": 44
+          },
+          "south_vertex": {
+            "x": 64,
+            "y": 244
+          },
+          "east_vertex": {
+            "x": 264,
+            "y": 144
+          },
+          "west_vertex": {
+            "x": -136,
+            "y": 144
+          },
+          "center": {
+            "x": 64,
+            "y": 144
+          },
+          "z_offset": 0.0,
+          "north_east_midpoint": {
+            "x": 164,
+            "y": 94
+          },
+          "east_south_midpoint": {
+            "x": 164,
+            "y": 194
+          },
+          "south_west_midpoint": {
+            "x": -36,
+            "y": 194
+          },
+          "west_north_midpoint": {
+            "x": -36,
+            "y": 94
+          },
+          "sub_diamonds": {
+            "north": {
+              "quadrant": "north",
+              "north_vertex": {
+                "x": 64,
+                "y": 44
+              },
+              "south_vertex": {
+                "x": 64,
+                "y": 144
+              },
+              "east_vertex": {
+                "x": 164,
+                "y": 94
+              },
+              "west_vertex": {
+                "x": -36,
+                "y": 94
+              },
+              "center": {
+                "x": 64,
+                "y": 94
+              },
+              "is_walkable": null,
+              "edge_properties": {
+                "north_west": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "north_east": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "south_west": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "south_east": {
+                  "blocks_line_of_sight": true,
+                  "blocks_movement": true,
+                  "z_portal": null
+                }
+              }
+            },
+            "south": {
+              "quadrant": "south",
+              "north_vertex": {
+                "x": 64,
+                "y": 144
+              },
+              "south_vertex": {
+                "x": 64,
+                "y": 244
+              },
+              "east_vertex": {
+                "x": 164,
+                "y": 194
+              },
+              "west_vertex": {
+                "x": -36,
+                "y": 194
+              },
+              "center": {
+                "x": 64,
+                "y": 194
+              },
+              "is_walkable": false,
+              "edge_properties": {
+                "north_west": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": true,
+                  "z_portal": 60.0
+                },
+                "north_east": {
+                  "blocks_line_of_sight": true,
+                  "blocks_movement": true,
+                  "z_portal": null
+                },
+                "south_west": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": true,
+                  "z_portal": 60.0
+                },
+                "south_east": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": true,
+                  "z_portal": 60.0
+                }
+              }
+            },
+            "east": {
+              "quadrant": "east",
+              "north_vertex": {
+                "x": 164,
+                "y": 94
+              },
+              "south_vertex": {
+                "x": 164,
+                "y": 194
+              },
+              "east_vertex": {
+                "x": 264,
+                "y": 144
+              },
+              "west_vertex": {
+                "x": 64,
+                "y": 144
+              },
+              "center": {
+                "x": 164,
+                "y": 144
+              },
+              "is_walkable": false,
+              "edge_properties": {
+                "north_west": {
+                  "blocks_line_of_sight": true,
+                  "blocks_movement": true,
+                  "z_portal": null
+                },
+                "north_east": {
+                  "blocks_line_of_sight": true,
+                  "blocks_movement": true,
+                  "z_portal": null
+                },
+                "south_west": {
+                  "blocks_line_of_sight": true,
+                  "blocks_movement": true,
+                  "z_portal": null
+                },
+                "south_east": {
+                  "blocks_line_of_sight": true,
+                  "blocks_movement": true,
+                  "z_portal": null
+                }
+              }
+            },
+            "west": {
+              "quadrant": "west",
+              "north_vertex": {
+                "x": -36,
+                "y": 94
+              },
+              "south_vertex": {
+                "x": -36,
+                "y": 194
+              },
+              "east_vertex": {
+                "x": 64,
+                "y": 144
+              },
+              "west_vertex": {
+                "x": -136,
+                "y": 144
+              },
+              "center": {
+                "x": -36,
+                "y": 144
+              },
+              "is_walkable": null,
+              "edge_properties": {
+                "north_west": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "north_east": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "south_west": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "south_east": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": true,
+                  "z_portal": null
+                }
+              }
+            }
+          }
+        },
+        "upper_diamond": {
+          "north_vertex": {
+            "x": 64,
+            "y": -56
+          },
+          "south_vertex": {
+            "x": 64,
+            "y": 144
+          },
+          "east_vertex": {
+            "x": 264,
+            "y": 44
+          },
+          "west_vertex": {
+            "x": -136,
+            "y": 44
+          },
+          "center": {
+            "x": 64,
+            "y": 44
+          },
+          "z_offset": 100.0,
+          "north_east_midpoint": {
+            "x": 164,
+            "y": -6
+          },
+          "east_south_midpoint": {
+            "x": 164,
+            "y": 94
+          },
+          "south_west_midpoint": {
+            "x": -36,
+            "y": 94
+          },
+          "west_north_midpoint": {
+            "x": -36,
+            "y": -6
+          },
+          "sub_diamonds": {
+            "north": {
+              "quadrant": "north",
+              "north_vertex": {
+                "x": 64,
+                "y": -56
+              },
+              "south_vertex": {
+                "x": 64,
+                "y": 44
+              },
+              "east_vertex": {
+                "x": 164,
+                "y": -6
+              },
+              "west_vertex": {
+                "x": -36,
+                "y": -6
+              },
+              "center": {
+                "x": 64,
+                "y": -6
+              },
+              "is_walkable": null,
+              "edge_properties": {
+                "north_west": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "north_east": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "south_west": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "south_east": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                }
+              }
+            },
+            "south": {
+              "quadrant": "south",
+              "north_vertex": {
+                "x": 64,
+                "y": 44
+              },
+              "south_vertex": {
+                "x": 64,
+                "y": 144
+              },
+              "east_vertex": {
+                "x": 164,
+                "y": 94
+              },
+              "west_vertex": {
+                "x": -36,
+                "y": 94
+              },
+              "center": {
+                "x": 64,
+                "y": 94
+              },
+              "is_walkable": false,
+              "edge_properties": {
+                "north_west": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "north_east": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": 60.0
+                },
+                "south_west": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "south_east": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                }
+              }
+            },
+            "east": {
+              "quadrant": "east",
+              "north_vertex": {
+                "x": 164,
+                "y": -6
+              },
+              "south_vertex": {
+                "x": 164,
+                "y": 94
+              },
+              "east_vertex": {
+                "x": 264,
+                "y": 44
+              },
+              "west_vertex": {
+                "x": 64,
+                "y": 44
+              },
+              "center": {
+                "x": 164,
+                "y": 44
+              },
+              "is_walkable": true,
+              "edge_properties": {
+                "north_west": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "north_east": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": false,
+                  "z_portal": null
+                },
+                "south_west": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "south_east": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": false,
+                  "z_portal": null
+                }
+              }
+            },
+            "west": {
+              "quadrant": "west",
+              "north_vertex": {
+                "x": -36,
+                "y": -6
+              },
+              "south_vertex": {
+                "x": -36,
+                "y": 94
+              },
+              "east_vertex": {
+                "x": 64,
+                "y": 44
+              },
+              "west_vertex": {
+                "x": -136,
+                "y": 44
+              },
+              "center": {
+                "x": -36,
+                "y": 44
+              },
+              "is_walkable": null,
+              "edge_properties": {
+                "north_west": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "north_east": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "south_west": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                },
+                "south_east": {
+                  "blocks_line_of_sight": null,
+                  "blocks_movement": null,
+                  "z_portal": null
+                }
+              }
+            }
+          }
+        },
+        "extra_diamonds": {
+          "mid_stairs": {
+            "north_vertex": {
+              "x": 64,
+              "y": -16
+            },
+            "south_vertex": {
+              "x": 64,
+              "y": 184
+            },
+            "east_vertex": {
+              "x": 264,
+              "y": 84
+            },
+            "west_vertex": {
+              "x": -136,
+              "y": 84
+            },
+            "center": {
+              "x": 64,
+              "y": 84
+            },
+            "z_offset": 60.0,
+            "north_east_midpoint": {
+              "x": 164,
+              "y": 34
+            },
+            "east_south_midpoint": {
+              "x": 164,
+              "y": 134
+            },
+            "south_west_midpoint": {
+              "x": -36,
+              "y": 134
+            },
+            "west_north_midpoint": {
+              "x": -36,
+              "y": 34
+            },
+            "sub_diamonds": {
+              "north": {
+                "quadrant": "north",
+                "north_vertex": {
+                  "x": 64,
+                  "y": -16
+                },
+                "south_vertex": {
+                  "x": 64,
+                  "y": 84
+                },
+                "east_vertex": {
+                  "x": 164,
+                  "y": 34
+                },
+                "west_vertex": {
+                  "x": -36,
+                  "y": 34
+                },
+                "center": {
+                  "x": 64,
+                  "y": 34
+                },
+                "is_walkable": null,
+                "edge_properties": {
+                  "north_west": {
+                    "blocks_line_of_sight": null,
+                    "blocks_movement": null,
+                    "z_portal": null
+                  },
+                  "north_east": {
+                    "blocks_line_of_sight": null,
+                    "blocks_movement": null,
+                    "z_portal": null
+                  },
+                  "south_west": {
+                    "blocks_line_of_sight": null,
+                    "blocks_movement": null,
+                    "z_portal": null
+                  },
+                  "south_east": {
+                    "blocks_line_of_sight": true,
+                    "blocks_movement": true,
+                    "z_portal": null
+                  }
+                }
+              },
+              "south": {
+                "quadrant": "south",
+                "north_vertex": {
+                  "x": 64,
+                  "y": 84
+                },
+                "south_vertex": {
+                  "x": 64,
+                  "y": 184
+                },
+                "east_vertex": {
+                  "x": 164,
+                  "y": 134
+                },
+                "west_vertex": {
+                  "x": -36,
+                  "y": 134
+                },
+                "center": {
+                  "x": 64,
+                  "y": 134
+                },
+                "is_walkable": true,
+                "edge_properties": {
+                  "north_west": {
+                    "blocks_line_of_sight": null,
+                    "blocks_movement": null,
+                    "z_portal": 0.0
+                  },
+                  "north_east": {
+                    "blocks_line_of_sight": true,
+                    "blocks_movement": true,
+                    "z_portal": 100.0
+                  },
+                  "south_west": {
+                    "blocks_line_of_sight": null,
+                    "blocks_movement": null,
+                    "z_portal": 0.0
+                  },
+                  "south_east": {
+                    "blocks_line_of_sight": null,
+                    "blocks_movement": false,
+                    "z_portal": 0.0
+                  }
+                }
+              },
+              "east": {
+                "quadrant": "east",
+                "north_vertex": {
+                  "x": 164,
+                  "y": 34
+                },
+                "south_vertex": {
+                  "x": 164,
+                  "y": 134
+                },
+                "east_vertex": {
+                  "x": 264,
+                  "y": 84
+                },
+                "west_vertex": {
+                  "x": 64,
+                  "y": 84
+                },
+                "center": {
+                  "x": 164,
+                  "y": 84
+                },
+                "is_walkable": false,
+                "edge_properties": {
+                  "north_west": {
+                    "blocks_line_of_sight": true,
+                    "blocks_movement": true,
+                    "z_portal": null
+                  },
+                  "north_east": {
+                    "blocks_line_of_sight": true,
+                    "blocks_movement": true,
+                    "z_portal": null
+                  },
+                  "south_west": {
+                    "blocks_line_of_sight": true,
+                    "blocks_movement": true,
+                    "z_portal": null
+                  },
+                  "south_east": {
+                    "blocks_line_of_sight": true,
+                    "blocks_movement": true,
+                    "z_portal": null
+                  }
+                }
+              },
+              "west": {
+                "quadrant": "west",
+                "north_vertex": {
+                  "x": -36,
+                  "y": 34
+                },
+                "south_vertex": {
+                  "x": -36,
+                  "y": 134
+                },
+                "east_vertex": {
+                  "x": 64,
+                  "y": 84
+                },
+                "west_vertex": {
+                  "x": -136,
+                  "y": 84
+                },
+                "center": {
+                  "x": -36,
+                  "y": 84
+                },
+                "is_walkable": null,
+                "edge_properties": {
+                  "north_west": {
+                    "blocks_line_of_sight": null,
+                    "blocks_movement": null,
+                    "z_portal": null
+                  },
+                  "north_east": {
+                    "blocks_line_of_sight": null,
+                    "blocks_movement": null,
+                    "z_portal": null
+                  },
+                  "south_west": {
+                    "blocks_line_of_sight": null,
+                    "blocks_movement": null,
+                    "z_portal": null
+                  },
+                  "south_east": {
+                    "blocks_line_of_sight": null,
+                    "blocks_movement": null,
+                    "z_portal": null
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "custom_keypoints": {}
+    }
+  ]
+}

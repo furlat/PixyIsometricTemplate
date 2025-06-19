@@ -1,0 +1,40 @@
+{
+  "name": "pixy-isometric-template",
+  "version": "1.0.0",
+  "description": "A base template for isometric games using Pixy.js, TypeScript, and Valtio",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
+  },
+  "dependencies": {
+    "pixi.js": "latest",
+    "valtio": "latest"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "@typescript-eslint/eslint-plugin": "latest",
+    "@typescript-eslint/parser": "latest",
+    "autoprefixer": "^10.4.16",
+    "daisyui": "^4.4.19",
+    "eslint": "latest",
+    "postcss": "^8.4.32",
+    "tailwindcss": "^3.3.6",
+    "typescript": "latest",
+    "vite": "latest"
+  },
+  "keywords": [
+    "pixi",
+    "pixijs",
+    "typescript",
+    "valtio",
+    "vite",
+    "isometric",
+    "game",
+    "template"
+  ],
+  "author": "",
+  "license": "MIT"
+}

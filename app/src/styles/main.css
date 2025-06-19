@@ -1,0 +1,73 @@
+@tailwind base; 
+@tailwind components;
+@tailwind utilities;
+
+/* Base styles */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: #0f172a;
+  color: #ffffff;
+  overflow: hidden;
+  position: relative;
+  height: 100vh;
+}
+
+#gameCanvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: #0f172a;
+  display: block;
+}
+
+/* Custom scrollbar for DaisyUI components */
+@layer components {
+  .custom-scrollbar::-webkit-scrollbar {
+    @apply w-1;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-track {
+    @apply bg-base-300 rounded;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-primary/30 rounded hover:bg-primary/50;
+  }
+  
+  /* Status indicator utilities */
+  .status-active {
+    @apply text-success font-bold;
+  }
+  
+  .status-inactive {
+    @apply text-base-content/50;
+  }
+  
+  .status-system {
+    @apply text-info;
+  }
+  
+  .status-camera {
+    @apply text-warning;
+  }
+  
+  .status-mouse {
+    @apply text-accent;
+  }
+  
+  .value-updated {
+    @apply animate-pulse;
+  }
+}
