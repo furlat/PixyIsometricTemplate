@@ -1,4 +1,4 @@
-import { Container, Graphics } from 'pixi.js'
+import { Container } from 'pixi.js'
 import { InfiniteCanvas } from './InfiniteCanvas'
 import { BackgroundGridRenderer } from './BackgroundGridRenderer'
 import { GeometryRenderer } from './GeometryRenderer'
@@ -120,7 +120,7 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
     
     // Update mouse visualization (only when background is not rendering)
     if (!this.isBackgroundRendering) {
-      this.mouseHighlightRenderer.render(this.localPixeloidScale)
+      this.mouseHighlightRenderer.render()
     }
 
     // TODO: Render other layers (raycast, UI overlay)
@@ -128,15 +128,17 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
   }
   
   /**
-   * Render background layer only when needed
+   * Render background layer only when needed and if grid is visible
    */
   private renderBackgroundLayer(corners: ViewportCorners, pixeloidScale: number): void {
-    // Render background grid using the extracted renderer
-    this.backgroundGridRenderer.render(corners, pixeloidScale)
-    
-    // Only update if graphics changed
+    // Clear background layer first
     this.backgroundLayer.removeChildren()
-    this.backgroundLayer.addChild(this.backgroundGridRenderer.getGraphics())
+    
+    // Only render grid if grid layer is visible
+    if (gameStore.geometry.layerVisibility.grid) {
+      this.backgroundGridRenderer.render(corners, pixeloidScale)
+      this.backgroundLayer.addChild(this.backgroundGridRenderer.getGraphics())
+    }
   }
   
   /**
@@ -161,6 +163,12 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
   private subscribeToStoreChanges(): void {
     // Subscribe to geometry changes using Valtio
     subscribe(gameStore.geometry, () => {
+      this.geometryDirty = true
+    })
+
+    // Subscribe to layer visibility changes to trigger re-rendering
+    subscribe(gameStore.geometry.layerVisibility, () => {
+      this.backgroundDirty = true
       this.geometryDirty = true
     })
 

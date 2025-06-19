@@ -1,4 +1,4 @@
-import { Graphics, RenderTexture, Sprite, Renderer } from 'pixi.js'
+import { Graphics, RenderTexture, Sprite } from 'pixi.js'
 import type { ViewportCorners } from '../types'
 import { CoordinateHelper } from './CoordinateHelper'
 

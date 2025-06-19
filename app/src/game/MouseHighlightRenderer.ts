@@ -21,7 +21,7 @@ export class MouseHighlightRenderer {
   /**
    * Render mouse highlight in pixeloid coordinates (will be transformed by camera)
    */
-  public render(pixeloidScale: number): void {
+  public render(): void {
     // Only update if mouse position actually changed
     if (!this.isDirty) return
     
