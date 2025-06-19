@@ -22,23 +22,26 @@ this.gridGraphics.rect(x, y, 1, 1).fill(color)
 
 // New: InfiniteCanvas becomes a layer manager using PixiJS RenderLayer
 class LayeredInfiniteCanvas extends InfiniteCanvas {
-  private backgroundLayer: RenderLayer     // Grid background
-  private geometryLayer: RenderLayer       // User-drawn shapes
-  private diamondAssetLayer: RenderLayer   // Isometric game assets
-  private uiOverlayLayer: RenderLayer      // Debug visualizations
+  private backgroundLayer: RenderLayer       // Grid background
+  private geometryLayer: RenderLayer         // User-drawn shapes
+  private isometricGridLayer: RenderLayer    // Diamond grid visualization
+  private assetLayer: RenderLayer            // Isometric game assets
+  private uiOverlayLayer: RenderLayer        // Debug visualizations
   
   constructor() {
     super()
     // Create PixiJS RenderLayers for proper layering
     this.backgroundLayer = new RenderLayer()
     this.geometryLayer = new RenderLayer()
-    this.diamondAssetLayer = new RenderLayer()
+    this.isometricGridLayer = new RenderLayer()
+    this.assetLayer = new RenderLayer()
     this.uiOverlayLayer = new RenderLayer()
     
-    // Add layers to stage in correct order
+    // Add layers to stage in correct order (bottom to top)
     this.stage.addChild(this.backgroundLayer)
     this.stage.addChild(this.geometryLayer)
-    this.stage.addChild(this.diamondAssetLayer)
+    this.stage.addChild(this.isometricGridLayer)
+    this.stage.addChild(this.assetLayer)
     this.stage.addChild(this.uiOverlayLayer)
   }
   
@@ -49,10 +52,11 @@ class LayeredInfiniteCanvas extends InfiniteCanvas {
 }
 ```
 
-**What each layer does**:
-- **BackgroundGridLayer**: Current checkered grid (moves from InfiniteCanvas.renderGrid)
+**What each layer does** (bottom to top rendering order):
+- **BackgroundLayer**: Current checkered grid (moves from InfiniteCanvas.renderGrid)
 - **GeometryLayer**: User-drawn rectangles, polygons, custom shapes
-- **DiamondAssetLayer**: Isometric assets positioned on diamond grid
+- **IsometricGridLayer**: Diamond grid visualization, grid lines, coordinate helpers
+- **AssetLayer**: Isometric assets positioned on diamond grid
 - **UIOverlayLayer**: Raycast visualizations, selection highlights, debug info
 
 **Integration with existing systems**:
@@ -446,19 +450,48 @@ class DiamondGrid {
 
 **Problem**: Isometric games need proper depth sorting and layer management.
 
-**Integration with current rendering**:
+**Integration with separated grid and asset layers**:
 ```typescript
-// Extends current layer system
-class DiamondAssetLayer extends RenderLayer {
+// Isometric Grid Layer - handles diamond grid visualization
+class IsometricGridLayer {
+  private gridGraphics: Graphics = new Graphics()
+  
+  render(cameraTransform: Container, viewportSize: Size) {
+    this.gridGraphics.clear()
+    
+    // Render diamond grid lines and coordinate helpers
+    const visibleDiamonds = this.diamondGrid.getVisibleDiamonds(this.camera)
+    for (const diamond of visibleDiamonds) {
+      this.renderDiamondGridCell(diamond)
+    }
+    
+    // Render grid coordinate labels, diamond outlines
+    this.renderGridHelpers(visibleDiamonds)
+  }
+  
+  private renderDiamondGridCell(diamond: DiamondCoordinate) {
+    const pixeloidPos = this.diamondGrid.diamondToPixeloid(diamond)
+    // Draw diamond outline using Graphics API
+    this.gridGraphics.moveTo(pixeloidPos.x, pixeloidPos.y - DIAMOND_HEIGHT_HALF)
+    this.gridGraphics.lineTo(pixeloidPos.x + DIAMOND_WIDTH_HALF, pixeloidPos.y)
+    this.gridGraphics.lineTo(pixeloidPos.x, pixeloidPos.y + DIAMOND_HEIGHT_HALF)
+    this.gridGraphics.lineTo(pixeloidPos.x - DIAMOND_WIDTH_HALF, pixeloidPos.y)
+    this.gridGraphics.lineTo(pixeloidPos.x, pixeloidPos.y - DIAMOND_HEIGHT_HALF)
+    this.gridGraphics.stroke({ width: 1, color: 0x444444, alpha: 0.3 })
+  }
+}
+
+// Asset Layer - handles actual isometric game assets
+class AssetLayer {
   render(cameraTransform: Container, viewportSize: Size) {
     // Use existing camera transform
     this.container.transform = cameraTransform
     
-    // Get visible diamonds using existing viewport culling
-    const visibleDiamonds = this.diamondGrid.getVisibleDiamonds(this.camera)
+    // Get placed assets in visible area
+    const visibleAssets = this.getVisibleAssets(this.camera)
     
     // Render by Z-order for proper depth sorting
-    const sortedAssets = this.getSortedAssetsByDepth(visibleDiamonds)
+    const sortedAssets = this.getSortedAssetsByDepth(visibleAssets)
     for (const asset of sortedAssets) {
       this.renderAsset(asset)
     }
