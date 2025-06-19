@@ -40,6 +40,7 @@ export class StorePanel {
       // Geometry Debug elements (Phase 1: Multi-Layer System)
       'drawing-mode',
       'objects-count',
+      'selected-object',
       'active-raycasts',
       'layer-grid',
       'layer-geometry',
@@ -153,6 +154,14 @@ export class StorePanel {
     updateElement(this.elements, 'objects-count',
       gameStore.geometry.objects.length.toString(),
       'text-primary'
+    );
+
+    // Selected object
+    const selectedObjectId = gameStore.geometry.selection.selectedObjectId
+    const selectedText = selectedObjectId ? selectedObjectId : 'none'
+    updateElement(this.elements, 'selected-object',
+      selectedText,
+      selectedObjectId ? 'text-info' : 'text-base-content/50'
     );
 
     updateElement(this.elements, 'active-raycasts',

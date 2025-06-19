@@ -1,5 +1,6 @@
 import { Graphics } from 'pixi.js'
 import { gameStore } from '../store/gameStore'
+import { GeometryHelper } from './GeometryHelper'
 import type { ViewportCorners, GeometricObject, GeometricRectangle, GeometricCircle, GeometricLine, GeometricPoint, GeometricDiamond } from '../types'
 
 /**
@@ -24,6 +25,11 @@ export class GeometryRenderer {
     // Render each object based on its type
     for (const obj of visibleObjects) {
       this.renderGeometricObject(obj, pixeloidScale)
+      
+      // Render selection highlight if this object is selected
+      if (obj.id === gameStore.geometry.selection.selectedObjectId) {
+        this.renderSelectionHighlight(obj, pixeloidScale)
+      }
     }
 
     // Render preview for active drawing
@@ -137,36 +143,15 @@ export class GeometryRenderer {
    * Render an isometric diamond shape with proper proportions
    */
   private renderDiamond(diamond: GeometricDiamond, pixeloidScale: number): void {
-    // Use raw pixeloid coordinates - camera transform handles scaling
-    const anchorX = diamond.anchorX  // West vertex
-    const anchorY = diamond.anchorY  // Center Y of the diamond
-    const width = diamond.width
-    const height = diamond.height   // This is center-to-edge distance
-
-    // Calculate center position (all widths are forced to be even)
-    const centerX = anchorX + width / 2
-
-    // Calculate diamond vertices - ALL vertices snap to pixeloid centers
-    // West vertex: (anchorX, anchorY)
-    // North vertex: (centerX, anchorY - height) - snapped to pixeloid center
-    // East vertex: (anchorX + width, anchorY)
-    // South vertex: (centerX, anchorY + height) - snapped to pixeloid center
+    // Use centralized geometry calculations
+    const vertices = GeometryHelper.calculateDiamondVertices(diamond)
     
-    const westX = anchorX
-    const westY = anchorY
-    const northX = centerX
-    const northY = Math.floor(anchorY - height) + 0.5  // Snap to pixeloid center
-    const eastX = anchorX + width
-    const eastY = anchorY
-    const southX = centerX
-    const southY = Math.floor(anchorY + height) + 0.5  // Snap to pixeloid center
-    
-    // Draw diamond shape
-    this.graphics.moveTo(westX, westY)            // West
-    this.graphics.lineTo(northX, northY)          // North
-    this.graphics.lineTo(eastX, eastY)            // East
-    this.graphics.lineTo(southX, southY)          // South
-    this.graphics.lineTo(westX, westY)            // Back to West (close)
+    // Draw diamond shape using calculated vertices
+    this.graphics.moveTo(vertices.west.x, vertices.west.y)    // West
+    this.graphics.lineTo(vertices.north.x, vertices.north.y)  // North
+    this.graphics.lineTo(vertices.east.x, vertices.east.y)    // East
+    this.graphics.lineTo(vertices.south.x, vertices.south.y)  // South
+    this.graphics.lineTo(vertices.west.x, vertices.west.y)    // Back to West (close)
 
     // Apply fill if specified
     if (diamond.fillColor !== undefined) {
@@ -239,42 +224,18 @@ export class GeometryRenderer {
         })
       }
     } else if (activeDrawing.type === 'diamond') {
-      // Calculate width from horizontal drag distance
-      let width = Math.abs(currentPoint.x - startPoint.x)
+      // Use centralized geometry calculations for preview
+      const preview = GeometryHelper.calculateDiamondPreview(startPoint, currentPoint)
       
-      // Force odd widths to even - snap down to prevent tiling issues
-      if (width % 2 === 1) {
-        width = width - 1  // 401 becomes 400, etc.
-      }
-      
-      // Height calculation for perfect tiling (even widths only)
-      const totalHeight = (width - 1) / 2
-      const height = totalHeight / 2  // Center to north/south distance
-      
-      if (width >= 2) {
-        // Use the original click position as the anchor (west vertex)
-        const anchorX = startPoint.x
-        const anchorY = startPoint.y
+      if (preview.width >= 2) {
+        const vertices = preview.vertices
         
-        // Calculate center position (all widths are forced to be even)
-        const centerX = anchorX + width / 2
-        
-        // Calculate diamond vertices - ALL vertices snap to pixeloid centers
-        const westX = anchorX
-        const westY = anchorY
-        const northX = centerX
-        const northY = Math.floor(anchorY - height) + 0.5  // Snap to pixeloid center
-        const eastX = anchorX + width
-        const eastY = anchorY
-        const southX = centerX
-        const southY = Math.floor(anchorY + height) + 0.5  // Snap to pixeloid center
-        
-        // Draw diamond preview
-        this.graphics.moveTo(westX, westY)                  // West
-        this.graphics.lineTo(northX, northY)                // North
-        this.graphics.lineTo(eastX, eastY)                  // East
-        this.graphics.lineTo(southX, southY)                // South
-        this.graphics.lineTo(westX, westY)                  // Back to West
+        // Draw diamond preview using calculated vertices
+        this.graphics.moveTo(vertices.west.x, vertices.west.y)    // West
+        this.graphics.lineTo(vertices.north.x, vertices.north.y)  // North
+        this.graphics.lineTo(vertices.east.x, vertices.east.y)    // East
+        this.graphics.lineTo(vertices.south.x, vertices.south.y)  // South
+        this.graphics.lineTo(vertices.west.x, vertices.west.y)    // Back to West
         this.graphics.stroke({
           width: gameStore.geometry.drawing.settings.defaultStrokeWidth / pixeloidScale,
           color: gameStore.geometry.drawing.settings.defaultColor,
@@ -282,6 +243,31 @@ export class GeometryRenderer {
         })
       }
     }
+  }
+
+  /**
+   * Render selection highlight around selected object
+   */
+  private renderSelectionHighlight(obj: GeometricObject, pixeloidScale: number): void {
+    // For now, only handle diamond selection highlight
+    if ('anchorX' in obj && 'anchorY' in obj) {
+      const diamond = obj as GeometricDiamond
+      const vertices = GeometryHelper.calculateDiamondVertices(diamond)
+      
+      // Draw selection outline with thicker stroke and different color
+      this.graphics.moveTo(vertices.west.x, vertices.west.y)
+      this.graphics.lineTo(vertices.north.x, vertices.north.y)
+      this.graphics.lineTo(vertices.east.x, vertices.east.y)
+      this.graphics.lineTo(vertices.south.x, vertices.south.y)
+      this.graphics.lineTo(vertices.west.x, vertices.west.y)
+      this.graphics.stroke({
+        width: (diamond.strokeWidth + 2) / pixeloidScale,
+        color: 0xff6600, // Orange selection color
+        alpha: 0.8
+      })
+    }
+    
+    // TODO: Add selection highlights for other shapes
   }
 
   /**

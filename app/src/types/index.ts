@@ -185,4 +185,9 @@ export interface GeometryState {
     raycast: boolean
     grid: boolean
   }
+  // Selection state
+  selection: {
+    selectedObjectId: string | null
+    isEditPanelOpen: boolean
+  }
 }

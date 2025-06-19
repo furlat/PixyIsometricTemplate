@@ -18,7 +18,7 @@ export const gameStore = proxy<GameState>({
   },
   camera: {
     position: { x: 0, y: 0 },
-    pixeloidScale: 10, // Start with 10 pixels per pixeloid (minimum)
+    pixeloidScale: 10, // Start with 10 pixels per pixeloid
     viewportCorners: {
       topLeft: { x: 0, y: 0 },
       topRight: { x: 0, y: 0 },
@@ -65,6 +65,10 @@ export const gameStore = proxy<GameState>({
       geometry: true,
       raycast: true,
       grid: true
+    },
+    selection: {
+      selectedObjectId: null,
+      isEditPanelOpen: false
     }
   }
 })
@@ -98,8 +102,8 @@ export const updateGameStore = {
   },
 
   setPixeloidScale: (scale: number) => {
-    // Clamp scale between reasonable values
-    gameStore.camera.pixeloidScale = Math.max(1, Math.min(100, scale))
+    // Clamp scale between reasonable values (minimum 2 pixeloids)
+    gameStore.camera.pixeloidScale = Math.max(2, Math.min(100, scale))
   },
 
   updateViewportCorners: (corners: ViewportCorners) => {
@@ -165,6 +169,20 @@ export const updateGameStore = {
 
   setRaycastSettings: (settings: Partial<typeof gameStore.geometry.raycast.settings>) => {
     Object.assign(gameStore.geometry.raycast.settings, settings)
+  },
+
+  // Selection controls
+  setSelectedObject: (objectId: string | null) => {
+    gameStore.geometry.selection.selectedObjectId = objectId
+  },
+
+  setEditPanelOpen: (open: boolean) => {
+    gameStore.geometry.selection.isEditPanelOpen = open
+  },
+
+  clearSelection: () => {
+    gameStore.geometry.selection.selectedObjectId = null
+    gameStore.geometry.selection.isEditPanelOpen = false
   }
 }
 

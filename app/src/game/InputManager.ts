@@ -1,10 +1,15 @@
 import { updateGameStore, gameStore } from '../store/gameStore'
+import { GeometryHelper } from './GeometryHelper'
 import type { InfiniteCanvas } from './InfiniteCanvas'
 import type { GeometricRectangle, GeometricPoint, GeometricLine, GeometricCircle, GeometricDiamond } from '../types'
 
 export class InputManager {
   private canvas: HTMLCanvasElement | null = null
   private infiniteCanvas: InfiniteCanvas | null = null
+  
+  // Double-click detection
+  private lastClickTime: number = 0
+  private doubleClickThreshold: number = 300 // ms
   
   // Store bound handlers for cleanup
   private keydownHandler: (event: KeyboardEvent) => void = () => {}
@@ -175,6 +180,12 @@ export class InputManager {
   private handleGeometryMouseDown(pixeloidPos: { x: number, y: number }): void {
     const mode = gameStore.geometry.drawing.mode
     
+    // If not in drawing mode, check for object selection
+    if (mode === 'none') {
+      this.handleObjectSelection(pixeloidPos)
+      return
+    }
+    
     // Different coordinate snapping for different shapes
     let pixelPerfectPos: { x: number, y: number }
     
@@ -214,10 +225,7 @@ export class InputManager {
       gameStore.geometry.drawing.activeDrawing.isDrawing = true
     } else if (mode === 'diamond') {
       // Diamonds: snap to pixeloid centers (0.5, 1.5, 2.5, etc.)
-      pixelPerfectPos = {
-        x: Math.floor(pixeloidPos.x) + 0.5,
-        y: Math.floor(pixeloidPos.y) + 0.5
-      }
+      pixelPerfectPos = GeometryHelper.snapPointToPixeloidCenter(pixeloidPos)
       gameStore.geometry.drawing.activeDrawing.type = 'diamond'
       gameStore.geometry.drawing.activeDrawing.startPoint = pixelPerfectPos
       gameStore.geometry.drawing.activeDrawing.isDrawing = true
@@ -275,10 +283,7 @@ export class InputManager {
         this.createCircle(startPoint, endPoint)
       } else if (activeDrawing.type === 'diamond') {
         // Diamonds: snap to pixeloid centers for perfect alignment
-        endPoint = {
-          x: Math.floor(pixeloidPos.x) + 0.5,
-          y: Math.floor(pixeloidPos.y) + 0.5
-        }
+        endPoint = GeometryHelper.snapPointToPixeloidCenter(pixeloidPos)
         this.createDiamond(startPoint, endPoint)
       }
       
@@ -356,10 +361,7 @@ export class InputManager {
         }
       } else if (activeDrawing.type === 'diamond') {
         // Diamonds: snap to pixeloid centers for perfect alignment
-        pixelPerfectPos = {
-          x: Math.floor(pixeloidPos.x) + 0.5,
-          y: Math.floor(pixeloidPos.y) + 0.5
-        }
+        pixelPerfectPos = GeometryHelper.snapPointToPixeloidCenter(pixeloidPos)
       } else {
         // Default: center of pixeloid
         pixelPerfectPos = {
@@ -467,30 +469,17 @@ export class InputManager {
    * Create an isometric diamond from anchor point and width
    */
   private createDiamond(anchorPoint: { x: number, y: number }, dragPoint: { x: number, y: number }): void {
-    // Calculate width from horizontal drag distance
-    let width = Math.abs(dragPoint.x - anchorPoint.x)
-    
-    // Force odd widths to even - snap down to prevent tiling issues
-    if (width % 2 === 1) {
-      width = width - 1  // 401 becomes 400, etc.
-    }
-    
-    // Height calculation for perfect tiling (even widths only)
-    const totalHeight = (width - 1) / 2
-    const height = totalHeight / 2  // Center to north/south distance
+    // Use centralized geometry calculations
+    const properties = GeometryHelper.calculateDiamondProperties(anchorPoint, dragPoint)
     
     // Only create diamond if it has some size (minimum 2 pixeloids width)
-    if (width >= 2) {
-      // Use the original click position as the anchor (west vertex)
-      const anchorX = anchorPoint.x
-      const anchorY = anchorPoint.y
-      
+    if (properties.width >= 2) {
       const diamond: GeometricDiamond = {
         id: `diamond_${Date.now()}`,
-        anchorX: anchorX, // West vertex at original click position
-        anchorY: anchorY, // Y stays at original click position
-        width: width,
-        height: height,
+        anchorX: properties.anchorX, // West vertex at original click position
+        anchorY: properties.anchorY, // Y stays at original click position
+        width: properties.width,
+        height: properties.height,
         color: gameStore.geometry.drawing.settings.defaultColor,
         strokeWidth: gameStore.geometry.drawing.settings.defaultStrokeWidth,
         isVisible: true,
@@ -499,6 +488,44 @@ export class InputManager {
       
       // Add to store
       updateGameStore.addGeometricObject(diamond)
+    }
+  }
+
+  /**
+   * Handle object selection when clicking in none mode
+   */
+  private handleObjectSelection(pixeloidPos: { x: number, y: number }): void {
+    const currentTime = Date.now()
+    const isDoubleClick = currentTime - this.lastClickTime < this.doubleClickThreshold
+    this.lastClickTime = currentTime
+
+    // Find the topmost object at the click position
+    const clickedObjects = gameStore.geometry.objects.filter(obj => {
+      if (!obj.isVisible) return false
+      
+      // For now, only handle diamond selection
+      if ('anchorX' in obj && 'anchorY' in obj) {
+        return GeometryHelper.isPointInsideDiamond(pixeloidPos, obj as any)
+      }
+      
+      // TODO: Add selection logic for other shapes
+      return false
+    })
+    
+    if (clickedObjects.length > 0) {
+      // Select the last (topmost) object
+      const selectedObject = clickedObjects[clickedObjects.length - 1]
+      const wasAlreadySelected = gameStore.geometry.selection.selectedObjectId === selectedObject.id
+      
+      updateGameStore.setSelectedObject(selectedObject.id)
+      
+      // If double-clicking on already selected object, open edit panel
+      if (isDoubleClick && wasAlreadySelected) {
+        updateGameStore.setEditPanelOpen(true)
+      }
+    } else {
+      // Clear selection if clicking on empty space
+      updateGameStore.clearSelection()
     }
   }
 

@@ -143,8 +143,8 @@ export class InfiniteCanvas {
     const zoomStep = deltaY > 0 ? -1 : 1
     const newScale = this.localPixeloidScale + zoomStep
     
-    // Clamp zoom levels to integers between 10 and 100
-    this.localPixeloidScale = Math.max(10, Math.min(100, newScale))
+    // Clamp zoom levels to integers between 2 and 100
+    this.localPixeloidScale = Math.max(2, Math.min(100, newScale))
     
     // Update store
     updateGameStore.setPixeloidScale(this.localPixeloidScale)
