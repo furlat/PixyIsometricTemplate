@@ -43,6 +43,7 @@ export const gameStore = proxy<GameState>({
       activeDrawing: {
         type: null,
         startPoint: null,
+        currentPoint: null,
         isDrawing: false
       },
       settings: {
@@ -123,11 +124,12 @@ export const updateGameStore = {
   },
 
   // Geometry controls (Phase 1: Multi-Layer System)
-  setDrawingMode: (mode: 'none' | 'point' | 'line' | 'circle' | 'rectangle') => {
+  setDrawingMode: (mode: 'none' | 'point' | 'line' | 'circle' | 'rectangle' | 'diamond') => {
     gameStore.geometry.drawing.mode = mode
     // Clear active drawing when switching modes
     gameStore.geometry.drawing.activeDrawing.type = null
     gameStore.geometry.drawing.activeDrawing.startPoint = null
+    gameStore.geometry.drawing.activeDrawing.currentPoint = null
     gameStore.geometry.drawing.activeDrawing.isDrawing = false
   },
 

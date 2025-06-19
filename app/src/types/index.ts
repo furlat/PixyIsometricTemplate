@@ -115,15 +115,32 @@ export interface GeometricRectangle {
   createdAt: number
 }
 
-export type GeometricObject = GeometricPoint | GeometricLine | GeometricCircle | GeometricRectangle
+export interface GeometricDiamond {
+  id: string
+  // West corner anchor point
+  anchorX: number
+  anchorY: number
+  // Width determines the horizontal size
+  width: number
+  // Height is computed as width/2 (integer/approximate)
+  height: number
+  color: number
+  strokeWidth: number
+  fillColor?: number
+  isVisible: boolean
+  createdAt: number
+}
+
+export type GeometricObject = GeometricPoint | GeometricLine | GeometricCircle | GeometricRectangle | GeometricDiamond
 
 export interface GeometryDrawingState {
   // Current drawing mode
-  mode: 'none' | 'point' | 'line' | 'circle' | 'rectangle'
+  mode: 'none' | 'point' | 'line' | 'circle' | 'rectangle' | 'diamond'
   // Active drawing operation (for multi-step operations like line drawing)
   activeDrawing: {
     type: GeometricObject['id'] | null
     startPoint: PixeloidCoordinate | null
+    currentPoint: PixeloidCoordinate | null
     isDrawing: boolean
   }
   // Drawing settings

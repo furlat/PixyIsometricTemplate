@@ -242,6 +242,7 @@
               <button id="geometry-mode-line" class="btn btn-xs btn-outline">Line</button>
               <button id="geometry-mode-circle" class="btn btn-xs btn-outline">Circle</button>
               <button id="geometry-mode-rectangle" class="btn btn-xs btn-outline">Rectangle</button>
+              <button id="geometry-mode-diamond" class="btn btn-xs btn-outline">Diamond</button>
             </div>
           </div>
         </div>
@@ -349,6 +350,23 @@
           </div>
         </div>
 
+      </div>
+    </div>
+
+    <!-- Layer Toggle Bar (Bottom Center) -->
+    <div id="layer-toggle-bar" class="fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-base-100/95 backdrop-blur-md border border-base-300 rounded-full shadow-lg z-50 px-4 py-2">
+      <div class="flex items-center gap-3">
+        <span class="text-sm font-semibold text-accent">Layers</span>
+        <div class="divider divider-horizontal mx-0"></div>
+        <button id="toggle-layer-grid" class="btn btn-sm btn-success rounded-full">
+          <span class="button-text">Grid</span>
+        </button>
+        <button id="toggle-layer-geometry" class="btn btn-sm btn-secondary rounded-full">
+          <span class="button-text">Geometry</span>
+        </button>
+        <button id="toggle-layer-raycast" class="btn btn-sm btn-warning rounded-full">
+          <span class="button-text">Raycast</span>
+        </button>
       </div>
     </div>
 

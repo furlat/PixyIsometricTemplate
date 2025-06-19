@@ -1,6 +1,6 @@
 import { Game } from './game'
 import { updateGameStore } from './store/gameStore'
-import { StorePanel, UIControlBar, GeometryPanel } from './ui'
+import { StorePanel, UIControlBar, GeometryPanel, LayerToggleBar } from './ui'
 
 // Initialize the game when the DOM is loaded
 async function init() {
@@ -19,6 +19,7 @@ async function init() {
     const storePanel = new StorePanel()
     const geometryPanel = new GeometryPanel()
     const uiControlBar = new UIControlBar()
+    const layerToggleBar = new LayerToggleBar()
     
     // Connect the control bar with the panels
     uiControlBar.registerStorePanel(storePanel)
@@ -31,6 +32,7 @@ async function init() {
     console.log('✅ Store Panel:', storePanel)
     console.log('✅ Geometry Panel:', geometryPanel)
     console.log('✅ UI Control Bar:', uiControlBar)
+    console.log('✅ Layer Toggle Bar:', layerToggleBar)
     console.log('')
     console.log('🎯 Controls:')
     console.log('   WASD: Move camera')

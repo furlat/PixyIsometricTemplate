@@ -1,6 +1,8 @@
 import { Container } from 'pixi.js'
 import { InfiniteCanvas } from './InfiniteCanvas'
 import { BackgroundGridRenderer } from './BackgroundGridRenderer'
+import { GeometryRenderer } from './GeometryRenderer'
+import { gameStore } from '../store/gameStore'
 
 /**
  * LayeredInfiniteCanvas extends the existing InfiniteCanvas with a multi-layer architecture.
@@ -19,6 +21,9 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
 
   // Background grid renderer using extracted logic
   private backgroundGridRenderer: BackgroundGridRenderer
+  
+  // Geometry renderer for user-drawn shapes
+  private geometryRenderer: GeometryRenderer
 
   constructor() {
     super()
@@ -31,6 +36,9 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
 
     // Initialize background grid renderer
     this.backgroundGridRenderer = new BackgroundGridRenderer()
+
+    // Initialize geometry renderer
+    this.geometryRenderer = new GeometryRenderer()
 
     // Setup layer hierarchy within the existing camera transform
     // This maintains all existing InfiniteCanvas functionality
@@ -71,7 +79,16 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
     this.backgroundLayer.removeChildren()
     this.backgroundLayer.addChild(this.backgroundGridRenderer.getGraphics())
 
-    // TODO: Render other layers (geometry, raycast, UI overlay)
+    // Render geometry layer using the geometry renderer
+    if (gameStore.geometry.layerVisibility.geometry) {
+      this.geometryRenderer.render(corners, pixeloidScale)
+      
+      // Clear and re-add geometry graphics to geometry layer
+      this.geometryLayer.removeChildren()
+      this.geometryLayer.addChild(this.geometryRenderer.getGraphics())
+    }
+
+    // TODO: Render other layers (raycast, UI overlay)
     // This will be implemented in subsequent steps
   }
 
@@ -116,8 +133,9 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
    * Override destroy to clean up layer resources
    */
   public destroy(): void {
-    // Destroy background grid renderer
+    // Destroy renderers
     this.backgroundGridRenderer.destroy()
+    this.geometryRenderer.destroy()
 
     // Destroy layer containers
     this.backgroundLayer.destroy()

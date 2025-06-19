@@ -3,8 +3,7 @@ import { gameStore, updateGameStore } from '../store/gameStore'
 import {
   updateElement,
   getBooleanStatusClass,
-  getBooleanStatusText,
-  STATUS_COLORS
+  getBooleanStatusText
 } from './handlers/UIHandlers'
 
 export class GeometryPanel {
@@ -51,7 +50,7 @@ export class GeometryPanel {
   
   private setupEventHandlers(): void {
     // Drawing mode buttons
-    const modes = ['none', 'point', 'line', 'circle', 'rectangle']
+    const modes = ['none', 'point', 'line', 'circle', 'rectangle', 'diamond']
     modes.forEach(mode => {
       const button = document.getElementById(`geometry-mode-${mode}`)
       if (button) {
@@ -124,7 +123,7 @@ export class GeometryPanel {
   }
   
   private updateModeButtons(): void {
-    const modes = ['none', 'point', 'line', 'circle', 'rectangle']
+    const modes = ['none', 'point', 'line', 'circle', 'rectangle', 'diamond']
     const currentMode = gameStore.geometry.drawing.mode
     
     modes.forEach(mode => {
