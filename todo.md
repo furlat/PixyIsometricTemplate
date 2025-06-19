@@ -428,20 +428,43 @@ interface DiamondCoordinate {
 }
 
 class DiamondGrid {
-  // Converts diamond coords to pixeloid using existing CoordinateHelper
-  diamondToPixeloid(diamondCoord: DiamondCoordinate): PixeloidCoordinate {
-    // Diamond grid uses isometric projection
-    const pixeloidX = (diamondCoord.x - diamondCoord.y) * DIAMOND_WIDTH_HALF
-    const pixeloidY = (diamondCoord.x + diamondCoord.y) * DIAMOND_HEIGHT_HALF
-    return { x: pixeloidX, y: pixeloidY }
+  // Converts diamond coords to pixeloid using ACTUAL JSON pixel data
+  diamondToPixeloid(diamondCoord: DiamondCoordinate, assetMetadata: any): PixeloidCoordinate {
+    // JSON coordinates are relative to sprite pixels - use them directly
+    const diamondInfo = assetMetadata.diamond_info
+    const spriteAnchor = diamondInfo.sprite_anchor || { x: 0, y: 0 }
+    
+    // Diamond vertices are actual pixel coordinates relative to sprite
+    const northVertex = diamondInfo.vertices.north
+    const southVertex = diamondInfo.vertices.south
+    const eastVertex = diamondInfo.vertices.east
+    const westVertex = diamondInfo.vertices.west
+    
+    // Calculate center of diamond from actual vertex positions
+    const centerX = (eastVertex.x + westVertex.x) / 2
+    const centerY = (northVertex.y + southVertex.y) / 2
+    
+    // Convert to world pixeloid coordinates
+    const worldX = diamondCoord.x + centerX - spriteAnchor.x
+    const worldY = diamondCoord.y + centerY - spriteAnchor.y
+    
+    return { x: worldX, y: worldY }
   }
   
-  // Uses existing viewport culling from InfiniteCanvas
-  getVisibleDiamonds(camera: CameraState): DiamondCoordinate[] {
-    const corners = camera.viewportCorners
-    // Convert pixeloid viewport to diamond coordinate range
-    const diamondBounds = this.pixeloidToDiamondBounds(corners)
-    return this.getDiamondsInBounds(diamondBounds)
+  // Get diamond bounds from JSON vertex data
+  getDiamondBounds(assetMetadata: any): {
+    north: PixeloidCoordinate,
+    south: PixeloidCoordinate,
+    east: PixeloidCoordinate,
+    west: PixeloidCoordinate
+  } {
+    const vertices = assetMetadata.diamond_info.vertices
+    return {
+      north: { x: vertices.north.x, y: vertices.north.y },
+      south: { x: vertices.south.x, y: vertices.south.y },
+      east: { x: vertices.east.x, y: vertices.east.y },
+      west: { x: vertices.west.x, y: vertices.west.y }
+    }
   }
 }
 ```
@@ -524,34 +547,163 @@ The `diamond_info` in your asset files provides:
 - **Z-offset information**: Proper height layering
 - **Edge properties**: Game mechanic data (blocks_movement, blocks_line_of_sight, z_portal)
 
-**Implementation integration**:
+**Implementation integration using actual JSON pixel data**:
 ```typescript
 class AssetPositioningSystem {
-  positionAsset(assetId: string, diamondCoord: DiamondCoordinate) {
+  async positionAsset(assetId: string, worldPosition: PixeloidCoordinate) {
     // Load asset metadata (your existing JSON files)
     const metadata = await fetch(`/assets/analysis_data/${assetId}_analysis.json`)
     const analysis = await metadata.json()
     
-    // Convert diamond coordinate to pixeloid using existing helpers
-    const pixeloidPosition = this.diamondGrid.diamondToPixeloid(diamondCoord)
+    // Use actual pixel coordinates from JSON analysis
+    const diamondBounds = this.diamondGrid.getDiamondBounds(analysis)
+    const spriteAnchor = analysis.diamond_info.sprite_anchor || { x: 0, y: 0 }
     
-    // Create PixiJS sprite at calculated position
+    // Create PixiJS sprite using JSON sprite anchor data
     const sprite = new Sprite(assetTexture)
-    sprite.position.set(pixeloidPosition.x, pixeloidPosition.y)
+    sprite.anchor.set(
+      spriteAnchor.x / sprite.texture.width,
+      spriteAnchor.y / sprite.texture.height
+    )
+    sprite.position.set(worldPosition.x, worldPosition.y)
     
-    // Store placement data for game mechanics
+    // Store placement data with actual JSON coordinates
     const placement = {
       assetId,
-      diamondCoord,
-      pixeloidPosition,
+      worldPosition,
+      diamondBounds,
       walkabilityData: analysis.diamond_info.sub_diamonds,
-      zOffset: analysis.diamond_info.diamonds_z_offset
+      zOffset: analysis.diamond_info.diamonds_z_offset,
+      spriteAnchor: spriteAnchor
     }
     
     updateDiamondStore.addAssetPlacement(placement)
   }
+  
+  // Check if world position intersects with diamond bounds
+  isPositionInDiamond(worldPos: PixeloidCoordinate, placement: AssetPlacement): boolean {
+    const bounds = placement.diamondBounds
+    const relativePos = {
+      x: worldPos.x - placement.worldPosition.x,
+      y: worldPos.y - placement.worldPosition.y
+    }
+    
+    // Use actual diamond vertex coordinates for precise collision
+    return this.pointInDiamond(relativePos, bounds)
+  }
 }
 ```
+
+### Current Implementation: Lower Diamond Positioning
+
+**For now, we will position assets based on the `lower_diamond`** to establish a consistent baseline:
+
+```typescript
+class AssetPositioningSystem {
+  async positionAsset(assetId: string, gridCoord: GridCoordinate) {
+    const analysis = await this.loadAssetAnalysis(assetId);
+    const spriteData = analysis.sprites[0];
+    
+    // Use lower_diamond as baseline positioning (current implementation)
+    const diamond = spriteData.diamond_info.lower_diamond;
+    const worldGridPosition = this.diamondGrid.gridToWorldPosition(gridCoord);
+    
+    sprite.position.set(
+      worldGridPosition.x - diamond.center.x,
+      worldGridPosition.y - diamond.center.y
+    );
+  }
+}
+```
+
+### Future: Infinite Z-Axis Grid System
+
+**Vision**: Create beautiful vertical isometric maps with infinite Z-axis growth:
+
+```typescript
+// Future implementation: Dynamic Z-layer grid system
+class InfiniteZGridSystem {
+  private gridLayers: Map<number, DiamondGridLayer> = new Map()
+  
+  // Create or reuse existing grid layer for Z-level
+  getOrCreateGridLayer(zLevel: number): DiamondGridLayer {
+    if (!this.gridLayers.has(zLevel)) {
+      // Create new grid layer for this Z-level
+      const newLayer = new DiamondGridLayer(zLevel)
+      this.gridLayers.set(zLevel, newLayer)
+    }
+    return this.gridLayers.get(zLevel)!
+  }
+  
+  // Position asset on any Z-layer using asset's diamond data
+  async positionAssetOnLayer(assetId: string, gridCoord: GridCoordinate, assetLevel: 'upper' | 'lower') {
+    const analysis = await this.loadAssetAnalysis(assetId)
+    const spriteData = analysis.sprites[0]
+    
+    // Calculate target Z-layer based on grid position + asset's internal level
+    const targetZLayer = gridCoord.z + (assetLevel === 'upper' ? 1 : 0)
+    
+    // Get or create grid layer for this Z-level
+    const gridLayer = this.getOrCreateGridLayer(targetZLayer)
+    
+    // Use appropriate diamond from asset (upper/lower)
+    const diamond = spriteData.diamond_info[`${assetLevel}_diamond`]
+    const worldGridPosition = gridLayer.gridToWorldPosition(gridCoord)
+    
+    sprite.position.set(
+      worldGridPosition.x - diamond.center.x,
+      worldGridPosition.y - diamond.center.y
+    )
+    
+    // Add to correct layer
+    gridLayer.addAsset(sprite)
+  }
+  
+  // Swap between layers for asset placement
+  setActiveLayer(zLevel: number) {
+    this.activeLayer = this.getOrCreateGridLayer(zLevel)
+    // Update UI to show current layer, hide/show other layers
+  }
+}
+
+// Grid layer sharing - reuse grids across Z-levels
+class DiamondGridLayer {
+  constructor(private zLevel: number) {}
+  
+  // Same grid coordinates, different Z-level
+  gridToWorldPosition(gridCoord: GridCoordinate): PixeloidCoordinate {
+    const baseX = (gridCoord.x - gridCoord.y) * this.DIAMOND_WIDTH_HALF
+    const baseY = (gridCoord.x + gridCoord.y) * this.DIAMOND_HEIGHT_HALF
+    
+    // Z-level affects Y positioning for isometric depth
+    const zOffset = this.zLevel * this.LAYER_HEIGHT_OFFSET
+    
+    return {
+      x: baseX,
+      y: baseY - zOffset  // Higher Z = higher on screen
+    }
+  }
+}
+```
+
+### Benefits of Infinite Z-System
+
+- **Infinite Vertical Growth**: Build towers, underground levels, floating platforms
+- **Grid Sharing**: Same grid coordinates work across all Z-levels
+- **Layer Swapping**: Easy switching between floors/levels during building
+- **Memory Efficient**: Only create grid layers when needed
+- **Asset Flexibility**: Each asset can use upper/lower diamond as appropriate
+- **Beautiful Depth**: True 3D isometric environments with proper depth sorting
+
+### Implementation Phases
+
+1. **Phase 1 (Current)**: Use `lower_diamond` for consistent baseline positioning
+2. **Phase 2**: Add Z-layer grid creation and management
+3. **Phase 3**: Implement layer swapping UI and controls
+4. **Phase 4**: Add infinite Z-axis building tools
+5. **Phase 5**: Advanced features (layer visibility, Z-level templates, etc.)
+
+This approach enables the creation of stunning multi-level isometric worlds with unlimited vertical complexity!
 
 ### 3.4 Performance Optimization Integration
 
