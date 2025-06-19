@@ -15,6 +15,14 @@ export class InfiniteCanvas {
   
   // Movement speed in pixeloids per second
   private readonly CAMERA_SPEED = 50
+  
+  // Zoom batching to prevent rapid scroll events from causing multiple re-renders
+  private zoomBatchTimeout: number | null = null
+  private pendingZoomDelta: number = 0
+  private readonly ZOOM_BATCH_DELAY = 50 // ms
+  
+  // Mouse-centered zooming
+  private zoomTargetScreen: { x: number, y: number } | null = null
 
   constructor() {
     this.container = new Container()
@@ -136,21 +144,87 @@ export class InfiniteCanvas {
   }
 
   /**
-   * Handle zoom input (mouse wheel)
+   * Handle zoom input (mouse wheel) with batching and mouse-centered zooming
    */
-  public handleZoom(deltaY: number): void {
-    // Calculate new scale as integer
+  public handleZoom(deltaY: number, mouseScreenX?: number, mouseScreenY?: number): void {
+    // Accumulate zoom delta
     const zoomStep = deltaY > 0 ? -1 : 1
-    const newScale = this.localPixeloidScale + zoomStep
+    this.pendingZoomDelta += zoomStep
     
-    // Clamp zoom levels to integers between 2 and 100
-    this.localPixeloidScale = Math.max(2, Math.min(100, newScale))
+    // Store mouse position for zoom-to-center functionality
+    if (mouseScreenX !== undefined && mouseScreenY !== undefined) {
+      this.zoomTargetScreen = { x: mouseScreenX, y: mouseScreenY }
+    }
     
-    // Update store
+    // Clear existing timeout
+    if (this.zoomBatchTimeout !== null) {
+      clearTimeout(this.zoomBatchTimeout)
+    }
+    
+    // Set new timeout to batch zoom changes
+    this.zoomBatchTimeout = window.setTimeout(() => {
+      this.applyBatchedZoom()
+      this.zoomBatchTimeout = null
+    }, this.ZOOM_BATCH_DELAY)
+  }
+  
+  /**
+   * Apply accumulated zoom changes in one batch with mouse-centered zooming
+   */
+  private applyBatchedZoom(): void {
+    if (this.pendingZoomDelta === 0) return
+    
+    // Store old scale for zoom-to-center calculation
+    const oldScale = this.localPixeloidScale
+    
+    // Calculate new scale with accumulated delta
+    const newScale = this.localPixeloidScale + this.pendingZoomDelta
+    
+    // Clamp zoom levels to integers between 1 and 100 (unlocked full zoom out)
+    this.localPixeloidScale = Math.max(1, Math.min(100, newScale))
+    
+    // Apply mouse-centered zoom if we have a target
+    if (this.zoomTargetScreen && oldScale !== this.localPixeloidScale) {
+      this.applyMouseCenteredZoom(oldScale, this.localPixeloidScale)
+    }
+    
+    // Reset state
+    this.pendingZoomDelta = 0
+    this.zoomTargetScreen = null
+    
+    // Update store once with final value
     updateGameStore.setPixeloidScale(this.localPixeloidScale)
     
     // Update viewport corners since scale changed
     this.syncToStore()
+  }
+  
+  /**
+   * Adjust camera position so the target pixeloid ends up at screen center
+   */
+  private applyMouseCenteredZoom(oldScale: number, newScale: number): void {
+    if (!this.zoomTargetScreen) return
+    
+    // Convert mouse screen position to pixeloid coordinates at old scale
+    const targetPixeloid = CoordinateHelper.screenToPixeloid(
+      this.zoomTargetScreen.x,
+      this.zoomTargetScreen.y,
+      this.localCameraPosition,
+      this.localViewportSize,
+      oldScale
+    )
+    
+    // Calculate screen center
+    const screenCenterX = this.localViewportSize.width / 2
+    const screenCenterY = this.localViewportSize.height / 2
+    
+    // Calculate what camera position would put the target pixeloid at screen center with new scale
+    const newCameraX = targetPixeloid.x - (screenCenterX - this.localViewportSize.width / 2) / newScale
+    const newCameraY = targetPixeloid.y - (screenCenterY - this.localViewportSize.height / 2) / newScale
+    
+    // Update camera position
+    this.localCameraPosition.x = newCameraX
+    this.localCameraPosition.y = newCameraY
   }
 
   /**
@@ -292,6 +366,12 @@ export class InfiniteCanvas {
    * Destroy the canvas and clean up resources
    */
   public destroy(): void {
+    // Clear any pending zoom batch timeout
+    if (this.zoomBatchTimeout !== null) {
+      clearTimeout(this.zoomBatchTimeout)
+      this.zoomBatchTimeout = null
+    }
+    
     this.gridGraphics.destroy()
     this.cameraTransform.destroy()
     this.container.destroy()

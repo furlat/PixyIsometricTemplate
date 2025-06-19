@@ -102,8 +102,8 @@ export const updateGameStore = {
   },
 
   setPixeloidScale: (scale: number) => {
-    // Clamp scale between reasonable values (minimum 2 pixeloids)
-    gameStore.camera.pixeloidScale = Math.max(2, Math.min(100, scale))
+    // Clamp scale between reasonable values (minimum 1 pixeloid - full zoom out unlocked)
+    gameStore.camera.pixeloidScale = Math.max(1, Math.min(100, scale))
   },
 
   updateViewportCorners: (corners: ViewportCorners) => {

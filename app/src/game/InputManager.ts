@@ -114,7 +114,7 @@ export class InputManager {
   }
 
   /**
-   * Handle mouse movement
+   * Handle mouse movement (restored full functionality for mouse layer)
    */
   private handleMouseMove(event: MouseEvent): void {
     if (!this.canvas || !this.infiniteCanvas) return
@@ -376,15 +376,20 @@ export class InputManager {
   }
 
   /**
-   * Handle mouse wheel for zooming
+   * Handle mouse wheel for zooming with mouse position for center-zoom
    */
   private handleWheel(event: WheelEvent): void {
-    if (!this.infiniteCanvas) return
+    if (!this.canvas || !this.infiniteCanvas) return
     
     event.preventDefault()
     
-    // Handle zoom
-    this.infiniteCanvas.handleZoom(event.deltaY)
+    // Get mouse position relative to canvas
+    const rect = this.canvas.getBoundingClientRect()
+    const mouseX = event.clientX - rect.left
+    const mouseY = event.clientY - rect.top
+    
+    // Handle zoom with mouse position for zoom-to-center functionality
+    this.infiniteCanvas.handleZoom(event.deltaY, mouseX, mouseY)
   }
 
   /**
