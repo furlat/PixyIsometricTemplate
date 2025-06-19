@@ -1,5 +1,14 @@
 import { subscribe } from 'valtio';
 import { gameStore } from '../store/gameStore';
+import {
+  updateElement,
+  formatCoordinates,
+  formatWindowSize,
+  getBooleanStatusClass,
+  getBooleanStatusText,
+  getKeyStatusText,
+  STATUS_COLORS
+} from './handlers/UIHandlers';
 
 export class UIPanel {
   private elements: Map<string, HTMLElement> = new Map();
@@ -50,101 +59,80 @@ export class UIPanel {
   
   private updateValues(): void {
     // System Status
-    this.updateElement('game-initialized', 
-      gameStore.isInitialized ? 'true' : 'false',
-      gameStore.isInitialized ? 'status-active' : 'status-inactive'
+    updateElement(this.elements, 'game-initialized',
+      getBooleanStatusText(gameStore.isInitialized),
+      getBooleanStatusClass(gameStore.isInitialized)
     );
     
-    this.updateElement('game-loading', 
-      gameStore.isLoading ? 'true' : 'false',
-      gameStore.isLoading ? 'status-active' : 'status-inactive'
+    updateElement(this.elements, 'game-loading',
+      getBooleanStatusText(gameStore.isLoading),
+      getBooleanStatusClass(gameStore.isLoading)
     );
     
-    this.updateElement('game-scene', gameStore.currentScene, 'status-system');
+    updateElement(this.elements, 'game-scene', gameStore.currentScene, STATUS_COLORS.system);
     
     // Camera & Canvas
-    this.updateElement('camera-position', 
-      `${gameStore.camera.position.x.toFixed(1)}, ${gameStore.camera.position.y.toFixed(1)}`,
-      'status-camera'
+    updateElement(this.elements, 'camera-position',
+      formatCoordinates(gameStore.camera.position.x, gameStore.camera.position.y),
+      STATUS_COLORS.camera
     );
     
-    this.updateElement('pixeloid-scale', 
+    updateElement(this.elements, 'pixeloid-scale',
       gameStore.camera.pixeloidScale.toString(),
       'text-primary'
     );
     
-    this.updateElement('top-left-corner', 
-      `${gameStore.camera.viewportCorners.topLeft.x.toFixed(0)}, ${gameStore.camera.viewportCorners.topLeft.y.toFixed(0)}`,
-      'status-camera'
+    updateElement(this.elements, 'top-left-corner',
+      formatCoordinates(gameStore.camera.viewportCorners.topLeft.x, gameStore.camera.viewportCorners.topLeft.y, 0),
+      STATUS_COLORS.camera
     );
     
-    this.updateElement('bottom-right-corner', 
-      `${gameStore.camera.viewportCorners.bottomRight.x.toFixed(0)}, ${gameStore.camera.viewportCorners.bottomRight.y.toFixed(0)}`,
-      'status-camera'
+    updateElement(this.elements, 'bottom-right-corner',
+      formatCoordinates(gameStore.camera.viewportCorners.bottomRight.x, gameStore.camera.viewportCorners.bottomRight.y, 0),
+      STATUS_COLORS.camera
     );
     
     // Window & Mouse
-    this.updateElement('window-size', 
-      `${gameStore.windowWidth} x ${gameStore.windowHeight}`,
+    updateElement(this.elements, 'window-size',
+      formatWindowSize(gameStore.windowWidth, gameStore.windowHeight),
       'text-info'
     );
     
-    this.updateElement('mouse-position', 
-      `${gameStore.mousePosition.x}, ${gameStore.mousePosition.y}`,
-      'status-mouse'
+    updateElement(this.elements, 'mouse-position',
+      formatCoordinates(gameStore.mousePosition.x, gameStore.mousePosition.y, 0),
+      STATUS_COLORS.mouse
     );
     
-    this.updateElement('mouse-pixeloid-position', 
-      `${gameStore.mousePixeloidPosition.x.toFixed(2)}, ${gameStore.mousePixeloidPosition.y.toFixed(2)}`,
-      'status-mouse'
+    updateElement(this.elements, 'mouse-pixeloid-position',
+      formatCoordinates(gameStore.mousePixeloidPosition.x, gameStore.mousePixeloidPosition.y, 2),
+      STATUS_COLORS.mouse
     );
     
     // Input State
-    this.updateElement('key-w', 
-      gameStore.input.keys.w ? 'Pressed' : 'Released',
-      gameStore.input.keys.w ? 'status-active' : 'status-inactive'
+    updateElement(this.elements, 'key-w',
+      getKeyStatusText(gameStore.input.keys.w),
+      getBooleanStatusClass(gameStore.input.keys.w)
     );
     
-    this.updateElement('key-a', 
-      gameStore.input.keys.a ? 'Pressed' : 'Released',
-      gameStore.input.keys.a ? 'status-active' : 'status-inactive'
+    updateElement(this.elements, 'key-a',
+      getKeyStatusText(gameStore.input.keys.a),
+      getBooleanStatusClass(gameStore.input.keys.a)
     );
     
-    this.updateElement('key-s', 
-      gameStore.input.keys.s ? 'Pressed' : 'Released',
-      gameStore.input.keys.s ? 'status-active' : 'status-inactive'
+    updateElement(this.elements, 'key-s',
+      getKeyStatusText(gameStore.input.keys.s),
+      getBooleanStatusClass(gameStore.input.keys.s)
     );
     
-    this.updateElement('key-d', 
-      gameStore.input.keys.d ? 'Pressed' : 'Released',
-      gameStore.input.keys.d ? 'status-active' : 'status-inactive'
+    updateElement(this.elements, 'key-d',
+      getKeyStatusText(gameStore.input.keys.d),
+      getBooleanStatusClass(gameStore.input.keys.d)
     );
     
-    this.updateElement('key-space', 
-      gameStore.input.keys.space ? 'Pressed' : 'Released',
-      gameStore.input.keys.space ? 'status-active' : 'status-inactive'
+    updateElement(this.elements, 'key-space',
+      getKeyStatusText(gameStore.input.keys.space),
+      getBooleanStatusClass(gameStore.input.keys.space)
     );
-  }
-  
-  private updateElement(id: string, value: string, cssClass: string): void {
-    const element = this.elements.get(id);
-    if (element) {
-      // Clear existing status classes
-      element.className = element.className
-        .split(' ')
-        .filter(cls => !cls.startsWith('status-') && !cls.startsWith('text-'))
-        .join(' ');
-      
-      // Add base classes back and new status class
-      element.className += ` font-bold font-mono ${cssClass}`;
-      element.textContent = value;
-      
-      // Add a subtle animation on update
-      element.classList.add('value-updated');
-      setTimeout(() => {
-        element.classList.remove('value-updated');
-      }, 300);
-    }
   }
   
   public resize(_width: number, _height: number): void {

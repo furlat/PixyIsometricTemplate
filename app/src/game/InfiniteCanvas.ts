@@ -1,5 +1,7 @@
 import { Container, Graphics, Point } from 'pixi.js'
-import { gameStore, updateGameStore, type ViewportCorners } from '../store/gameStore'
+import { gameStore, updateGameStore } from '../store/gameStore'
+import type { ViewportCorners } from '../types'
+import { CoordinateHelper } from './CoordinateHelper'
 
 export class InfiniteCanvas {
   private container: Container
@@ -49,10 +51,13 @@ export class InfiniteCanvas {
    * Set initial camera position so (0,0) appears at top-left at default zoom
    */
   private setInitialCameraPosition(): void {
-    // Calculate camera position to place (0,0) at top-left corner
-    // At zoom level 10, we want pixeloid (0,0) to appear at screen (0,0)
-    this.localCameraPosition.x = this.localViewportSize.width / (2 * this.localPixeloidScale)
-    this.localCameraPosition.y = this.localViewportSize.height / (2 * this.localPixeloidScale)
+    const initialPosition = CoordinateHelper.calculateInitialCameraPosition(
+      this.localViewportSize,
+      this.localPixeloidScale
+    )
+    
+    this.localCameraPosition.x = initialPosition.x
+    this.localCameraPosition.y = initialPosition.y
     
     console.log(`Initial camera position set to (${this.localCameraPosition.x.toFixed(1)}, ${this.localCameraPosition.y.toFixed(1)}) to place (0,0) at top-left`)
   }
@@ -74,27 +79,11 @@ export class InfiniteCanvas {
    * Calculate viewport corners in pixeloid coordinates
    */
   private calculateViewportCorners(): ViewportCorners {
-    const halfWidth = (this.localViewportSize.width / this.localPixeloidScale) / 2
-    const halfHeight = (this.localViewportSize.height / this.localPixeloidScale) / 2
-    
-    return {
-      topLeft: {
-        x: this.localCameraPosition.x - halfWidth,
-        y: this.localCameraPosition.y - halfHeight
-      },
-      topRight: {
-        x: this.localCameraPosition.x + halfWidth,
-        y: this.localCameraPosition.y - halfHeight
-      },
-      bottomLeft: {
-        x: this.localCameraPosition.x - halfWidth,
-        y: this.localCameraPosition.y + halfHeight
-      },
-      bottomRight: {
-        x: this.localCameraPosition.x + halfWidth,
-        y: this.localCameraPosition.y + halfHeight
-      }
-    }
+    return CoordinateHelper.calculateViewportCorners(
+      this.localCameraPosition,
+      this.localViewportSize,
+      this.localPixeloidScale
+    )
   }
 
   /**
@@ -128,8 +117,12 @@ export class InfiniteCanvas {
     // Space to recenter camera to place (0,0) at top-left
     if (keys.space) {
       // Reset camera to place pixeloid (0,0) at top-left corner
-      this.localCameraPosition.x = this.localViewportSize.width / (2 * this.localPixeloidScale)
-      this.localCameraPosition.y = this.localViewportSize.height / (2 * this.localPixeloidScale)
+      const centerPosition = CoordinateHelper.calculateInitialCameraPosition(
+        this.localViewportSize,
+        this.localPixeloidScale
+      )
+      this.localCameraPosition.x = centerPosition.x
+      this.localCameraPosition.y = centerPosition.y
       moved = true
       // Reset space key to prevent continuous recentering
       updateGameStore.setKeyState('space', false)
@@ -188,10 +181,12 @@ export class InfiniteCanvas {
     
     // Update camera transform
     this.cameraTransform.scale.set(this.localPixeloidScale)
-    this.cameraTransform.position.set(
-      this.localViewportSize.width / 2 - this.localCameraPosition.x * this.localPixeloidScale,
-      this.localViewportSize.height / 2 - this.localCameraPosition.y * this.localPixeloidScale
+    const transformPosition = CoordinateHelper.calculateCameraTransformPosition(
+      this.localCameraPosition,
+      this.localViewportSize,
+      this.localPixeloidScale
     )
+    this.cameraTransform.position.set(transformPosition.x, transformPosition.y)
 
     // Render grid
     this.renderGrid()
@@ -206,12 +201,9 @@ export class InfiniteCanvas {
     // Calculate visible area in pixeloid coordinates
     const corners = this.calculateViewportCorners()
     
-    // Expand slightly to avoid edge artifacts
-    const padding = 2
-    const startX = Math.floor(corners.topLeft.x) - padding
-    const endX = Math.ceil(corners.topRight.x) + padding
-    const startY = Math.floor(corners.topLeft.y) - padding
-    const endY = Math.ceil(corners.bottomLeft.y) + padding
+    // Get visible grid bounds with padding
+    const bounds = CoordinateHelper.calculateVisibleGridBounds(corners, 2)
+    const { startX, endX, startY, endY } = bounds
 
     // Get mouse pixeloid position for highlighting
     const mousePixeloidX = Math.floor(gameStore.mousePixeloidPosition.x)
@@ -267,20 +259,26 @@ export class InfiniteCanvas {
    * Convert screen coordinates to pixeloid coordinates
    */
   public screenToPixeloid(screenX: number, screenY: number): Point {
-    const worldX = (screenX - this.localViewportSize.width / 2) / this.localPixeloidScale + this.localCameraPosition.x
-    const worldY = (screenY - this.localViewportSize.height / 2) / this.localPixeloidScale + this.localCameraPosition.y
-    
-    return new Point(worldX, worldY)
+    return CoordinateHelper.screenToPixeloid(
+      screenX,
+      screenY,
+      this.localCameraPosition,
+      this.localViewportSize,
+      this.localPixeloidScale
+    )
   }
 
   /**
    * Convert pixeloid coordinates to screen coordinates
    */
   public pixeloidToScreen(pixeloidX: number, pixeloidY: number): Point {
-    const screenX = (pixeloidX - this.localCameraPosition.x) * this.localPixeloidScale + this.localViewportSize.width / 2
-    const screenY = (pixeloidY - this.localCameraPosition.y) * this.localPixeloidScale + this.localViewportSize.height / 2
-    
-    return new Point(screenX, screenY)
+    return CoordinateHelper.pixeloidToScreen(
+      pixeloidX,
+      pixeloidY,
+      this.localCameraPosition,
+      this.localViewportSize,
+      this.localPixeloidScale
+    )
   }
 
   /**
