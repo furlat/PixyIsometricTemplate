@@ -18,6 +18,9 @@
         <button id="toggle-store-panel" class="btn btn-sm btn-primary rounded-full">
           <span class="button-text">Store</span>
         </button>
+        <button id="toggle-geometry-panel" class="btn btn-sm btn-secondary rounded-full">
+          <span class="button-text">Geometry</span>
+        </button>
       </div>
     </div>
     
@@ -142,6 +145,47 @@
           </div>
         </div>
 
+        <!-- Geometry Debug (Phase 1: Multi-Layer System) -->
+        <div class="card bg-base-200/30 shadow-sm mb-3">
+          <div class="card-body p-3">
+            <h3 class="card-title text-sm text-success flex items-center gap-2">
+              <span class="text-xs">▸</span>
+              Geometry Debug
+            </h3>
+            <div class="space-y-2">
+              <div class="flex justify-between items-center text-xs">
+                <span class="text-base-content/70">Drawing Mode:</span>
+                <span id="drawing-mode" class="font-bold font-mono text-success">none</span>
+              </div>
+              <div class="flex justify-between items-center text-xs">
+                <span class="text-base-content/70">Objects Count:</span>
+                <span id="objects-count" class="font-bold font-mono text-primary">0</span>
+              </div>
+              <div class="flex justify-between items-center text-xs">
+                <span class="text-base-content/70">Active Raycasts:</span>
+                <span id="active-raycasts" class="font-bold font-mono text-warning">0</span>
+              </div>
+            </div>
+            
+            <!-- Layer Visibility -->
+            <div class="divider my-2 text-xs text-base-content/50">Layer Visibility</div>
+            <div class="grid grid-cols-3 gap-2">
+              <div class="flex flex-col items-center text-xs">
+                <span class="text-base-content/70 mb-1">Grid</span>
+                <span id="layer-grid" class="font-bold font-mono status-active">ON</span>
+              </div>
+              <div class="flex flex-col items-center text-xs">
+                <span class="text-base-content/70 mb-1">Geometry</span>
+                <span id="layer-geometry" class="font-bold font-mono status-active">ON</span>
+              </div>
+              <div class="flex flex-col items-center text-xs">
+                <span class="text-base-content/70 mb-1">Raycast</span>
+                <span id="layer-raycast" class="font-bold font-mono status-active">ON</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Controls -->
         <div class="alert alert-info bg-info/10 border-info/20">
           <div class="w-full">
@@ -165,6 +209,142 @@
                 <kbd class="kbd kbd-xs bg-base-300">Space</kbd>
                 <span>Place origin (0,0) at top-left</span>
               </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Geometry Panel -->
+    <div id="geometry-panel" class="fixed top-4 left-4 w-80 max-h-[calc(100vh-2rem)] bg-base-100/95 backdrop-blur-md border border-base-300 rounded-xl shadow-2xl z-50 overflow-hidden animate-fade-in" style="display: none;">
+      <!-- Header -->
+      <div class="bg-base-200/50 border-b border-base-300 p-4">
+        <h2 class="text-lg font-bold text-secondary flex items-center gap-2">
+          <span class="text-success">🎨</span>
+          Geometry Tools
+        </h2>
+      </div>
+      
+      <!-- Scrollable Content -->
+      <div class="max-h-[calc(100vh-8rem)] overflow-y-auto custom-scrollbar p-2">
+        
+        <!-- Drawing Modes -->
+        <div class="card bg-base-200/30 shadow-sm mb-3">
+          <div class="card-body p-3">
+            <h3 class="card-title text-sm text-success flex items-center gap-2">
+              <span class="text-xs">▸</span>
+              Drawing Modes
+            </h3>
+            <div class="grid grid-cols-2 gap-2">
+              <button id="geometry-mode-none" class="btn btn-xs btn-outline">None</button>
+              <button id="geometry-mode-point" class="btn btn-xs btn-outline">Point</button>
+              <button id="geometry-mode-line" class="btn btn-xs btn-outline">Line</button>
+              <button id="geometry-mode-circle" class="btn btn-xs btn-outline">Circle</button>
+              <button id="geometry-mode-rectangle" class="btn btn-xs btn-outline">Rectangle</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Current State -->
+        <div class="card bg-base-200/30 shadow-sm mb-3">
+          <div class="card-body p-3">
+            <h3 class="card-title text-sm text-primary flex items-center gap-2">
+              <span class="text-xs">▸</span>
+              Current State
+            </h3>
+            <div class="space-y-2">
+              <div class="flex justify-between items-center text-xs">
+                <span class="text-base-content/70">Mode:</span>
+                <span id="geometry-current-mode" class="font-bold font-mono text-success">none</span>
+              </div>
+              <div class="flex justify-between items-center text-xs">
+                <span class="text-base-content/70">Objects:</span>
+                <span id="geometry-objects-count" class="font-bold font-mono text-primary">0</span>
+              </div>
+              <div class="flex justify-between items-center text-xs">
+                <span class="text-base-content/70">Selected:</span>
+                <span id="geometry-selected-count" class="font-bold font-mono text-info">0</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Layer Visibility -->
+        <div class="card bg-base-200/30 shadow-sm mb-3">
+          <div class="card-body p-3">
+            <h3 class="card-title text-sm text-warning flex items-center gap-2">
+              <span class="text-xs">▸</span>
+              Layer Visibility
+            </h3>
+            <div class="space-y-2">
+              <div class="flex justify-between items-center text-xs">
+                <span class="text-base-content/70">Grid:</span>
+                <button id="geometry-toggle-grid" class="btn btn-xs">
+                  <span id="geometry-layer-grid" class="font-bold font-mono">ON</span>
+                </button>
+              </div>
+              <div class="flex justify-between items-center text-xs">
+                <span class="text-base-content/70">Geometry:</span>
+                <button id="geometry-toggle-geometry" class="btn btn-xs">
+                  <span id="geometry-layer-geometry" class="font-bold font-mono">ON</span>
+                </button>
+              </div>
+              <div class="flex justify-between items-center text-xs">
+                <span class="text-base-content/70">Raycast:</span>
+                <button id="geometry-toggle-raycast" class="btn btn-xs">
+                  <span id="geometry-layer-raycast" class="font-bold font-mono">ON</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Drawing Settings -->
+        <div class="card bg-base-200/30 shadow-sm mb-3">
+          <div class="card-body p-3">
+            <h3 class="card-title text-sm text-accent flex items-center gap-2">
+              <span class="text-xs">▸</span>
+              Drawing Settings
+            </h3>
+            <div class="space-y-2">
+              <div class="flex justify-between items-center text-xs">
+                <span class="text-base-content/70">Color:</span>
+                <span id="geometry-default-color" class="font-bold font-mono text-accent">#0066cc</span>
+              </div>
+              <div class="flex justify-between items-center text-xs">
+                <span class="text-base-content/70">Stroke Width:</span>
+                <span id="geometry-default-stroke-width" class="font-bold font-mono text-accent">2</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="card bg-base-200/30 shadow-sm mb-3">
+          <div class="card-body p-3">
+            <h3 class="card-title text-sm text-error flex items-center gap-2">
+              <span class="text-xs">▸</span>
+              Actions
+            </h3>
+            <button id="geometry-clear-all" class="btn btn-sm btn-error w-full">
+              Clear All Objects
+            </button>
+          </div>
+        </div>
+
+        <!-- Instructions -->
+        <div class="alert alert-success bg-success/10 border-success/20">
+          <div class="w-full">
+            <h4 class="font-bold text-sm text-success mb-2 flex items-center gap-2">
+              <span>✨</span>
+              Instructions
+            </h4>
+            <div class="space-y-1 text-xs text-base-content/80">
+              <div>• Select a drawing mode above</div>
+              <div>• Click on canvas to draw</div>
+              <div>• Use layer toggles to show/hide</div>
+              <div>• Check Store Panel for debug info</div>
             </div>
           </div>
         </div>

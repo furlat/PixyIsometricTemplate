@@ -1,5 +1,6 @@
 export class UIControlBar {
   private storePanel: { toggle: () => void; getVisible: () => boolean } | null = null;
+  private geometryPanel: { toggle: () => void; getVisible: () => boolean } | null = null;
   
   constructor() {
     this.initializeElements();
@@ -24,6 +25,16 @@ export class UIControlBar {
     } else {
       console.warn('Store panel toggle button not found');
     }
+    
+    // Geometry Panel toggle button
+    const geometryPanelToggle = document.getElementById('toggle-geometry-panel');
+    if (geometryPanelToggle) {
+      geometryPanelToggle.addEventListener('click', () => {
+        this.toggleGeometryPanel();
+      });
+    } else {
+      console.warn('Geometry panel toggle button not found');
+    }
   }
   
   /**
@@ -35,12 +46,30 @@ export class UIControlBar {
   }
   
   /**
+   * Register the geometry panel with the control bar
+   */
+  public registerGeometryPanel(geometryPanel: { toggle: () => void; getVisible: () => boolean }): void {
+    this.geometryPanel = geometryPanel;
+    this.updateGeometryPanelButton();
+  }
+  
+  /**
    * Toggle store panel visibility
    */
   private toggleStorePanel(): void {
     if (this.storePanel) {
       this.storePanel.toggle();
       this.updateStorePanelButton();
+    }
+  }
+  
+  /**
+   * Toggle geometry panel visibility
+   */
+  private toggleGeometryPanel(): void {
+    if (this.geometryPanel) {
+      this.geometryPanel.toggle();
+      this.updateGeometryPanelButton();
     }
   }
   
@@ -65,6 +94,31 @@ export class UIControlBar {
       const buttonText = button.querySelector('.button-text');
       if (buttonText) {
         buttonText.textContent = 'Store';
+      }
+    }
+  }
+  
+  /**
+   * Update the geometry panel button state
+   */
+  private updateGeometryPanelButton(): void {
+    const button = document.getElementById('toggle-geometry-panel');
+    if (button && this.geometryPanel) {
+      const isVisible = this.geometryPanel.getVisible();
+      
+      // Update button appearance based on state
+      if (isVisible) {
+        button.classList.remove('btn-outline');
+        button.classList.add('btn-secondary');
+      } else {
+        button.classList.remove('btn-secondary');
+        button.classList.add('btn-outline');
+      }
+      
+      // Update button text
+      const buttonText = button.querySelector('.button-text');
+      if (buttonText) {
+        buttonText.textContent = 'Geometry';
       }
     }
   }

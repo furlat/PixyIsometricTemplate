@@ -1,6 +1,6 @@
 import { Application, Container, extensions, CullerPlugin } from 'pixi.js';
 import { updateGameStore } from '../store/gameStore';
-import { InfiniteCanvas } from './InfiniteCanvas';
+import { LayeredInfiniteCanvas } from './LayeredInfiniteCanvas';
 import { InputManager } from './InputManager';
 import { StorePanel } from '../ui/StorePanel';
 
@@ -9,7 +9,7 @@ extensions.add(CullerPlugin);
 
 export class Game {
   private app: Application;
-  private infiniteCanvas: InfiniteCanvas;
+  private infiniteCanvas: LayeredInfiniteCanvas;
   private inputManager: InputManager;
   private storePanel: StorePanel;
   private initialized = false;
@@ -17,7 +17,7 @@ export class Game {
   constructor() {
     // Create the application instance (step 1 from docs)
     this.app = new Application();
-    this.infiniteCanvas = new InfiniteCanvas();
+    this.infiniteCanvas = new LayeredInfiniteCanvas();
     this.inputManager = new InputManager();
     this.storePanel = new StorePanel();
   }
@@ -132,7 +132,7 @@ export class Game {
     return this.initialized;
   }
 
-  public get canvasSystem(): InfiniteCanvas {
+  public get canvasSystem(): LayeredInfiniteCanvas {
     return this.infiniteCanvas;
   }
 }

@@ -5,13 +5,13 @@ import { CoordinateHelper } from './CoordinateHelper'
 
 export class InfiniteCanvas {
   private container: Container
-  private gridGraphics: Graphics
-  private cameraTransform: Container
+  protected gridGraphics: Graphics
+  protected cameraTransform: Container
   
   // Local state to avoid store loops during rendering
-  private localCameraPosition = { x: 0, y: 0 }
-  private localPixeloidScale = 10
-  private localViewportSize = { width: window.innerWidth, height: window.innerHeight }
+  protected localCameraPosition = { x: 0, y: 0 }
+  protected localPixeloidScale = 10
+  protected localViewportSize = { width: window.innerWidth, height: window.innerHeight }
   
   // Movement speed in pixeloids per second
   private readonly CAMERA_SPEED = 50
@@ -78,7 +78,7 @@ export class InfiniteCanvas {
   /**
    * Calculate viewport corners in pixeloid coordinates
    */
-  private calculateViewportCorners(): ViewportCorners {
+  protected calculateViewportCorners(): ViewportCorners {
     return CoordinateHelper.calculateViewportCorners(
       this.localCameraPosition,
       this.localViewportSize,
@@ -195,7 +195,7 @@ export class InfiniteCanvas {
   /**
    * Render the checkered grid pattern
    */
-  private renderGrid(): void {
+  protected renderGrid(): void {
     this.gridGraphics.clear()
 
     // Calculate visible area in pixeloid coordinates

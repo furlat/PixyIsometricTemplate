@@ -36,7 +36,14 @@ export class StorePanel {
       'key-a',
       'key-s',
       'key-d',
-      'key-space'
+      'key-space',
+      // Geometry Debug elements (Phase 1: Multi-Layer System)
+      'drawing-mode',
+      'objects-count',
+      'active-raycasts',
+      'layer-grid',
+      'layer-geometry',
+      'layer-raycast'
     ];
     
     elementIds.forEach(id => {
@@ -132,9 +139,41 @@ export class StorePanel {
       getBooleanStatusClass(gameStore.input.keys.d)
     );
     
-    updateElement(this.elements, 'key-space', 
+    updateElement(this.elements, 'key-space',
       getKeyStatusText(gameStore.input.keys.space),
       getBooleanStatusClass(gameStore.input.keys.space)
+    );
+
+    // Geometry Debug (Phase 1: Multi-Layer System)
+    updateElement(this.elements, 'drawing-mode',
+      gameStore.geometry.drawing.mode,
+      'text-success'
+    );
+
+    updateElement(this.elements, 'objects-count',
+      gameStore.geometry.objects.length.toString(),
+      'text-primary'
+    );
+
+    updateElement(this.elements, 'active-raycasts',
+      gameStore.geometry.raycast.activeRaycasts.length.toString(),
+      'text-warning'
+    );
+
+    // Layer visibility states
+    updateElement(this.elements, 'layer-grid',
+      getBooleanStatusText(gameStore.geometry.layerVisibility.grid),
+      getBooleanStatusClass(gameStore.geometry.layerVisibility.grid)
+    );
+
+    updateElement(this.elements, 'layer-geometry',
+      getBooleanStatusText(gameStore.geometry.layerVisibility.geometry),
+      getBooleanStatusClass(gameStore.geometry.layerVisibility.geometry)
+    );
+
+    updateElement(this.elements, 'layer-raycast',
+      getBooleanStatusText(gameStore.geometry.layerVisibility.raycast),
+      getBooleanStatusClass(gameStore.geometry.layerVisibility.raycast)
     );
   }
   

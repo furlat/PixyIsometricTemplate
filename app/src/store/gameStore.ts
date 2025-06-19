@@ -1,5 +1,5 @@
 import { proxy } from 'valtio'
-import type { GameState, ViewportCorners } from '../types'
+import type { GameState, ViewportCorners, GeometricObject } from '../types'
 
 // Create the game store using Valtio
 export const gameStore = proxy<GameState>({
@@ -33,6 +33,37 @@ export const gameStore = proxy<GameState>({
       s: false,
       d: false,
       space: false
+    }
+  },
+  // Geometry system state (Phase 1: Multi-Layer System)
+  geometry: {
+    objects: [],
+    drawing: {
+      mode: 'none',
+      activeDrawing: {
+        type: null,
+        startPoint: null,
+        isDrawing: false
+      },
+      settings: {
+        defaultColor: 0x0066cc,
+        defaultStrokeWidth: 2,
+        defaultFillColor: 0x99ccff
+      }
+    },
+    raycast: {
+      activeRaycasts: [],
+      settings: {
+        maxDistance: 100,
+        visualizationColor: 0xff6600,
+        showSteps: true,
+        stepColor: 0xffaa66
+      }
+    },
+    layerVisibility: {
+      geometry: true,
+      raycast: true,
+      grid: true
     }
   }
 })
@@ -89,6 +120,49 @@ export const updateGameStore = {
   updateMousePixeloidPosition: (pixeloidX: number, pixeloidY: number) => {
     gameStore.mousePixeloidPosition.x = pixeloidX
     gameStore.mousePixeloidPosition.y = pixeloidY
+  },
+
+  // Geometry controls (Phase 1: Multi-Layer System)
+  setDrawingMode: (mode: 'none' | 'point' | 'line' | 'circle' | 'rectangle') => {
+    gameStore.geometry.drawing.mode = mode
+    // Clear active drawing when switching modes
+    gameStore.geometry.drawing.activeDrawing.type = null
+    gameStore.geometry.drawing.activeDrawing.startPoint = null
+    gameStore.geometry.drawing.activeDrawing.isDrawing = false
+  },
+
+  addGeometricObject: (object: GeometricObject) => {
+    gameStore.geometry.objects.push(object)
+  },
+
+  removeGeometricObject: (id: string) => {
+    const index = gameStore.geometry.objects.findIndex(obj => obj.id === id)
+    if (index !== -1) {
+      gameStore.geometry.objects.splice(index, 1)
+    }
+  },
+
+  clearAllGeometricObjects: () => {
+    gameStore.geometry.objects.length = 0
+  },
+
+  updateGeometricObjectVisibility: (id: string, isVisible: boolean) => {
+    const object = gameStore.geometry.objects.find(obj => obj.id === id)
+    if (object) {
+      object.isVisible = isVisible
+    }
+  },
+
+  setLayerVisibility: (layer: 'geometry' | 'raycast' | 'grid', visible: boolean) => {
+    gameStore.geometry.layerVisibility[layer] = visible
+  },
+
+  setDrawingSettings: (settings: Partial<typeof gameStore.geometry.drawing.settings>) => {
+    Object.assign(gameStore.geometry.drawing.settings, settings)
+  },
+
+  setRaycastSettings: (settings: Partial<typeof gameStore.geometry.raycast.settings>) => {
+    Object.assign(gameStore.geometry.raycast.settings, settings)
   }
 }
 

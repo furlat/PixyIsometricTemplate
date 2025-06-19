@@ -818,37 +818,192 @@ export class InputManager {
 
 ---
 
-## 📈 Implementation Timeline
+## ✅ CURRENT IMPLEMENTATION STATUS
 
-### Week 1: Foundation
-- [ ] Extract grid rendering to `BackgroundGridRenderer`
-- [ ] Implement `LayeredInfiniteCanvas` with 4 render layers
-- [ ] Update `Game.ts` to use new layered system
-- [ ] Verify existing functionality remains intact
+### ✅ COMPLETED (Foundation Architecture):
 
-### Week 2: Geometry Store & Types
-- [ ] Add geometry types to [`types/index.ts`](app/src/types/index.ts:1)
-- [ ] Extend [`gameStore`](app/src/store/gameStore.ts:1) with geometry state
-- [ ] Implement `updateGeometryStore` functions
-- [ ] Create shape factory utilities
+**1. Multi-Layer System Foundation**
+- ✅ [`BackgroundGridRenderer.ts`](app/src/game/BackgroundGridRenderer.ts:1) - Extracted grid rendering from InfiniteCanvas
+- ✅ [`LayeredInfiniteCanvas.ts`](app/src/game/LayeredInfiniteCanvas.ts:1) - Extends InfiniteCanvas with 4 PixiJS Container layers
+- ✅ [`Game.ts`](app/src/game/Game.ts:1) - Updated to use LayeredInfiniteCanvas
+- ✅ [`InfiniteCanvas.ts`](app/src/game/InfiniteCanvas.ts:198) - Made members protected for proper inheritance
 
-### Week 3: Bresenham & Ray System
-- [ ] Implement `BresenhamRaycast` class
-- [ ] Integrate raycast with existing coordinate system
-- [ ] Add raycast input handling to [`InputManager`](app/src/game/InputManager.ts:1)
-- [ ] Create ray visualization in `raycastLayer`
+**2. Store & Types Integration**
+- ✅ [`types/index.ts`](app/src/types/index.ts:69) - Complete geometry types (GeometricPoint, GeometricLine, etc.)
+- ✅ [`gameStore.ts`](app/src/store/gameStore.ts:38) - Full geometry state with Valtio reactivity
+- ✅ [`StorePanel.ts`](app/src/ui/StorePanel.ts:142) - Geometry debug information integrated
 
-### Week 4: UI & Debug Tools
-- [ ] Create `GeometryPanel` following [`StorePanel`](app/src/ui/StorePanel.ts:1) pattern
-- [ ] Add geometry debug page to store panel
-- [ ] Implement click-to-center functionality
-- [ ] Add geometry control buttons to [`UIControlBar`](app/src/ui/UIControlBar.ts:1)
+**3. GeometryPanel UI Component**
+- ✅ [`GeometryPanel.ts`](app/src/ui/GeometryPanel.ts:1) - Complete UI component with reactive updates
+- ✅ [`index.html`](app/index.html:203) - Full HTML interface with drawing modes, layer toggles, settings
+- ✅ [`UIControlBar.ts`](app/src/ui/UIControlBar.ts:35) - Geometry button + panel management
+- ✅ [`main.ts`](app/src/main.ts:20) - GeometryPanel initialization and connection
 
-### Week 5: Integration & Testing
-- [ ] Test all geometry modes (selection, rectangle, raycast)
-- [ ] Verify performance with multiple shapes
-- [ ] Test camera centering on shape selection
-- [ ] Document new APIs and usage patterns
+### ❌ MISSING CRITICAL FUNCTIONALITY:
+
+**1. Layer Visibility Control - UI EXISTS BUT NON-FUNCTIONAL**
+- ❌ **Problem**: Buttons exist but [`LayeredInfiniteCanvas.ts:74-75`](app/src/game/LayeredInfiniteCanvas.ts:74) shows TODO
+- ❌ **Issue**: Store updates but layers don't actually hide/show
+- ❌ **Missing**: Logic to set `layer.visible = false` based on store state
+
+**2. Drawing Functionality - COMPLETELY MISSING**
+- ❌ **Problem**: GeometryPanel is only a UI stub - no actual drawing capability
+- ❌ **Issue**: Mouse clicks don't create shapes (no InputManager integration)
+- ❌ **Missing**: Connection between mode selection and mouse input handling
+
+**3. Shape Rendering - GEOMETRY LAYER EMPTY**
+- ❌ **Problem**: Container exists but renders nothing
+- ❌ **Issue**: Store can hold geometric objects but they don't appear on screen
+- ❌ **Missing**: Shape rendering logic in geometry layer
+
+**4. Bresenham Raycast - INTENTIONALLY SKIPPED**
+- ⚠️ **Status**: Not implemented per user request
+
+## 🎯 NEXT STEPS TO COMPLETE DRAWING FUNCTIONALITY:
+
+### 🔥 PRIORITY 1: Layer Visibility Implementation
+**File**: [`LayeredInfiniteCanvas.ts`](app/src/game/LayeredInfiniteCanvas.ts:74)
+```typescript
+// Replace TODO with actual layer visibility logic
+public render(): void {
+  super.render()
+  
+  // Apply layer visibility from store state
+  this.backgroundLayer.visible = gameStore.geometry.layerVisibility.grid
+  this.geometryLayer.visible = gameStore.geometry.layerVisibility.geometry
+  this.raycastLayer.visible = gameStore.geometry.layerVisibility.raycast
+  
+  // Render background grid
+  if (this.backgroundLayer.visible) {
+    this.backgroundGridRenderer.render(corners, pixeloidScale)
+    this.backgroundLayer.removeChildren()
+    this.backgroundLayer.addChild(this.backgroundGridRenderer.getGraphics())
+  }
+  
+  // Render geometry shapes
+  if (this.geometryLayer.visible) {
+    this.renderGeometryLayer()
+  }
+}
+```
+
+### 🔥 PRIORITY 2: Mouse Input for Drawing
+**File**: [`InputManager.ts`](app/src/game/InputManager.ts:1) - Extend existing mouse handling
+```typescript
+private handleMouseClick(event: MouseEvent): void {
+  // Existing mouse position update...
+  
+  // NEW: Handle geometry mode interactions
+  if (gameStore.geometry.drawing.mode !== 'none') {
+    this.handleGeometryModeClick(pixeloidPos)
+  }
+}
+
+private handleGeometryModeClick(pixeloidPos: Point): void {
+  const mode = gameStore.geometry.drawing.mode
+  
+  switch (mode) {
+    case 'rectangle':
+      this.handleRectangleClick(pixeloidPos)
+      break
+    case 'circle':
+      this.handleCircleClick(pixeloidPos)
+      break
+    case 'point':
+      this.handlePointClick(pixeloidPos)
+      break
+    case 'line':
+      this.handleLineClick(pixeloidPos)
+      break
+  }
+}
+```
+
+### 🔥 PRIORITY 3: Shape Creation & Rendering
+**Files**: Create [`ShapeFactory.ts`](app/src/game/ShapeFactory.ts) and [`GeometryRenderer.ts`](app/src/game/GeometryRenderer.ts)
+```typescript
+// ShapeFactory.ts - Create geometric objects
+export class ShapeFactory {
+  static createRectangle(start: PixeloidCoordinate, end: PixeloidCoordinate): GeometricRectangle {
+    return {
+      id: `rect_${Date.now()}`,
+      x: Math.min(start.x, end.x),
+      y: Math.min(start.y, end.y),
+      width: Math.abs(end.x - start.x),
+      height: Math.abs(end.y - start.y),
+      color: gameStore.geometry.drawing.settings.defaultColor,
+      strokeWidth: gameStore.geometry.drawing.settings.defaultStrokeWidth,
+      isVisible: true,
+      createdAt: Date.now()
+    }
+  }
+}
+
+// GeometryRenderer.ts - Render shapes to PixiJS Graphics
+export class GeometryRenderer {
+  private graphics: Graphics = new Graphics()
+  
+  render(objects: GeometricObject[]): Graphics {
+    this.graphics.clear()
+    
+    for (const obj of objects) {
+      if (!obj.isVisible) continue
+      
+      switch (obj.type) {
+        case 'rectangle':
+          this.renderRectangle(obj)
+          break
+        case 'circle':
+          this.renderCircle(obj)
+          break
+        case 'point':
+          this.renderPoint(obj)
+          break
+        case 'line':
+          this.renderLine(obj)
+          break
+      }
+    }
+    
+    return this.graphics
+  }
+}
+```
+
+### 🔥 PRIORITY 4: Integration in LayeredInfiniteCanvas
+```typescript
+// Add to LayeredInfiniteCanvas.ts
+private geometryRenderer: GeometryRenderer
+
+private renderGeometryLayer(): void {
+  const geometryObjects = Array.from(gameStore.geometry.objects)
+  const renderedGraphics = this.geometryRenderer.render(geometryObjects)
+  
+  this.geometryLayer.removeChildren()
+  this.geometryLayer.addChild(renderedGraphics)
+}
+```
+
+## 📋 IMPLEMENTATION CHECKLIST:
+
+### Phase 1: Core Functionality (Immediate)
+- [ ] **Layer Visibility Logic** - Make toggles actually work
+- [ ] **Mouse Input Handling** - Connect clicks to shape creation
+- [ ] **Shape Factory** - Create geometric objects from coordinates
+- [ ] **Geometry Renderer** - Render shapes to PixiJS Graphics
+- [ ] **Integration** - Connect all pieces in LayeredInfiniteCanvas
+
+### Phase 2: Enhanced Features (Follow-up)
+- [ ] **Shape Selection** - Click existing shapes to select them
+- [ ] **Shape Editing** - Drag corners to resize shapes
+- [ ] **Shape Deletion** - Delete selected shapes
+- [ ] **Multi-shape Operations** - Select multiple shapes
+
+### Phase 3: Advanced Features (Future)
+- [ ] **Bresenham Raycast** - If requested later
+- [ ] **Complex Polygons** - Multi-point drawing
+- [ ] **Shape Persistence** - Save/load geometric objects
+- [ ] **Performance Optimization** - Spatial indexing for many shapes
 
 ---
 
@@ -863,3 +1018,448 @@ export class InputManager {
 7. **API Compatibility**: All existing functionality preserved
 
 This implementation provides the foundation for advanced geometric interactions while maintaining the architectural integrity of the existing PixyIsometric Template.
+---
+
+## 🖱️ UX/INPUT HANDLING DESIGN FOR DRAWING
+
+### 🎯 Core UX Principles
+
+**1. Single-Action Drawing (No Multi-Click for Basic Shapes)**
+- **Rectangles**: Click and drag to define opposite corners
+- **Circles**: Click and drag from center to edge (radius)
+- **Lines**: Click and drag from start to end point
+- **Points**: Single click to place
+- **Polygons**: ONLY shape requiring multiple clicks (sequential vertex placement)
+
+**2. Visual Feedback During Drawing**
+- **Preview shape** renders in real-time during drag operations
+- **Snap indicators** show grid alignment
+- **Dimension display** shows current size/coordinates
+- **Constraint indicators** show when proportions are locked
+
+**3. Shape Regulation & Constraints**
+- **Grid snapping** with toggle control
+- **Proportional constraints** (hold Shift for squares from rectangles)
+- **Minimum size limits** prevent degenerate shapes
+- **Maximum canvas bounds** prevent drawing outside visible area
+
+### 📐 Drawing Mode Behaviors
+
+#### Rectangle Mode (`mode: 'rectangle'`)
+```typescript
+// UX Flow: Click + Drag
+onMouseDown(pixeloidPos) {
+  startCorner = pixeloidPos
+  showPreviewRectangle = true
+}
+
+onMouseMove(pixeloidPos) {
+  if (showPreviewRectangle) {
+    currentCorner = applyConstraints(pixeloidPos, startCorner)
+    renderPreviewRectangle(startCorner, currentCorner)
+    displayDimensions(calculateSize(startCorner, currentCorner))
+  }
+}
+
+onMouseUp(pixeloidPos) {
+  if (isValidRectangle(startCorner, currentCorner)) {
+    createRectangle(startCorner, currentCorner)
+  }
+  clearPreview()
+}
+
+// Constraints & Regulation
+function applyConstraints(current, start) {
+  let result = current
+  
+  // Grid snapping
+  if (gameStore.geometry.settings.snapToGrid) {
+    result = snapToGrid(result, gameStore.geometry.settings.gridSnapSize)
+  }
+  
+  // Square constraint (Shift key held)
+  if (isShiftPressed) {
+    result = makeSquare(start, result)
+  }
+  
+  // Minimum size
+  result = enforceMinimumSize(start, result, MIN_RECTANGLE_SIZE)
+  
+  return result
+}
+```
+
+#### Circle Mode (`mode: 'circle'`)
+```typescript
+// UX Flow: Click + Drag (center to radius)
+onMouseDown(pixeloidPos) {
+  centerPoint = pixeloidPos
+  showPreviewCircle = true
+}
+
+onMouseMove(pixeloidPos) {
+  if (showPreviewCircle) {
+    radius = calculateRadius(centerPoint, pixeloidPos)
+    radius = applyCircleConstraints(radius)
+    renderPreviewCircle(centerPoint, radius)
+    displayRadius(radius)
+  }
+}
+
+onMouseUp(pixeloidPos) {
+  if (radius >= MIN_CIRCLE_RADIUS) {
+    createCircle(centerPoint, radius)
+  }
+  clearPreview()
+}
+
+// Circle-specific constraints
+function applyCircleConstraints(radius) {
+  // Snap radius to grid intervals
+  if (gameStore.geometry.settings.snapToGrid) {
+    radius = Math.round(radius / gameStore.geometry.settings.gridSnapSize) * gameStore.geometry.settings.gridSnapSize
+  }
+  
+  // Enforce minimum/maximum radius
+  radius = Math.max(radius, MIN_CIRCLE_RADIUS)
+  radius = Math.min(radius, MAX_CIRCLE_RADIUS)
+  
+  return radius
+}
+```
+
+#### Line Mode (`mode: 'line'`)
+```typescript
+// UX Flow: Click + Drag (start to end)
+onMouseDown(pixeloidPos) {
+  startPoint = pixeloidPos
+  showPreviewLine = true
+}
+
+onMouseMove(pixeloidPos) {
+  if (showPreviewLine) {
+    endPoint = applyLineConstraints(pixeloidPos, startPoint)
+    renderPreviewLine(startPoint, endPoint)
+    displayLength(calculateDistance(startPoint, endPoint))
+    displayAngle(calculateAngle(startPoint, endPoint))
+  }
+}
+
+// Line-specific constraints
+function applyLineConstraints(end, start) {
+  let result = end
+  
+  // Angle snapping (Shift for 45-degree increments)
+  if (isShiftPressed) {
+    result = snapToAngle(start, result, [0, 45, 90, 135, 180, 225, 270, 315])
+  }
+  
+  // Grid snapping
+  if (gameStore.geometry.settings.snapToGrid) {
+    result = snapToGrid(result, gameStore.geometry.settings.gridSnapSize)
+  }
+  
+  return result
+}
+```
+
+#### Point Mode (`mode: 'point'`)
+```typescript
+// UX Flow: Single Click
+onMouseDown(pixeloidPos) {
+  point = applyPointConstraints(pixeloidPos)
+  createPoint(point)
+}
+
+function applyPointConstraints(pos) {
+  if (gameStore.geometry.settings.snapToGrid) {
+    return snapToGrid(pos, gameStore.geometry.settings.gridSnapSize)
+  }
+  return pos
+}
+```
+
+#### Polygon Mode (`mode: 'polygon'`) - MULTI-CLICK EXCEPTION
+```typescript
+// UX Flow: Sequential clicks to build polygon
+onMouseDown(pixeloidPos) {
+  if (!activePolygon.isDrawing) {
+    // Start new polygon
+    activePolygon.vertices = [pixeloidPos]
+    activePolygon.isDrawing = true
+    showPolygonPreview = true
+  } else {
+    // Add vertex to existing polygon
+    activePolygon.vertices.push(pixeloidPos)
+  }
+  
+  renderPolygonPreview(activePolygon.vertices)
+}
+
+onMouseMove(pixeloidPos) {
+  if (activePolygon.isDrawing && showPolygonPreview) {
+    previewVertices = [...activePolygon.vertices, pixeloidPos]
+    renderPolygonPreview(previewVertices)
+  }
+}
+
+onDoubleClick() {
+  // Finish polygon
+  if (activePolygon.vertices.length >= 3) {
+    createPolygon(activePolygon.vertices)
+  }
+  clearPolygonDrawing()
+}
+
+onEscapeKey() {
+  // Cancel polygon drawing
+  clearPolygonDrawing()
+}
+```
+
+### 🎛️ Shape Manipulation (Post-Creation)
+
+#### Selection System
+```typescript
+// Visual selection indicators
+function renderSelectionHandles(shape: GeometricShape) {
+  switch (shape.type) {
+    case 'rectangle':
+      // 8 handles: 4 corners + 4 edge midpoints
+      renderCornerHandles(shape.boundingBox)
+      renderEdgeHandles(shape.boundingBox)
+      break
+      
+    case 'circle':
+      // 4 cardinal direction handles + center
+      renderRadiusHandles(shape.center, shape.radius)
+      renderCenterHandle(shape.center)
+      break
+      
+    case 'line':
+      // 2 endpoint handles
+      renderEndpointHandles(shape.start, shape.end)
+      break
+      
+    case 'point':
+      // Single position handle
+      renderPositionHandle(shape.position)
+      break
+  }
+}
+```
+
+#### Movement Actions
+```typescript
+// Drag entire shape
+onShapeDrag(shape: GeometricShape, deltaX: number, deltaY: number) {
+  const newShape = translateShape(shape, deltaX, deltaY)
+  
+  // Apply movement constraints
+  if (gameStore.geometry.settings.snapToGrid) {
+    newShape = snapShapeToGrid(newShape)
+  }
+  
+  // Bounds checking
+  if (isWithinCanvas(newShape)) {
+    updateGeometryStore.updateShape(shape.id, newShape)
+  }
+}
+```
+
+#### Resize Actions
+```typescript
+// Drag selection handles
+onHandleDrag(shape: GeometricShape, handleType: HandleType, newPosition: PixeloidCoordinate) {
+  switch (shape.type) {
+    case 'rectangle':
+      if (handleType === 'corner') {
+        shape = resizeRectangleByCorner(shape, newPosition)
+      } else if (handleType === 'edge') {
+        shape = resizeRectangleByEdge(shape, newPosition)
+      }
+      break
+      
+    case 'circle':
+      if (handleType === 'radius') {
+        shape = resizeCircleByRadius(shape, newPosition)
+      } else if (handleType === 'center') {
+        shape = moveCircleCenter(shape, newPosition)
+      }
+      break
+      
+    case 'line':
+      shape = moveLineEndpoint(shape, handleType, newPosition)
+      break
+  }
+  
+  // Apply resize constraints
+  shape = enforceShapeConstraints(shape)
+  updateGeometryStore.updateShape(shape.id, shape)
+}
+```
+
+### ⌨️ Keyboard Shortcuts & Modifiers
+
+```typescript
+// Drawing constraints
+const MODIFIER_KEYS = {
+  SHIFT: 'proportional-constraint',     // Square from rectangle, snap angles
+  CTRL: 'precision-mode',               // Disable snapping temporarily
+  ALT: 'center-origin',                 // Draw from center instead of corner
+  SPACE: 'pan-mode'                     // Temporarily switch to pan mode
+}
+
+// Shape operations
+const SHORTCUTS = {
+  DELETE: 'delete-selected-shapes',
+  ESCAPE: 'cancel-current-operation',
+  ENTER: 'confirm-current-operation',
+  TAB: 'cycle-through-shapes',
+  'CTRL+A': 'select-all-shapes',
+  'CTRL+D': 'duplicate-selected-shapes',
+  'CTRL+Z': 'undo-last-action',
+  'CTRL+Y': 'redo-last-action'
+}
+```
+
+### 📏 Shape Regulation Parameters
+
+```typescript
+// Add to GeometryState settings
+export interface GeometrySettings {
+  // Snapping
+  snapToGrid: boolean
+  gridSnapSize: number                  // Pixeloids
+  snapToAngles: boolean
+  angleSnapIncrement: number            // Degrees
+  
+  // Size constraints
+  minRectangleSize: { width: number, height: number }
+  maxRectangleSize: { width: number, height: number }
+  minCircleRadius: number
+  maxCircleRadius: number
+  minLineLength: number
+  maxLineLength: number
+  
+  // Drawing behavior
+  previewOpacity: number                // 0.0 - 1.0
+  previewColor: number                  // Hex color
+  selectionColor: number                // Hex color
+  handleSize: number                    // Pixeloids
+  
+  // Performance
+  maxShapesPerLayer: number
+  enableRealTimePreview: boolean
+  
+  // Validation
+  preventShapeOverlap: boolean
+  preventCanvasBounds: boolean
+}
+```
+
+### 🔄 State Machine for Drawing
+
+```typescript
+type DrawingState = 
+  | 'idle'                              // No active drawing
+  | 'drawing-preview'                   // Drag in progress, showing preview
+  | 'shape-selected'                    // Existing shape selected
+  | 'handle-dragging'                   // Resizing/moving selected shape
+  | 'multi-selection'                   // Multiple shapes selected
+  | 'polygon-building'                  // Special state for polygon multi-click
+
+interface DrawingContext {
+  state: DrawingState
+  activeShape: GeometricShape | null
+  selectedShapes: Set<string>
+  previewData: any
+  dragStartPosition: PixeloidCoordinate | null
+  activeHandle: HandleType | null
+}
+
+// State transitions
+function handleDrawingInput(context: DrawingContext, event: InputEvent) {
+  switch (context.state) {
+    case 'idle':
+      if (event.type === 'mousedown') {
+        if (event.target === 'empty-space') {
+          return startDrawing(context, event)
+        } else if (event.target === 'existing-shape') {
+          return selectShape(context, event)
+        }
+      }
+      break
+      
+    case 'drawing-preview':
+      if (event.type === 'mousemove') {
+        return updatePreview(context, event)
+      } else if (event.type === 'mouseup') {
+        return finishDrawing(context, event)
+      }
+      break
+      
+    // ... other states
+  }
+}
+```
+
+### 🎨 Visual Feedback System
+
+```typescript
+// Preview rendering during drawing
+function renderDrawingPreview(context: DrawingContext) {
+  if (context.state === 'drawing-preview') {
+    const previewGraphics = new Graphics()
+    previewGraphics.alpha = gameStore.geometry.settings.previewOpacity
+    
+    switch (gameStore.geometry.drawing.mode) {
+      case 'rectangle':
+        previewGraphics.rect(...)
+        previewGraphics.stroke({ 
+          width: 2, 
+          color: gameStore.geometry.settings.previewColor,
+          style: 'dashed'
+        })
+        break
+        
+      case 'circle':
+        previewGraphics.circle(...)
+        previewGraphics.stroke({ 
+          width: 2, 
+          color: gameStore.geometry.settings.previewColor,
+          style: 'dashed'
+        })
+        break
+    }
+    
+    // Add dimension labels
+    renderDimensionLabels(previewGraphics, context.previewData)
+  }
+}
+
+// Snap indicators
+function renderSnapIndicators(snapPoint: PixeloidCoordinate) {
+  const indicator = new Graphics()
+  indicator.circle(snapPoint.x, snapPoint.y, 4)
+  indicator.fill(0x00ff00)  // Green snap indicator
+  
+  // Show snap distance
+  const label = new Text(`(${snapPoint.x}, ${snapPoint.y})`, {
+    fontSize: 12,
+    fill: 0x00ff00
+  })
+  label.position.set(snapPoint.x + 10, snapPoint.y - 10)
+  
+  return { indicator, label }
+}
+```
+
+This UX design ensures:
+1. **Single-action drawing** for all basic shapes (rectangles, circles, lines, points)
+2. **Multi-click reserved** only for polygons
+3. **Rich visual feedback** during all operations
+4. **Flexible constraints** and regulation systems
+5. **Intuitive manipulation** of existing shapes
+6. **Keyboard shortcuts** for power users
+7. **Clear state management** for complex interactions
