@@ -10,13 +10,24 @@
   <body>
     <canvas id="gameCanvas"></canvas>
     
-    <!-- Modern DaisyUI Panel -->
-    <div id="ui-panel" class="fixed top-4 right-4 w-80 max-h-[calc(100vh-2rem)] bg-base-100/95 backdrop-blur-md border border-base-300 rounded-xl shadow-2xl z-50 overflow-hidden animate-fade-in">
+    <!-- UI Control Bar -->
+    <div id="ui-control-bar" class="fixed top-4 left-1/2 transform -translate-x-1/2 bg-base-100/95 backdrop-blur-md border border-base-300 rounded-full shadow-lg z-50 px-4 py-2">
+      <div class="flex items-center gap-3">
+        <span class="text-sm font-semibold text-primary">UI Controls</span>
+        <div class="divider divider-horizontal mx-0"></div>
+        <button id="toggle-store-panel" class="btn btn-sm btn-primary rounded-full">
+          <span class="button-text">Store</span>
+        </button>
+      </div>
+    </div>
+    
+    <!-- Store Panel (formerly UI Panel) -->
+    <div id="store-panel" class="fixed top-4 right-4 w-80 max-h-[calc(100vh-2rem)] bg-base-100/95 backdrop-blur-md border border-base-300 rounded-xl shadow-2xl z-50 overflow-hidden animate-fade-in">
       <!-- Header -->
       <div class="bg-base-200/50 border-b border-base-300 p-4">
         <h2 class="text-lg font-bold text-primary flex items-center gap-2">
-          <span class="text-info">⬢</span>
-          Infinite Canvas
+          <span class="text-info">📊</span>
+          Store Panel
         </h2>
       </div>
       

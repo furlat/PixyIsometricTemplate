@@ -1,1 +1,2 @@
-export { UIPanel } from './UIPanel';
+export { StorePanel } from './StorePanel';
+export { UIControlBar } from './UIControlBar';

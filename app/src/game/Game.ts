@@ -2,7 +2,7 @@ import { Application, Container, extensions, CullerPlugin } from 'pixi.js';
 import { updateGameStore } from '../store/gameStore';
 import { InfiniteCanvas } from './InfiniteCanvas';
 import { InputManager } from './InputManager';
-import { UIPanel } from '../ui/UIPanel';
+import { StorePanel } from '../ui/StorePanel';
 
 // Register the CullerPlugin
 extensions.add(CullerPlugin);
@@ -11,7 +11,7 @@ export class Game {
   private app: Application;
   private infiniteCanvas: InfiniteCanvas;
   private inputManager: InputManager;
-  private uiPanel: UIPanel;
+  private storePanel: StorePanel;
   private initialized = false;
 
   constructor() {
@@ -19,7 +19,7 @@ export class Game {
     this.app = new Application();
     this.infiniteCanvas = new InfiniteCanvas();
     this.inputManager = new InputManager();
-    this.uiPanel = new UIPanel();
+    this.storePanel = new StorePanel();
   }
 
   async init(canvas: HTMLCanvasElement): Promise<void> {
@@ -86,8 +86,8 @@ export class Game {
   }
 
   public destroy(): void {
-    // Clean up UI panel
-    this.uiPanel.destroy();
+    // Clean up store panel
+    this.storePanel.destroy();
     
     // Clean up input manager
     this.inputManager.destroy();

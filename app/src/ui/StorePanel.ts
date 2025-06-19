@@ -10,8 +10,9 @@ import {
   STATUS_COLORS
 } from './handlers/UIHandlers';
 
-export class UIPanel {
+export class StorePanel {
   private elements: Map<string, HTMLElement> = new Map();
+  private isVisible: boolean = true;
   
   constructor() {
     this.initializeElements();
@@ -43,7 +44,7 @@ export class UIPanel {
       if (element) {
         this.elements.set(id, element);
       } else {
-        console.warn(`UI element with id '${id}' not found`);
+        console.warn(`StorePanel element with id '${id}' not found`);
       }
     });
   }
@@ -58,13 +59,15 @@ export class UIPanel {
   }
   
   private updateValues(): void {
+    if (!this.isVisible) return;
+    
     // System Status
-    updateElement(this.elements, 'game-initialized',
+    updateElement(this.elements, 'game-initialized', 
       getBooleanStatusText(gameStore.isInitialized),
       getBooleanStatusClass(gameStore.isInitialized)
     );
     
-    updateElement(this.elements, 'game-loading',
+    updateElement(this.elements, 'game-loading', 
       getBooleanStatusText(gameStore.isLoading),
       getBooleanStatusClass(gameStore.isLoading)
     );
@@ -72,67 +75,106 @@ export class UIPanel {
     updateElement(this.elements, 'game-scene', gameStore.currentScene, STATUS_COLORS.system);
     
     // Camera & Canvas
-    updateElement(this.elements, 'camera-position',
+    updateElement(this.elements, 'camera-position', 
       formatCoordinates(gameStore.camera.position.x, gameStore.camera.position.y),
       STATUS_COLORS.camera
     );
     
-    updateElement(this.elements, 'pixeloid-scale',
+    updateElement(this.elements, 'pixeloid-scale', 
       gameStore.camera.pixeloidScale.toString(),
       'text-primary'
     );
     
-    updateElement(this.elements, 'top-left-corner',
+    updateElement(this.elements, 'top-left-corner', 
       formatCoordinates(gameStore.camera.viewportCorners.topLeft.x, gameStore.camera.viewportCorners.topLeft.y, 0),
       STATUS_COLORS.camera
     );
     
-    updateElement(this.elements, 'bottom-right-corner',
+    updateElement(this.elements, 'bottom-right-corner', 
       formatCoordinates(gameStore.camera.viewportCorners.bottomRight.x, gameStore.camera.viewportCorners.bottomRight.y, 0),
       STATUS_COLORS.camera
     );
     
     // Window & Mouse
-    updateElement(this.elements, 'window-size',
+    updateElement(this.elements, 'window-size', 
       formatWindowSize(gameStore.windowWidth, gameStore.windowHeight),
       'text-info'
     );
     
-    updateElement(this.elements, 'mouse-position',
+    updateElement(this.elements, 'mouse-position', 
       formatCoordinates(gameStore.mousePosition.x, gameStore.mousePosition.y, 0),
       STATUS_COLORS.mouse
     );
     
-    updateElement(this.elements, 'mouse-pixeloid-position',
+    updateElement(this.elements, 'mouse-pixeloid-position', 
       formatCoordinates(gameStore.mousePixeloidPosition.x, gameStore.mousePixeloidPosition.y, 2),
       STATUS_COLORS.mouse
     );
     
     // Input State
-    updateElement(this.elements, 'key-w',
+    updateElement(this.elements, 'key-w', 
       getKeyStatusText(gameStore.input.keys.w),
       getBooleanStatusClass(gameStore.input.keys.w)
     );
     
-    updateElement(this.elements, 'key-a',
+    updateElement(this.elements, 'key-a', 
       getKeyStatusText(gameStore.input.keys.a),
       getBooleanStatusClass(gameStore.input.keys.a)
     );
     
-    updateElement(this.elements, 'key-s',
+    updateElement(this.elements, 'key-s', 
       getKeyStatusText(gameStore.input.keys.s),
       getBooleanStatusClass(gameStore.input.keys.s)
     );
     
-    updateElement(this.elements, 'key-d',
+    updateElement(this.elements, 'key-d', 
       getKeyStatusText(gameStore.input.keys.d),
       getBooleanStatusClass(gameStore.input.keys.d)
     );
     
-    updateElement(this.elements, 'key-space',
+    updateElement(this.elements, 'key-space', 
       getKeyStatusText(gameStore.input.keys.space),
       getBooleanStatusClass(gameStore.input.keys.space)
     );
+  }
+  
+  /**
+   * Toggle panel visibility
+   */
+  public toggle(): void {
+    this.isVisible = !this.isVisible;
+    const panelElement = document.getElementById('store-panel');
+    if (panelElement) {
+      panelElement.style.display = this.isVisible ? 'block' : 'none';
+    }
+    
+    // Update values if becoming visible
+    if (this.isVisible) {
+      this.updateValues();
+    }
+  }
+  
+  /**
+   * Set panel visibility
+   */
+  public setVisible(visible: boolean): void {
+    this.isVisible = visible;
+    const panelElement = document.getElementById('store-panel');
+    if (panelElement) {
+      panelElement.style.display = this.isVisible ? 'block' : 'none';
+    }
+    
+    // Update values if becoming visible
+    if (this.isVisible) {
+      this.updateValues();
+    }
+  }
+  
+  /**
+   * Get current visibility state
+   */
+  public getVisible(): boolean {
+    return this.isVisible;
   }
   
   public resize(_width: number, _height: number): void {

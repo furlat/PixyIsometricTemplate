@@ -1,6 +1,6 @@
 import { Game } from './game'
 import { updateGameStore } from './store/gameStore'
-import { UIPanel } from './ui'
+import { StorePanel, UIControlBar } from './ui'
 
 // Initialize the game when the DOM is loaded
 async function init() {
@@ -15,14 +15,19 @@ async function init() {
     const game = new Game()
     await game.init(canvas)
     
-    // Initialize UI panel for real-time data display
-    const uiPanel = new UIPanel()
+    // Initialize UI components for real-time data display and control
+    const storePanel = new StorePanel()
+    const uiControlBar = new UIControlBar()
+    
+    // Connect the control bar with the store panel
+    uiControlBar.registerStorePanel(storePanel)
     
     console.log('🎮 Infinite Canvas Template initialized successfully!')
     console.log('✅ PixiJS Application:', game.application)
     console.log('✅ Infinite Canvas System:', game.canvasSystem)
     console.log('✅ Fullscreen Canvas:', game.canvas)
-    console.log('✅ UI Panel:', uiPanel)
+    console.log('✅ Store Panel:', storePanel)
+    console.log('✅ UI Control Bar:', uiControlBar)
     console.log('')
     console.log('🎯 Controls:')
     console.log('   WASD: Move camera')
