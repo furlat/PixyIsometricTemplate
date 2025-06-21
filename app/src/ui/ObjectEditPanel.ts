@@ -98,6 +98,12 @@ export class ObjectEditPanel {
     if ('x' in obj && 'y' in obj) return 'Point'
     return 'Object'
   }
+
+  private objectSupportsFill(obj: GeometricObject): boolean {
+    // Check if the object type supports fill (circles, rectangles, diamonds)
+    // Points and lines don't support fill
+    return 'anchorX' in obj || ('width' in obj && 'height' in obj) || 'radius' in obj
+  }
   
   private generateObjectProperties(obj: GeometricObject): string {
     let html = ''
@@ -145,8 +151,8 @@ export class ObjectEditPanel {
       </div>
     `
 
-    // Fill color and alpha for objects that support fill
-    if ('fillColor' in obj) {
+    // Fill color and alpha for objects that support fill (circles, rectangles, diamonds)
+    if (this.objectSupportsFill(obj)) {
       const fillObj = obj as GeometricCircle | GeometricRectangle | GeometricDiamond
       if (fillObj.fillColor !== undefined) {
         html += `
@@ -154,7 +160,10 @@ export class ObjectEditPanel {
             <label class="label">
               <span class="label-text">Fill Color:</span>
             </label>
-            <input id="edit-fill-color" type="color" value="${this.numberToHex(fillObj.fillColor)}" class="input input-bordered w-full h-12" />
+            <div class="flex gap-2">
+              <input id="edit-fill-color" type="color" value="${this.numberToHex(fillObj.fillColor)}" class="input input-bordered flex-1 h-12" />
+              <button id="edit-remove-fill" class="btn btn-error btn-sm">Remove Fill</button>
+            </div>
           </div>
           <div>
             <label class="label">
@@ -168,9 +177,9 @@ export class ObjectEditPanel {
         html += `
           <div>
             <label class="label">
-              <span class="label-text">Fill Color:</span>
+              <span class="label-text">Fill:</span>
             </label>
-            <button id="edit-enable-fill" class="btn btn-outline btn-sm">Enable Fill</button>
+            <button id="edit-enable-fill" class="btn btn-primary btn-sm">Enable Fill</button>
           </div>
         `
       }
@@ -329,8 +338,44 @@ export class ObjectEditPanel {
     // Live preview on input changes
     const inputs = this.panel.querySelectorAll('input')
     inputs.forEach(input => {
-      input.addEventListener('input', () => this.updatePreview())
+      input.addEventListener('input', () => {
+        this.updatePreview()
+        // Update range slider display values
+        this.updateRangeDisplays()
+      })
     })
+
+    // Handle enable fill button
+    const enableFillButton = this.panel.querySelector('#edit-enable-fill') as HTMLButtonElement
+    if (enableFillButton) {
+      enableFillButton.addEventListener('click', () => {
+        // Enable fill with default color and alpha
+        const selectedObjectId = gameStore.geometry.selection.selectedObjectId
+        if (selectedObjectId) {
+          updateGameStore.updateGeometricObject(selectedObjectId, {
+            fillColor: gameStore.geometry.drawing.settings.defaultFillColor,
+            fillAlpha: gameStore.geometry.drawing.settings.fillAlpha
+          })
+          // Regenerate the form to show the new fill controls
+          this.loadSelectedObject()
+        }
+      })
+    }
+
+    // Handle remove fill button
+    const removeFillButton = this.panel.querySelector('#edit-remove-fill') as HTMLButtonElement
+    if (removeFillButton) {
+      removeFillButton.addEventListener('click', () => {
+        // Remove fill by setting fillColor to undefined
+        const selectedObjectId = gameStore.geometry.selection.selectedObjectId
+        if (selectedObjectId) {
+          const updates: any = { fillColor: undefined, fillAlpha: undefined }
+          updateGameStore.updateGeometricObject(selectedObjectId, updates)
+          // Regenerate the form to show the enable fill button
+          this.loadSelectedObject()
+        }
+      })
+    }
   }
   
   private updatePreview(): void {
@@ -382,7 +427,7 @@ export class ObjectEditPanel {
     }
 
     // Fill color and alpha for objects that support fill
-    if ('fillColor' in this.originalObject) {
+    if (this.objectSupportsFill(this.originalObject)) {
       const fillObj = this.originalObject as GeometricCircle | GeometricRectangle | GeometricDiamond
       
       const fillColorInput = this.panel.querySelector('#edit-fill-color') as HTMLInputElement
@@ -515,6 +560,24 @@ export class ObjectEditPanel {
     }
     
     return updates
+  }
+
+  private updateRangeDisplays(): void {
+    if (!this.panel) return
+
+    // Update stroke alpha display
+    const strokeAlphaInput = this.panel.querySelector('#edit-stroke-alpha') as HTMLInputElement
+    const strokeAlphaDisplay = this.panel.querySelector('#edit-stroke-alpha + span')
+    if (strokeAlphaInput && strokeAlphaDisplay) {
+      strokeAlphaDisplay.textContent = strokeAlphaInput.value
+    }
+
+    // Update fill alpha display
+    const fillAlphaInput = this.panel.querySelector('#edit-fill-alpha') as HTMLInputElement
+    const fillAlphaDisplay = this.panel.querySelector('#edit-fill-alpha + span')
+    if (fillAlphaInput && fillAlphaDisplay) {
+      fillAlphaDisplay.textContent = fillAlphaInput.value
+    }
   }
   
   

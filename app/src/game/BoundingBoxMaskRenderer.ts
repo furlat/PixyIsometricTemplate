@@ -29,7 +29,7 @@ export class BoundingBoxMaskRenderer {
     }
 
     // Get mask settings from store
-    const { enabledObjects, mode, visualSettings } = gameStore.geometry.mask
+    const { enabledObjects, visualSettings } = gameStore.geometry.mask
 
     // Get objects that should contribute to mask
     const objectsToRender = gameStore.geometry.objects.filter(obj => 
