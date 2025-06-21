@@ -180,8 +180,8 @@ export class StorePanel {
 
     // Layer visibility states
     updateElement(this.elements, 'layer-grid',
-      getBooleanStatusText(gameStore.geometry.layerVisibility.grid),
-      getBooleanStatusClass(gameStore.geometry.layerVisibility.grid)
+      getBooleanStatusText(gameStore.geometry.layerVisibility.background),
+      getBooleanStatusClass(gameStore.geometry.layerVisibility.background)
     );
 
     updateElement(this.elements, 'layer-geometry',

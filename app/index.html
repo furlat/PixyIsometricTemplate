@@ -424,19 +424,25 @@
       <!-- Content will be populated by Workspace.ts -->
     </div>
 
-    <!-- Layer Toggle Bar (Bottom Center) -->
-    <div id="layer-toggle-bar" class="fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-base-100/95 backdrop-blur-md border border-base-300 rounded-full shadow-lg z-50 px-4 py-2">
-      <div class="flex items-center gap-3">
+    <!-- Layer Toggle Bar (Bottom Right) -->
+    <div id="layer-toggle-bar" class="fixed bottom-4 right-4 bg-base-100/95 backdrop-blur-md border border-base-300 rounded-full shadow-lg z-50 px-4 py-2">
+      <div class="flex items-center gap-2">
         <span class="text-sm font-semibold text-accent">Layers</span>
         <div class="divider divider-horizontal mx-0"></div>
-        <button id="toggle-layer-grid" class="btn btn-sm btn-success rounded-full">
+        <button id="toggle-layer-background" class="btn btn-sm btn-success rounded-full">
           <span class="button-text">Grid</span>
         </button>
         <button id="toggle-layer-geometry" class="btn btn-sm btn-secondary rounded-full">
           <span class="button-text">Geometry</span>
         </button>
+        <button id="toggle-layer-selection" class="btn btn-sm btn-primary rounded-full">
+          <span class="button-text">Selection</span>
+        </button>
         <button id="toggle-layer-raycast" class="btn btn-sm btn-warning rounded-full">
           <span class="button-text">Raycast</span>
+        </button>
+        <button id="toggle-layer-mouse" class="btn btn-sm btn-accent rounded-full">
+          <span class="button-text">Mouse</span>
         </button>
       </div>
     </div>

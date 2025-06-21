@@ -200,9 +200,12 @@ export interface GeometryState {
   raycast: RaycastState
   // Layer visibility
   layerVisibility: {
-    geometry: boolean
-    raycast: boolean
-    grid: boolean
+    background: boolean  // Grid and background elements (backgroundLayer)
+    geometry: boolean    // Geometric shapes and objects (geometryLayer)
+    selection: boolean   // Selection highlights (selectionLayer)
+    raycast: boolean     // Raycast lines and debug visuals (raycastLayer)
+    uiOverlay: boolean   // UI elements that follow camera (uiOverlayLayer)
+    mouse: boolean       // Mouse visualization (mouseLayer)
   }
   // Selection state
   selection: {

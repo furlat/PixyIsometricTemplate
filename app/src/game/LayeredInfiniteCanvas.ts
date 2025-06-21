@@ -141,15 +141,18 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
     // Render selection highlights (reactive, always updates based on store state)
     this.renderSelectionLayer(paddedCorners, pixeloidScale)
     
+    // Render UI overlay layer
+    this.renderUIOverlayLayer(paddedCorners, pixeloidScale)
+    
     // Update tracking variables
     this.lastPixeloidScale = pixeloidScale
     
-    // Update mouse visualization (only when background is not rendering)
+    // Update mouse visualization (only when background is not rendering and mouse layer is visible)
     if (!this.isBackgroundRendering) {
-      this.mouseHighlightRenderer.render()
+      this.renderMouseLayer()
     }
 
-    // TODO: Render other layers (raycast, UI overlay)
+    // TODO: Render raycast layer
     // This will be implemented in subsequent steps
   }
   
@@ -160,8 +163,8 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
     // Clear background layer first
     this.backgroundLayer.removeChildren()
     
-    // Only render grid if grid layer is visible
-    if (gameStore.geometry.layerVisibility.grid) {
+    // Only render grid if background layer is visible
+    if (gameStore.geometry.layerVisibility.background) {
       this.backgroundGridRenderer.render(corners, pixeloidScale)
       this.backgroundLayer.addChild(this.backgroundGridRenderer.getGraphics())
     }
@@ -192,11 +195,41 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
   }
   
   /**
-   * Render selection layer - always reactive to current selection state
+   * Render selection layer - only if selection layer is visible
    */
   private renderSelectionLayer(corners: ViewportCorners, pixeloidScale: number): void {
-    // Selection highlighting is always rendered reactively based on current store state
-    this.selectionHighlightRenderer.render(corners, pixeloidScale)
+    if (gameStore.geometry.layerVisibility.selection) {
+      // Selection highlighting is rendered reactively based on current store state
+      this.selectionHighlightRenderer.render(corners, pixeloidScale)
+      this.selectionLayer.visible = true
+    } else {
+      // Hide selection layer if not visible
+      this.selectionLayer.visible = false
+    }
+  }
+  
+  /**
+   * Render UI overlay layer - controls visibility of UI elements
+   */
+  private renderUIOverlayLayer(_corners: ViewportCorners, _pixeloidScale: number): void {
+    if (gameStore.geometry.layerVisibility.uiOverlay) {
+      this.uiOverlayLayer.visible = true
+      // UI overlay elements would be rendered here if any exist
+    } else {
+      this.uiOverlayLayer.visible = false
+    }
+  }
+  
+  /**
+   * Render mouse layer - controls mouse visualization
+   */
+  private renderMouseLayer(): void {
+    if (gameStore.geometry.layerVisibility.mouse) {
+      this.mouseHighlightRenderer.render()
+      this.mouseLayer.visible = true
+    } else {
+      this.mouseLayer.visible = false
+    }
   }
   
   /**

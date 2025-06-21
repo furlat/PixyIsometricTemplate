@@ -198,7 +198,7 @@ export class InfiniteCanvas {
   }
   
   /**
-   * Apply accumulated zoom changes in one batch with mouse-centered zooming
+   * Apply accumulated zoom changes in one batch with conditional recentering
    */
   private applyBatchedZoom(): void {
     if (this.pendingZoomDelta === 0) return
@@ -212,8 +212,11 @@ export class InfiniteCanvas {
     // Clamp zoom levels to integers between 1 and 100 (unlocked full zoom out)
     this.localPixeloidScale = Math.max(1, Math.min(100, newScale))
     
-    // Apply mouse-centered zoom if we have a target
-    if (this.zoomTargetScreen && oldScale !== this.localPixeloidScale) {
+    // Apply mouse-centered zoom only during zoom IN to prevent double renders during zoom out
+    // When zooming out, new pixeloids come into view causing double render (zoom + recenter)
+    // When zooming in, recentering is smooth and doesn't cause double renders
+    const isZoomingOut = this.localPixeloidScale < oldScale
+    if (this.zoomTargetScreen && oldScale !== this.localPixeloidScale && !isZoomingOut) {
       this.applyMouseCenteredZoom(oldScale, this.localPixeloidScale)
     }
     

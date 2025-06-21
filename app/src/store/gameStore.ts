@@ -67,9 +67,12 @@ export const gameStore = proxy<GameState>({
       }
     },
     layerVisibility: {
-      geometry: true,
-      raycast: true,
-      grid: true
+      background: true,  // Grid and background elements
+      geometry: true,    // Geometric shapes and objects
+      selection: true,   // Selection highlights
+      raycast: true,     // Raycast lines and debug visuals
+      uiOverlay: true,   // UI elements that follow camera
+      mouse: true        // Mouse visualization
     },
     selection: {
       selectedObjectId: null,
@@ -341,7 +344,7 @@ export const updateGameStore = {
     }
   },
 
-  setLayerVisibility: (layer: 'geometry' | 'raycast' | 'grid', visible: boolean) => {
+  setLayerVisibility: (layer: 'background' | 'geometry' | 'selection' | 'raycast' | 'uiOverlay' | 'mouse', visible: boolean) => {
     gameStore.geometry.layerVisibility[layer] = visible
   },
 

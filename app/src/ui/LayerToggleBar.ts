@@ -1,10 +1,14 @@
+import { updateGameStore } from '../store/gameStore'
+
 export class LayerToggleBar {
   private panel: HTMLElement | null = null
   private _isVisible: boolean = false
   private layerStates = {
-    grid: true,
-    geometry: true,
-    raycast: true
+    background: true,  // Grid and background elements
+    geometry: true,    // Geometric shapes and objects
+    selection: true,   // Selection highlights
+    raycast: true,     // Raycast lines and debug visuals
+    mouse: true        // Mouse visualization
   }
   
   constructor() {
@@ -21,11 +25,11 @@ export class LayerToggleBar {
   private setupEventHandlers(): void {
     if (!this.panel) return
     
-    // Grid layer toggle
-    const gridToggle = document.getElementById('toggle-layer-grid')
-    if (gridToggle) {
-      gridToggle.addEventListener('click', () => {
-        this.toggleLayer('grid')
+    // Background layer toggle (grid)
+    const backgroundToggle = document.getElementById('toggle-layer-background')
+    if (backgroundToggle) {
+      backgroundToggle.addEventListener('click', () => {
+        this.toggleLayer('background')
       })
     }
     
@@ -37,6 +41,14 @@ export class LayerToggleBar {
       })
     }
     
+    // Selection layer toggle
+    const selectionToggle = document.getElementById('toggle-layer-selection')
+    if (selectionToggle) {
+      selectionToggle.addEventListener('click', () => {
+        this.toggleLayer('selection')
+      })
+    }
+    
     // Raycast layer toggle
     const raycastToggle = document.getElementById('toggle-layer-raycast')
     if (raycastToggle) {
@@ -44,23 +56,33 @@ export class LayerToggleBar {
         this.toggleLayer('raycast')
       })
     }
+    
+    // Mouse layer toggle
+    const mouseToggle = document.getElementById('toggle-layer-mouse')
+    if (mouseToggle) {
+      mouseToggle.addEventListener('click', () => {
+        this.toggleLayer('mouse')
+      })
+    }
   }
   
-  private toggleLayer(layerName: 'grid' | 'geometry' | 'raycast'): void {
+  private toggleLayer(layerName: 'background' | 'geometry' | 'selection' | 'raycast' | 'mouse'): void {
     this.layerStates[layerName] = !this.layerStates[layerName]
     this.updateButtonState(layerName)
     this.notifyLayerChange(layerName, this.layerStates[layerName])
   }
   
-  private updateButtonState(layerName: 'grid' | 'geometry' | 'raycast'): void {
+  private updateButtonState(layerName: 'background' | 'geometry' | 'selection' | 'raycast' | 'mouse'): void {
     const buttonId = `toggle-layer-${layerName}`
     const button = document.getElementById(buttonId)
     if (!button) return
     
     const isActive = this.layerStates[layerName]
     const baseClasses = ['btn', 'btn-sm', 'rounded-full']
-    const activeClass = layerName === 'grid' ? 'btn-success' : 
-                       layerName === 'geometry' ? 'btn-secondary' : 'btn-warning'
+    const activeClass = layerName === 'background' ? 'btn-success' :
+                       layerName === 'geometry' ? 'btn-secondary' :
+                       layerName === 'selection' ? 'btn-primary' :
+                       layerName === 'raycast' ? 'btn-warning' : 'btn-accent'
     
     // Reset button classes
     button.className = baseClasses.join(' ')
@@ -73,31 +95,39 @@ export class LayerToggleBar {
   }
   
   private updateButtonStates(): void {
-    this.updateButtonState('grid')
+    this.updateButtonState('background')
     this.updateButtonState('geometry')
+    this.updateButtonState('selection')
     this.updateButtonState('raycast')
+    this.updateButtonState('mouse')
   }
   
   private notifyLayerChange(layerName: string, isVisible: boolean): void {
+    // Update the store with the layer visibility change
+    if (layerName === 'background' || layerName === 'geometry' || layerName === 'selection' ||
+        layerName === 'raycast' || layerName === 'mouse') {
+      updateGameStore.setLayerVisibility(layerName as any, isVisible)
+    }
+    
     // Dispatch custom event for layer visibility change
     const event = new CustomEvent('layerVisibilityChanged', {
       detail: { layerName, isVisible }
     })
     document.dispatchEvent(event)
     
-    // Also update the store panel indicators if they exist
-    const indicator = document.getElementById(`layer-${layerName}`)
+    // Also update the store panel indicators if they exist (for backwards compatibility)
+    const indicator = document.getElementById(`layer-${layerName === 'background' ? 'grid' : layerName}`)
     if (indicator) {
       indicator.textContent = isVisible ? 'ON' : 'OFF'
       indicator.className = `font-bold font-mono ${isVisible ? 'status-active' : 'status-inactive'}`
     }
   }
   
-  public getLayerState(layerName: 'grid' | 'geometry' | 'raycast'): boolean {
+  public getLayerState(layerName: 'background' | 'geometry' | 'selection' | 'raycast' | 'mouse'): boolean {
     return this.layerStates[layerName]
   }
   
-  public setLayerState(layerName: 'grid' | 'geometry' | 'raycast', isVisible: boolean): void {
+  public setLayerState(layerName: 'background' | 'geometry' | 'selection' | 'raycast' | 'mouse', isVisible: boolean): void {
     this.layerStates[layerName] = isVisible
     this.updateButtonState(layerName)
     this.notifyLayerChange(layerName, isVisible)
