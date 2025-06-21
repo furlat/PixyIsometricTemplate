@@ -101,6 +101,27 @@ export class InputManager {
           event.preventDefault()
         }
         break
+      case 'c':
+        // Copy selected object
+        if (gameStore.geometry.selection.selectedObjectId) {
+          const success = updateGameStore.copySelectedObject()
+          if (success) {
+            console.log('InputManager: Copied selected object')
+          }
+          event.preventDefault()
+        }
+        break
+      case 'v':
+        // Paste object at mouse position
+        if (gameStore.geometry.clipboard.copiedObject) {
+          const mousePos = gameStore.mousePixeloidPosition
+          const newObject = updateGameStore.pasteObjectAtPosition(mousePos.x, mousePos.y)
+          if (newObject) {
+            console.log(`InputManager: Pasted object at (${mousePos.x.toFixed(1)}, ${mousePos.y.toFixed(1)})`)
+          }
+          event.preventDefault()
+        }
+        break
     }
   }
 

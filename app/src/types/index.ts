@@ -209,6 +209,14 @@ export interface GeometryState {
     selectedObjectId: string | null
     isEditPanelOpen: boolean
   }
+  // Clipboard state for copy/paste
+  clipboard: {
+    copiedObject: GeometricObject | null
+  }
+  // Favorites system
+  favorites: {
+    favoriteObjectIds: string[]
+  }
 }
 
 // Texture Registry types for StoreExplorer previews (ISOLATED from main rendering)

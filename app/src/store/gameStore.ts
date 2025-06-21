@@ -74,6 +74,12 @@ export const gameStore = proxy<GameState>({
     selection: {
       selectedObjectId: null,
       isEditPanelOpen: false
+    },
+    clipboard: {
+      copiedObject: null
+    },
+    favorites: {
+      favoriteObjectIds: []
     }
   },
   // Texture registry for StoreExplorer previews (ISOLATED from main rendering)
@@ -366,6 +372,132 @@ export const updateGameStore = {
   clearSelection: () => {
     gameStore.geometry.selection.selectedObjectId = null
     gameStore.geometry.selection.isEditPanelOpen = false
+  },
+
+  // Clipboard operations
+  copySelectedObject: () => {
+    const selectedObjectId = gameStore.geometry.selection.selectedObjectId
+    if (!selectedObjectId) {
+      console.warn('Store: No object selected to copy')
+      return false
+    }
+
+    const selectedObject = gameStore.geometry.objects.find(obj => obj.id === selectedObjectId)
+    if (!selectedObject) {
+      console.warn(`Store: Selected object ${selectedObjectId} not found`)
+      return false
+    }
+
+    // Create a deep copy of the object
+    gameStore.geometry.clipboard.copiedObject = { ...selectedObject }
+    console.log(`Store: Copied object ${selectedObjectId} to clipboard`)
+    return true
+  },
+
+  pasteObjectAtPosition: (pixeloidX: number, pixeloidY: number) => {
+    if (!gameStore.geometry.clipboard.copiedObject) {
+      console.warn('Store: No object in clipboard to paste')
+      return null
+    }
+
+    const copiedObject = gameStore.geometry.clipboard.copiedObject
+    
+    // Create new object with unique ID and position it at the specified location
+    const newObject = updateGameStore.ensureUniqueId({ ...copiedObject })
+    
+    // Position the new object based on its type
+    if ('anchorX' in newObject && 'anchorY' in newObject) {
+      // Diamond - position anchor at mouse
+      newObject.anchorX = pixeloidX
+      newObject.anchorY = pixeloidY
+    } else if ('centerX' in newObject && 'centerY' in newObject) {
+      // Circle - position center at mouse
+      newObject.centerX = pixeloidX
+      newObject.centerY = pixeloidY
+    } else if ('x' in newObject && 'width' in newObject) {
+      // Rectangle - position top-left at mouse
+      newObject.x = pixeloidX
+      newObject.y = pixeloidY
+    } else if ('startX' in newObject && 'endX' in newObject) {
+      // Line - calculate offset and move both points
+      const line = newObject as GeometricLine
+      const originalLine = copiedObject as GeometricLine
+      const originalCenterX = (originalLine.startX + originalLine.endX) / 2
+      const originalCenterY = (originalLine.startY + originalLine.endY) / 2
+      const offsetX = pixeloidX - originalCenterX
+      const offsetY = pixeloidY - originalCenterY
+      
+      line.startX = originalLine.startX + offsetX
+      line.startY = originalLine.startY + offsetY
+      line.endX = originalLine.endX + offsetX
+      line.endY = originalLine.endY + offsetY
+    } else if ('x' in newObject && 'y' in newObject) {
+      // Point - position at mouse
+      newObject.x = pixeloidX
+      newObject.y = pixeloidY
+    }
+
+    // Update metadata and creation time
+    newObject.createdAt = Date.now()
+    
+    // Recalculate metadata based on new position
+    if ('anchorX' in newObject) {
+      newObject.metadata = GeometryHelper.calculateDiamondMetadata(newObject as any)
+    } else if ('centerX' in newObject) {
+      newObject.metadata = GeometryHelper.calculateCircleMetadata(newObject as any)
+    } else if ('x' in newObject && 'width' in newObject) {
+      newObject.metadata = GeometryHelper.calculateRectangleMetadata(newObject as any)
+    } else if ('startX' in newObject) {
+      newObject.metadata = GeometryHelper.calculateLineMetadata(newObject as any)
+    } else if ('x' in newObject && 'y' in newObject) {
+      newObject.metadata = GeometryHelper.calculatePointMetadata(newObject as any)
+    }
+
+    // Add to objects array
+    gameStore.geometry.objects.push(newObject)
+    
+    // Select the new object
+    updateGameStore.setSelectedObject(newObject.id)
+    
+    console.log(`Store: Pasted object as ${newObject.id} at (${pixeloidX.toFixed(1)}, ${pixeloidY.toFixed(1)})`)
+    return newObject
+  },
+
+  clearClipboard: () => {
+    gameStore.geometry.clipboard.copiedObject = null
+    console.log('Store: Cleared clipboard')
+  },
+
+  // Favorites operations
+  addToFavorites: (objectId: string) => {
+    if (!gameStore.geometry.favorites.favoriteObjectIds.includes(objectId)) {
+      gameStore.geometry.favorites.favoriteObjectIds.push(objectId)
+      console.log(`Store: Added object ${objectId} to favorites`)
+      return true
+    }
+    return false
+  },
+
+  removeFromFavorites: (objectId: string) => {
+    const index = gameStore.geometry.favorites.favoriteObjectIds.indexOf(objectId)
+    if (index !== -1) {
+      gameStore.geometry.favorites.favoriteObjectIds.splice(index, 1)
+      console.log(`Store: Removed object ${objectId} from favorites`)
+      return true
+    }
+    return false
+  },
+
+  toggleFavorite: (objectId: string) => {
+    if (gameStore.geometry.favorites.favoriteObjectIds.includes(objectId)) {
+      return updateGameStore.removeFromFavorites(objectId)
+    } else {
+      return updateGameStore.addToFavorites(objectId)
+    }
+  },
+
+  isFavorite: (objectId: string): boolean => {
+    return gameStore.geometry.favorites.favoriteObjectIds.includes(objectId)
   },
 
   // Set reference to InfiniteCanvas for direct camera control

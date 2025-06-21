@@ -1,111 +1,131 @@
-import { updateGameStore, gameStore } from '../store/gameStore'
-
 export class LayerToggleBar {
-  constructor() {
-    this.initializeElements();
-    this.setupEventListeners();
-    this.updateAllButtons();
+  private panel: HTMLElement | null = null
+  private _isVisible: boolean = false
+  private layerStates = {
+    grid: true,
+    geometry: true,
+    raycast: true
   }
   
-  private initializeElements(): void {
-    // Get the layer toggle bar element
-    const layerToggleBar = document.getElementById('layer-toggle-bar');
-    if (!layerToggleBar) {
-      console.warn('LayerToggleBar element with id "layer-toggle-bar" not found');
+  constructor() {
+    this.panel = document.getElementById('layer-toggle-bar')
+    this.setupEventHandlers()
+    this.updateButtonStates()
+    
+    // Set initial visibility
+    if (this.panel) {
+      this.panel.style.display = this._isVisible ? 'flex' : 'none'
     }
   }
   
-  private setupEventListeners(): void {
-    // Grid layer toggle button
-    const gridToggle = document.getElementById('toggle-layer-grid');
+  private setupEventHandlers(): void {
+    if (!this.panel) return
+    
+    // Grid layer toggle
+    const gridToggle = document.getElementById('toggle-layer-grid')
     if (gridToggle) {
       gridToggle.addEventListener('click', () => {
-        this.toggleLayer('grid');
-      });
-    } else {
-      console.warn('Grid layer toggle button not found');
+        this.toggleLayer('grid')
+      })
     }
     
-    // Geometry layer toggle button
-    const geometryToggle = document.getElementById('toggle-layer-geometry');
+    // Geometry layer toggle
+    const geometryToggle = document.getElementById('toggle-layer-geometry')
     if (geometryToggle) {
       geometryToggle.addEventListener('click', () => {
-        this.toggleLayer('geometry');
-      });
-    } else {
-      console.warn('Geometry layer toggle button not found');
+        this.toggleLayer('geometry')
+      })
     }
     
-    // Raycast layer toggle button
-    const raycastToggle = document.getElementById('toggle-layer-raycast');
+    // Raycast layer toggle
+    const raycastToggle = document.getElementById('toggle-layer-raycast')
     if (raycastToggle) {
       raycastToggle.addEventListener('click', () => {
-        this.toggleLayer('raycast');
-      });
+        this.toggleLayer('raycast')
+      })
+    }
+  }
+  
+  private toggleLayer(layerName: 'grid' | 'geometry' | 'raycast'): void {
+    this.layerStates[layerName] = !this.layerStates[layerName]
+    this.updateButtonState(layerName)
+    this.notifyLayerChange(layerName, this.layerStates[layerName])
+  }
+  
+  private updateButtonState(layerName: 'grid' | 'geometry' | 'raycast'): void {
+    const buttonId = `toggle-layer-${layerName}`
+    const button = document.getElementById(buttonId)
+    if (!button) return
+    
+    const isActive = this.layerStates[layerName]
+    const baseClasses = ['btn', 'btn-sm', 'rounded-full']
+    const activeClass = layerName === 'grid' ? 'btn-success' : 
+                       layerName === 'geometry' ? 'btn-secondary' : 'btn-warning'
+    
+    // Reset button classes
+    button.className = baseClasses.join(' ')
+    
+    if (isActive) {
+      button.classList.add(activeClass)
     } else {
-      console.warn('Raycast layer toggle button not found');
+      button.classList.add('btn-outline')
     }
   }
   
-  /**
-   * Toggle layer visibility
-   */
-  private toggleLayer(layer: 'grid' | 'geometry' | 'raycast'): void {
-    const currentVisibility = gameStore.geometry.layerVisibility[layer];
-    updateGameStore.setLayerVisibility(layer, !currentVisibility);
-    this.updateLayerButton(layer);
+  private updateButtonStates(): void {
+    this.updateButtonState('grid')
+    this.updateButtonState('geometry')
+    this.updateButtonState('raycast')
   }
   
-  /**
-   * Update a specific layer button state
-   */
-  private updateLayerButton(layer: 'grid' | 'geometry' | 'raycast'): void {
-    const button = document.getElementById(`toggle-layer-${layer}`);
-    if (button) {
-      const isVisible = gameStore.geometry.layerVisibility[layer];
-      
-      // Update button appearance based on state
-      if (isVisible) {
-        button.classList.remove('btn-outline');
-        // Use different colors for each layer
-        switch (layer) {
-          case 'grid':
-            button.classList.add('btn-success');
-            button.classList.remove('btn-secondary', 'btn-warning');
-            break;
-          case 'geometry':
-            button.classList.add('btn-secondary');
-            button.classList.remove('btn-success', 'btn-warning');
-            break;
-          case 'raycast':
-            button.classList.add('btn-warning');
-            button.classList.remove('btn-success', 'btn-secondary');
-            break;
-        }
-      } else {
-        // Remove all color classes and add outline
-        button.classList.remove('btn-success', 'btn-secondary', 'btn-warning');
-        button.classList.add('btn-outline');
-      }
-      
-      // Update button text (keep the same text)
-      const buttonText = button.querySelector('.button-text');
-      if (buttonText) {
-        buttonText.textContent = layer.charAt(0).toUpperCase() + layer.slice(1);
-      }
+  private notifyLayerChange(layerName: string, isVisible: boolean): void {
+    // Dispatch custom event for layer visibility change
+    const event = new CustomEvent('layerVisibilityChanged', {
+      detail: { layerName, isVisible }
+    })
+    document.dispatchEvent(event)
+    
+    // Also update the store panel indicators if they exist
+    const indicator = document.getElementById(`layer-${layerName}`)
+    if (indicator) {
+      indicator.textContent = isVisible ? 'ON' : 'OFF'
+      indicator.className = `font-bold font-mono ${isVisible ? 'status-active' : 'status-inactive'}`
     }
   }
   
-  /**
-   * Update all layer button states
-   */
-  public updateAllButtons(): void {
-    this.updateLayerButton('grid');
-    this.updateLayerButton('geometry');
-    this.updateLayerButton('raycast');
+  public getLayerState(layerName: 'grid' | 'geometry' | 'raycast'): boolean {
+    return this.layerStates[layerName]
+  }
+  
+  public setLayerState(layerName: 'grid' | 'geometry' | 'raycast', isVisible: boolean): void {
+    this.layerStates[layerName] = isVisible
+    this.updateButtonState(layerName)
+    this.notifyLayerChange(layerName, isVisible)
+  }
+  
+  public toggle(): void {
+    this._isVisible = !this._isVisible
+    if (this.panel) {
+      this.panel.style.display = this._isVisible ? 'flex' : 'none'
+    }
+  }
+  
+  public setVisible(visible: boolean): void {
+    this._isVisible = visible
+    if (this.panel) {
+      this.panel.style.display = this._isVisible ? 'flex' : 'none'
+    }
+  }
+  
+  public getVisible(): boolean {
+    return this._isVisible
+  }
+  
+  public isVisible(): boolean {
+    return this._isVisible
   }
   
   public destroy(): void {
-    // Clean up event listeners if needed
+    // Clean up if needed
   }
 }

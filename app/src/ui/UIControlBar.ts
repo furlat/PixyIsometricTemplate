@@ -2,6 +2,8 @@ export class UIControlBar {
   private storePanel: { toggle: () => void; getVisible: () => boolean } | null = null;
   private geometryPanel: { toggle: () => void; getVisible: () => boolean } | null = null;
   private storeExplorer: { toggle: () => void; isVisible: () => boolean } | null = null;
+  private workspace: { toggle: () => void; isVisible: () => boolean } | null = null;
+  private layers: { toggle: () => void; isVisible: () => boolean } | null = null;
   
   constructor() {
     this.initializeElements();
@@ -46,6 +48,26 @@ export class UIControlBar {
     } else {
       console.warn('Store explorer toggle button not found');
     }
+    
+    // Workspace toggle button
+    const workspaceToggle = document.getElementById('toggle-workspace');
+    if (workspaceToggle) {
+      workspaceToggle.addEventListener('click', () => {
+        this.toggleWorkspace();
+      });
+    } else {
+      console.warn('Workspace toggle button not found');
+    }
+    
+    // Layers toggle button
+    const layersToggle = document.getElementById('toggle-layers');
+    if (layersToggle) {
+      layersToggle.addEventListener('click', () => {
+        this.toggleLayers();
+      });
+    } else {
+      console.warn('Layers toggle button not found');
+    }
   }
   
   /**
@@ -70,6 +92,22 @@ export class UIControlBar {
   public registerStoreExplorer(storeExplorer: { toggle: () => void; isVisible: () => boolean }): void {
     this.storeExplorer = storeExplorer;
     this.updateStoreExplorerButton();
+  }
+  
+  /**
+   * Register the workspace with the control bar
+   */
+  public registerWorkspace(workspace: { toggle: () => void; isVisible: () => boolean }): void {
+    this.workspace = workspace;
+    this.updateWorkspaceButton();
+  }
+  
+  /**
+   * Register the layers with the control bar
+   */
+  public registerLayers(layers: { toggle: () => void; isVisible: () => boolean }): void {
+    this.layers = layers;
+    this.updateLayersButton();
   }
   
   /**
@@ -115,6 +153,26 @@ export class UIControlBar {
     if (this.storeExplorer) {
       this.storeExplorer.toggle();
       this.updateStoreExplorerButton();
+    }
+  }
+  
+  /**
+   * Toggle workspace visibility
+   */
+  private toggleWorkspace(): void {
+    if (this.workspace) {
+      this.workspace.toggle();
+      this.updateWorkspaceButton();
+    }
+  }
+  
+  /**
+   * Toggle layers visibility
+   */
+  private toggleLayers(): void {
+    if (this.layers) {
+      this.layers.toggle();
+      this.updateLayersButton();
     }
   }
   
@@ -189,6 +247,56 @@ export class UIControlBar {
       const buttonText = button.querySelector('.button-text');
       if (buttonText) {
         buttonText.textContent = 'Explorer';
+      }
+    }
+  }
+  
+  /**
+   * Update the workspace button state
+   */
+  private updateWorkspaceButton(): void {
+    const button = document.getElementById('toggle-workspace');
+    if (button && this.workspace) {
+      const isVisible = this.workspace.isVisible();
+      
+      // Update button appearance based on state
+      if (isVisible) {
+        button.classList.remove('btn-outline');
+        button.classList.add('btn-info');
+      } else {
+        button.classList.remove('btn-info');
+        button.classList.add('btn-outline');
+      }
+      
+      // Update button text
+      const buttonText = button.querySelector('.button-text');
+      if (buttonText) {
+        buttonText.textContent = 'Workspace';
+      }
+    }
+  }
+  
+  /**
+   * Update the layers button state
+   */
+  private updateLayersButton(): void {
+    const button = document.getElementById('toggle-layers');
+    if (button && this.layers) {
+      const isVisible = this.layers.isVisible();
+      
+      // Update button appearance based on state
+      if (isVisible) {
+        button.classList.remove('btn-outline');
+        button.classList.add('btn-warning');
+      } else {
+        button.classList.remove('btn-warning');
+        button.classList.add('btn-outline');
+      }
+      
+      // Update button text
+      const buttonText = button.querySelector('.button-text');
+      if (buttonText) {
+        buttonText.textContent = 'Layers';
       }
     }
   }

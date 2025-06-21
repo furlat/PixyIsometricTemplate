@@ -15,8 +15,14 @@
       <div class="flex items-center gap-3">
         <span class="text-sm font-semibold text-primary">UI Controls</span>
         <div class="divider divider-horizontal mx-0"></div>
-        <button id="toggle-geometry-panel" class="btn btn-sm btn-secondary rounded-full">
+        <button id="toggle-geometry-panel" class="btn btn-sm btn-outline rounded-full">
           <span class="button-text">Geometry</span>
+        </button>
+        <button id="toggle-workspace" class="btn btn-sm btn-outline rounded-full">
+          <span class="button-text">Workspace</span>
+        </button>
+        <button id="toggle-layers" class="btn btn-sm btn-outline rounded-full">
+          <span class="button-text">Layers</span>
         </button>
         <button id="toggle-store-explorer" class="btn btn-sm btn-outline rounded-full">
           <span class="button-text">Explorer</span>
@@ -411,6 +417,11 @@
           <button id="edit-panel-cancel" class="btn btn-outline flex-1">Cancel</button>
         </div>
       </div>
+    </div>
+
+    <!-- Workspace Panel (Bottom Left) -->
+    <div id="workspace-panel" class="fixed bottom-4 left-4 bg-base-100/95 backdrop-blur-md border border-base-300 rounded-xl shadow-2xl z-40 overflow-hidden animate-fade-in h-48" style="right: calc(50% + 180px);">
+      <!-- Content will be populated by Workspace.ts -->
     </div>
 
     <!-- Layer Toggle Bar (Bottom Center) -->

@@ -120,6 +120,11 @@ export class StoreExplorer {
     subscribe(gameStore.textureRegistry.objectTextures, () => {
       this.updatePreviews()
     })
+    
+    // Subscribe to favorites changes for star icon updates
+    subscribe(gameStore.geometry.favorites, () => {
+      this.updateObjectList()
+    })
   }
 
   /**
@@ -220,6 +225,9 @@ export class StoreExplorer {
             ${this.getObjectTypeName(obj)}
           </span>
           <div class="flex items-center gap-1">
+            <button class="favorite-star btn btn-xs btn-ghost btn-circle hover:bg-warning hover:text-white transition-colors ${updateGameStore.isFavorite(obj.id) ? 'text-warning' : 'text-base-content/30'}" data-object-id="${obj.id}" title="${updateGameStore.isFavorite(obj.id) ? 'Remove from favorites' : 'Add to favorites'}">
+              ${updateGameStore.isFavorite(obj.id) ? '⭐' : '☆'}
+            </button>
             <button class="delete-btn btn btn-xs btn-ghost btn-circle text-error hover:bg-error hover:text-white" data-object-id="${obj.id}" title="Delete object">
               🗑️
             </button>
@@ -261,6 +269,15 @@ export class StoreExplorer {
     
     if (propertiesEl) {
       propertiesEl.textContent = this.formatObjectProperties(obj)
+    }
+    
+    // Update favorite star
+    const starBtn = item.querySelector('.favorite-star') as HTMLElement
+    if (starBtn) {
+      const isFavorite = updateGameStore.isFavorite(obj.id)
+      starBtn.textContent = isFavorite ? '⭐' : '☆'
+      starBtn.className = `favorite-star btn btn-xs btn-ghost btn-circle hover:bg-warning hover:text-white transition-colors ${isFavorite ? 'text-warning' : 'text-base-content/30'}`
+      starBtn.title = isFavorite ? 'Remove from favorites' : 'Add to favorites'
     }
     
     // Update preview
@@ -400,6 +417,19 @@ export class StoreExplorer {
       const objectId = retryBtn?.dataset.objectId
       if (objectId) {
         this.retryObjectPreview(objectId)
+        event.preventDefault()
+        event.stopPropagation()
+        return
+      }
+    }
+    
+    // Handle favorite star clicks
+    if (target.classList.contains('favorite-star') || target.closest('.favorite-star')) {
+      const starBtn = target.classList.contains('favorite-star') ? target : target.closest('.favorite-star') as HTMLElement
+      const objectId = starBtn?.dataset.objectId
+      if (objectId) {
+        updateGameStore.toggleFavorite(objectId)
+        this.updateObjectItem(gameStore.geometry.objects.find(obj => obj.id === objectId)!)
         event.preventDefault()
         event.stopPropagation()
         return
