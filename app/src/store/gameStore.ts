@@ -1,5 +1,10 @@
 import { proxy } from 'valtio'
-import type { GameState, ViewportCorners, GeometricObject } from '../types'
+import type { GameState, ViewportCorners, GeometricObject, ObjectTextureData, GeometricPoint, GeometricLine, GeometricCircle, GeometricRectangle, GeometricDiamond } from '../types'
+import { GeometryHelper } from '../game/GeometryHelper'
+import type { InfiniteCanvas } from '../game/InfiniteCanvas'
+
+// Global reference to InfiniteCanvas for direct camera control
+let infiniteCanvasRef: InfiniteCanvas | null = null
 
 // Create the game store using Valtio
 export const gameStore = proxy<GameState>({
@@ -70,6 +75,14 @@ export const gameStore = proxy<GameState>({
       selectedObjectId: null,
       isEditPanelOpen: false
     }
+  },
+  // Texture registry for StoreExplorer previews (ISOLATED from main rendering)
+  textureRegistry: {
+    objectTextures: {},
+    stats: {
+      totalTextures: 0,
+      lastCaptureTime: 0
+    }
   }
 })
 
@@ -138,13 +151,176 @@ export const updateGameStore = {
   },
 
   addGeometricObject: (object: GeometricObject) => {
-    gameStore.geometry.objects.push(object)
+    // Check for duplicate IDs and generate new one if needed
+    const ensuredObject = updateGameStore.ensureUniqueId(object)
+    gameStore.geometry.objects.push(ensuredObject)
+  },
+
+  // Ensure unique ID for objects (handles copying and duplicate prevention)
+  ensureUniqueId: <T extends GeometricObject>(object: T): T => {
+    const existingIds = new Set(gameStore.geometry.objects.map(obj => obj.id))
+    
+    if (!existingIds.has(object.id)) {
+      return object // ID is unique, return as-is
+    }
+    
+    // Generate new unique ID for duplicate
+    let newId: string
+    let counter = 1
+    const baseId = object.id.replace(/_copy\d*$/, '') // Remove existing copy suffix
+    
+    do {
+      newId = `${baseId}_copy${counter}`
+      counter++
+    } while (existingIds.has(newId))
+    
+    console.log(`Store: Duplicate ID detected for ${object.id}, assigning new ID: ${newId}`)
+    return { ...object, id: newId }
+  },
+
+  // Generate truly unique ID for objects
+  generateUniqueId: (prefix: string): string => {
+    const existingIds = new Set(gameStore.geometry.objects.map(obj => obj.id))
+    let id: string
+    let counter = 0
+    
+    do {
+      const timestamp = Date.now()
+      const randomSuffix = Math.random().toString(36).substr(2, 5)
+      id = counter === 0 ? `${prefix}_${timestamp}_${randomSuffix}` : `${prefix}_${timestamp}_${randomSuffix}_${counter}`
+      counter++
+    } while (existingIds.has(id))
+    
+    return id
+  },
+
+  // Factory methods for creating objects with proper metadata
+  createPoint: (x: number, y: number) => {
+    const point: GeometricPoint = {
+      id: updateGameStore.generateUniqueId('point'),
+      x,
+      y,
+      color: gameStore.geometry.drawing.settings.defaultColor,
+      isVisible: true,
+      createdAt: Date.now(),
+      metadata: GeometryHelper.calculatePointMetadata({ x, y })
+    }
+    gameStore.geometry.objects.push(point)
+    return point
+  },
+
+  createLine: (startX: number, startY: number, endX: number, endY: number) => {
+    const line: GeometricLine = {
+      id: updateGameStore.generateUniqueId('line'),
+      startX,
+      startY,
+      endX,
+      endY,
+      color: gameStore.geometry.drawing.settings.defaultColor,
+      strokeWidth: gameStore.geometry.drawing.settings.defaultStrokeWidth,
+      isVisible: true,
+      createdAt: Date.now(),
+      metadata: GeometryHelper.calculateLineMetadata({ startX, startY, endX, endY })
+    }
+    gameStore.geometry.objects.push(line)
+    return line
+  },
+
+  createCircle: (centerX: number, centerY: number, radius: number) => {
+    const circle: GeometricCircle = {
+      id: updateGameStore.generateUniqueId('circle'),
+      centerX,
+      centerY,
+      radius,
+      color: gameStore.geometry.drawing.settings.defaultColor,
+      strokeWidth: gameStore.geometry.drawing.settings.defaultStrokeWidth,
+      isVisible: true,
+      createdAt: Date.now(),
+      metadata: GeometryHelper.calculateCircleMetadata({ centerX, centerY, radius })
+    }
+    gameStore.geometry.objects.push(circle)
+    return circle
+  },
+
+  createRectangle: (x: number, y: number, width: number, height: number) => {
+    const rectangle: GeometricRectangle = {
+      id: updateGameStore.generateUniqueId('rect'),
+      x,
+      y,
+      width,
+      height,
+      color: gameStore.geometry.drawing.settings.defaultColor,
+      strokeWidth: gameStore.geometry.drawing.settings.defaultStrokeWidth,
+      isVisible: true,
+      createdAt: Date.now(),
+      metadata: GeometryHelper.calculateRectangleMetadata({ x, y, width, height })
+    }
+    gameStore.geometry.objects.push(rectangle)
+    return rectangle
+  },
+
+  createDiamond: (anchorX: number, anchorY: number, width: number, height: number) => {
+    const diamond: GeometricDiamond = {
+      id: updateGameStore.generateUniqueId('diamond'),
+      anchorX,
+      anchorY,
+      width,
+      height,
+      color: gameStore.geometry.drawing.settings.defaultColor,
+      strokeWidth: gameStore.geometry.drawing.settings.defaultStrokeWidth,
+      isVisible: true,
+      createdAt: Date.now(),
+      metadata: GeometryHelper.calculateDiamondMetadata({ anchorX, anchorY, width, height })
+    }
+    gameStore.geometry.objects.push(diamond)
+    return diamond
   },
 
   removeGeometricObject: (id: string) => {
     const index = gameStore.geometry.objects.findIndex(obj => obj.id === id)
     if (index !== -1) {
       gameStore.geometry.objects.splice(index, 1)
+      // Remove texture when object is deleted
+      updateGameStore.removeObjectTexture(id)
+    }
+  },
+
+  updateGeometricObject: (id: string, updates: Partial<GeometricObject>) => {
+    const object = gameStore.geometry.objects.find(obj => obj.id === id)
+    if (object) {
+      // Apply updates
+      Object.assign(object, updates)
+      
+      // Recalculate metadata if geometry properties changed
+      if ('x' in updates || 'y' in updates || 'width' in updates || 'height' in updates ||
+          'centerX' in updates || 'centerY' in updates || 'radius' in updates ||
+          'startX' in updates || 'startY' in updates || 'endX' in updates || 'endY' in updates ||
+          'anchorX' in updates || 'anchorY' in updates) {
+        
+        if ('anchorX' in object && 'anchorY' in object) {
+          object.metadata = GeometryHelper.calculateDiamondMetadata(object as any)
+        } else if ('centerX' in object && 'centerY' in object) {
+          object.metadata = GeometryHelper.calculateCircleMetadata(object as any)
+        } else if ('x' in object && 'width' in object) {
+          object.metadata = GeometryHelper.calculateRectangleMetadata(object as any)
+        } else if ('startX' in object && 'endX' in object) {
+          object.metadata = GeometryHelper.calculateLineMetadata(object as any)
+        } else if ('x' in object && 'y' in object) {
+          object.metadata = GeometryHelper.calculatePointMetadata(object as any)
+        }
+      }
+      
+      // Invalidate texture cache when visual properties change
+      if ('color' in updates || 'strokeWidth' in updates || 'fillColor' in updates ||
+          'x' in updates || 'y' in updates || 'width' in updates || 'height' in updates ||
+          'centerX' in updates || 'centerY' in updates || 'radius' in updates ||
+          'startX' in updates || 'startY' in updates || 'endX' in updates || 'endY' in updates ||
+          'anchorX' in updates || 'anchorY' in updates) {
+        
+        // Remove cached texture to force regeneration
+        updateGameStore.removeObjectTexture(id)
+        console.log(`Store: Invalidated texture cache for object ${id} due to property changes`)
+      }
     }
   },
 
@@ -174,6 +350,13 @@ export const updateGameStore = {
   // Selection controls
   setSelectedObject: (objectId: string | null) => {
     gameStore.geometry.selection.selectedObjectId = objectId
+    
+    // Automatically set drawing mode to 'none' when selecting an object
+    // This prevents accidental object creation when clicking while something is selected
+    if (objectId !== null) {
+      updateGameStore.setDrawingMode('none')
+      console.log(`Store: Set drawing mode to 'none' due to object selection: ${objectId}`)
+    }
   },
 
   setEditPanelOpen: (open: boolean) => {
@@ -183,6 +366,54 @@ export const updateGameStore = {
   clearSelection: () => {
     gameStore.geometry.selection.selectedObjectId = null
     gameStore.geometry.selection.isEditPanelOpen = false
+  },
+
+  // Set reference to InfiniteCanvas for direct camera control
+  setInfiniteCanvasRef: (canvas: InfiniteCanvas) => {
+    infiniteCanvasRef = canvas
+    console.log('Store: InfiniteCanvas reference set for direct camera control')
+  },
+
+  centerCameraOnObject: (objectId: string) => {
+    const object = gameStore.geometry.objects.find(obj => obj.id === objectId)
+    if (object && object.metadata) {
+      if (infiniteCanvasRef) {
+        // Use direct camera movement to avoid store update loops
+        infiniteCanvasRef.moveCameraToPosition(object.metadata.center.x, object.metadata.center.y)
+        console.log(`Store: Centered camera on object ${objectId} at (${object.metadata.center.x.toFixed(1)}, ${object.metadata.center.y.toFixed(1)}) via direct movement`)
+      } else {
+        // Fallback to store update if no canvas reference
+        updateGameStore.setCameraPosition(object.metadata.center.x, object.metadata.center.y)
+        console.warn(`Store: Used fallback camera positioning for object ${objectId} - no InfiniteCanvas reference`)
+      }
+    } else {
+      console.warn(`Store: Cannot center on object ${objectId} - object not found or missing metadata`)
+    }
+  },
+
+  // Texture Registry actions (WRITE-ONLY from rendering perspective)
+  setObjectTexture: (objectId: string, textureData: ObjectTextureData) => {
+    gameStore.textureRegistry.objectTextures[objectId] = textureData
+    gameStore.textureRegistry.stats.totalTextures = Object.keys(gameStore.textureRegistry.objectTextures).length
+    gameStore.textureRegistry.stats.lastCaptureTime = Date.now()
+  },
+
+  removeObjectTexture: (objectId: string) => {
+    delete gameStore.textureRegistry.objectTextures[objectId]
+    gameStore.textureRegistry.stats.totalTextures = Object.keys(gameStore.textureRegistry.objectTextures).length
+  },
+
+  clearTextureCache: () => {
+    gameStore.textureRegistry.objectTextures = {}
+    gameStore.textureRegistry.stats.totalTextures = 0
+  },
+
+  getObjectTexture: (objectId: string): ObjectTextureData | undefined => {
+    return gameStore.textureRegistry.objectTextures[objectId]
+  },
+
+  hasObjectTexture: (objectId: string): boolean => {
+    return gameStore.textureRegistry.objectTextures[objectId] !== undefined
   }
 }
 

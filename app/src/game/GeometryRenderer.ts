@@ -64,11 +64,6 @@ export class GeometryRenderer {
     // Clear and re-render the object
     graphics.clear()
     this.renderGeometricObjectToGraphics(obj, pixeloidScale, graphics)
-    
-    // Render selection highlight if this object is selected
-    if (obj.id === gameStore.geometry.selection.selectedObjectId) {
-      this.renderSelectionHighlightToGraphics(obj, pixeloidScale, graphics)
-    }
   }
 
   /**
@@ -355,36 +350,20 @@ export class GeometryRenderer {
     }
   }
 
-  /**
-   * Render selection highlight around selected object to specific graphics
-   */
-  private renderSelectionHighlightToGraphics(obj: GeometricObject, pixeloidScale: number, graphics: Graphics): void {
-    // For now, only handle diamond selection highlight
-    if ('anchorX' in obj && 'anchorY' in obj) {
-      const diamond = obj as GeometricDiamond
-      const vertices = GeometryHelper.calculateDiamondVertices(diamond)
-      
-      // Draw selection outline with thicker stroke and different color
-      graphics.moveTo(vertices.west.x, vertices.west.y)
-      graphics.lineTo(vertices.north.x, vertices.north.y)
-      graphics.lineTo(vertices.east.x, vertices.east.y)
-      graphics.lineTo(vertices.south.x, vertices.south.y)
-      graphics.lineTo(vertices.west.x, vertices.west.y)
-      graphics.stroke({
-        width: (diamond.strokeWidth + 2) / pixeloidScale,
-        color: 0xff6600, // Orange selection color
-        alpha: 0.8
-      })
-    }
-    
-    // TODO: Add selection highlights for other shapes
-  }
 
   /**
    * Get the main container for adding to layer
    */
   public getGraphics(): Container {
     return this.mainContainer
+  }
+
+  /**
+   * Get object containers for texture capture (READ-ONLY access for TextureRegistry)
+   * This provides access to individual object Graphics for post-render texture capture
+   */
+  public getObjectContainers(): Map<string, Graphics> {
+    return new Map(this.objectContainers) // Return copy to prevent external modification
   }
 
   /**

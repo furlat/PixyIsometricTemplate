@@ -1,6 +1,7 @@
 export class UIControlBar {
   private storePanel: { toggle: () => void; getVisible: () => boolean } | null = null;
   private geometryPanel: { toggle: () => void; getVisible: () => boolean } | null = null;
+  private storeExplorer: { toggle: () => void; isVisible: () => boolean } | null = null;
   
   constructor() {
     this.initializeElements();
@@ -35,6 +36,16 @@ export class UIControlBar {
     } else {
       console.warn('Geometry panel toggle button not found');
     }
+    
+    // Store Explorer toggle button
+    const storeExplorerToggle = document.getElementById('toggle-store-explorer');
+    if (storeExplorerToggle) {
+      storeExplorerToggle.addEventListener('click', () => {
+        this.toggleStoreExplorer();
+      });
+    } else {
+      console.warn('Store explorer toggle button not found');
+    }
   }
   
   /**
@@ -54,12 +65,36 @@ export class UIControlBar {
   }
   
   /**
+   * Register the store explorer with the control bar
+   */
+  public registerStoreExplorer(storeExplorer: { toggle: () => void; isVisible: () => boolean }): void {
+    this.storeExplorer = storeExplorer;
+    this.updateStoreExplorerButton();
+  }
+  
+  /**
    * Toggle store panel visibility
    */
   private toggleStorePanel(): void {
     if (this.storePanel) {
       this.storePanel.toggle();
       this.updateStorePanelButton();
+      
+      // Notify StoreExplorer of store panel state change for repositioning
+      if (this.storeExplorer) {
+        // Small delay to ensure DOM updates are complete
+        setTimeout(() => {
+          if (this.storeExplorer) { // Additional null check for timeout context
+            // Force StoreExplorer to update position and height
+            if ('updatePanelPosition' in this.storeExplorer && typeof (this.storeExplorer as any).updatePanelPosition === 'function') {
+              (this.storeExplorer as any).updatePanelPosition();
+            }
+            if ('updatePanelHeight' in this.storeExplorer && typeof (this.storeExplorer as any).updatePanelHeight === 'function') {
+              (this.storeExplorer as any).updatePanelHeight();
+            }
+          }
+        }, 10);
+      }
     }
   }
   
@@ -70,6 +105,16 @@ export class UIControlBar {
     if (this.geometryPanel) {
       this.geometryPanel.toggle();
       this.updateGeometryPanelButton();
+    }
+  }
+  
+  /**
+   * Toggle store explorer visibility
+   */
+  private toggleStoreExplorer(): void {
+    if (this.storeExplorer) {
+      this.storeExplorer.toggle();
+      this.updateStoreExplorerButton();
     }
   }
   
@@ -119,6 +164,31 @@ export class UIControlBar {
       const buttonText = button.querySelector('.button-text');
       if (buttonText) {
         buttonText.textContent = 'Geometry';
+      }
+    }
+  }
+  
+  /**
+   * Update the store explorer button state
+   */
+  private updateStoreExplorerButton(): void {
+    const button = document.getElementById('toggle-store-explorer');
+    if (button && this.storeExplorer) {
+      const isVisible = this.storeExplorer.isVisible();
+      
+      // Update button appearance based on state
+      if (isVisible) {
+        button.classList.remove('btn-outline');
+        button.classList.add('btn-accent');
+      } else {
+        button.classList.remove('btn-accent');
+        button.classList.add('btn-outline');
+      }
+      
+      // Update button text
+      const buttonText = button.querySelector('.button-text');
+      if (buttonText) {
+        buttonText.textContent = 'Explorer';
       }
     }
   }

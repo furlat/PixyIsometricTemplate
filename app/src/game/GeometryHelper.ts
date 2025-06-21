@@ -3,7 +3,12 @@
  * Similar to CoordinateHelper for coordinate transformations
  */
 
-import type { GeometricDiamond, PixeloidCoordinate } from '../types'
+import type {
+  GeometricDiamond,
+  PixeloidCoordinate,
+  GeometricMetadata,
+
+} from '../types'
 
 export class GeometryHelper {
   /**
@@ -97,7 +102,8 @@ export class GeometryHelper {
       color: 0x0066cc,
       strokeWidth: 2,
       isVisible: true,
-      createdAt: Date.now()
+      createdAt: Date.now(),
+      metadata: this.calculateDiamondMetadata(properties)
     }
 
     const vertices = this.calculateDiamondVertices(tempDiamond)
@@ -177,5 +183,89 @@ export class GeometryHelper {
     p: PixeloidCoordinate
   ): number {
     return (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x)
+  }
+
+  /**
+   * Calculate metadata for a geometric point
+   */
+  static calculatePointMetadata(point: { x: number; y: number }): GeometricMetadata {
+    return {
+      center: { x: point.x, y: point.y },
+      bounds: {
+        minX: point.x,
+        maxX: point.x,
+        minY: point.y,
+        maxY: point.y
+      }
+    }
+  }
+
+  /**
+   * Calculate metadata for a geometric line
+   */
+  static calculateLineMetadata(line: { startX: number; startY: number; endX: number; endY: number }): GeometricMetadata {
+    const centerX = (line.startX + line.endX) / 2
+    const centerY = (line.startY + line.endY) / 2
+    
+    return {
+      center: { x: centerX, y: centerY },
+      bounds: {
+        minX: Math.min(line.startX, line.endX),
+        maxX: Math.max(line.startX, line.endX),
+        minY: Math.min(line.startY, line.endY),
+        maxY: Math.max(line.startY, line.endY)
+      }
+    }
+  }
+
+  /**
+   * Calculate metadata for a geometric circle
+   */
+  static calculateCircleMetadata(circle: { centerX: number; centerY: number; radius: number }): GeometricMetadata {
+    return {
+      center: { x: circle.centerX, y: circle.centerY },
+      bounds: {
+        minX: circle.centerX - circle.radius,
+        maxX: circle.centerX + circle.radius,
+        minY: circle.centerY - circle.radius,
+        maxY: circle.centerY + circle.radius
+      }
+    }
+  }
+
+  /**
+   * Calculate metadata for a geometric rectangle
+   */
+  static calculateRectangleMetadata(rectangle: { x: number; y: number; width: number; height: number }): GeometricMetadata {
+    const centerX = rectangle.x + rectangle.width / 2
+    const centerY = rectangle.y + rectangle.height / 2
+    
+    return {
+      center: { x: centerX, y: centerY },
+      bounds: {
+        minX: rectangle.x,
+        maxX: rectangle.x + rectangle.width,
+        minY: rectangle.y,
+        maxY: rectangle.y + rectangle.height
+      }
+    }
+  }
+
+  /**
+   * Calculate metadata for a geometric diamond
+   */
+  static calculateDiamondMetadata(diamond: { anchorX: number; anchorY: number; width: number; height: number }): GeometricMetadata {
+    const centerX = diamond.anchorX + diamond.width / 2
+    const centerY = diamond.anchorY
+    
+    return {
+      center: { x: centerX, y: centerY },
+      bounds: {
+        minX: diamond.anchorX,
+        maxX: diamond.anchorX + diamond.width,
+        minY: diamond.anchorY - diamond.height,
+        maxY: diamond.anchorY + diamond.height
+      }
+    }
   }
 }

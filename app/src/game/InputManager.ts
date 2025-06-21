@@ -11,6 +11,13 @@ export class InputManager {
   private lastClickTime: number = 0
   private doubleClickThreshold: number = 300 // ms
   
+  // Object dragging state
+  private isDragging: boolean = false
+  private dragStartPosition: { x: number, y: number } | null = null
+  private dragObjectId: string | null = null
+  private dragObjectOriginalPosition: { x: number, y: number } | null = null
+  private dragObjectOriginalEnd: { x: number, y: number } | null = null
+  
   // Store bound handlers for cleanup
   private keydownHandler: (event: KeyboardEvent) => void = () => {}
   private keyupHandler: (event: KeyboardEvent) => void = () => {}
@@ -85,6 +92,15 @@ export class InputManager {
         updateGameStore.setKeyState('space', true)
         event.preventDefault()
         break
+      case 'delete':
+      case 'backspace':
+        // Delete selected object
+        if (gameStore.geometry.selection.selectedObjectId) {
+          updateGameStore.removeGeometricObject(gameStore.geometry.selection.selectedObjectId)
+          updateGameStore.clearSelection()
+          event.preventDefault()
+        }
+        break
     }
   }
 
@@ -130,8 +146,12 @@ export class InputManager {
     const pixeloidPos = this.infiniteCanvas.screenToPixeloid(x, y)
     updateGameStore.updateMousePixeloidPosition(pixeloidPos.x, pixeloidPos.y)
     
-    // Handle preview during drawing
-    this.handleGeometryMouseMove(pixeloidPos)
+    // Handle preview during drawing or object dragging
+    if (this.isDragging) {
+      this.handleObjectDragging(pixeloidPos)
+    } else {
+      this.handleGeometryMouseMove(pixeloidPos)
+    }
   }
 
   /**
@@ -155,7 +175,7 @@ export class InputManager {
   }
 
   /**
-   * Handle mouse up - finish drawing
+   * Handle mouse up - finish drawing or stop dragging
    */
   private handleMouseUp(event: MouseEvent): void {
     if (!this.canvas || !this.infiniteCanvas) return
@@ -169,6 +189,12 @@ export class InputManager {
     
     // Convert to pixeloid coordinates (reuse existing logic)
     const pixeloidPos = this.infiniteCanvas.screenToPixeloid(x, y)
+    
+    // Stop object dragging if active
+    if (this.isDragging) {
+      this.stopObjectDragging()
+      return
+    }
     
     // Handle geometry drawing
     this.handleGeometryMouseUp(pixeloidPos)
@@ -299,17 +325,7 @@ export class InputManager {
    * Create a point immediately (no dragging needed)
    */
   private createPoint(pixeloidPos: { x: number, y: number }): void {
-    const point: GeometricPoint = {
-      id: `point_${Date.now()}`,
-      x: pixeloidPos.x,
-      y: pixeloidPos.y,
-      color: gameStore.geometry.drawing.settings.defaultColor,
-      isVisible: true,
-      createdAt: Date.now()
-    }
-    
-    // Add to store
-    updateGameStore.addGeometricObject(point)
+    updateGameStore.createPoint(pixeloidPos.x, pixeloidPos.y)
   }
 
   /**
@@ -404,20 +420,7 @@ export class InputManager {
     
     // Only create rectangle if it has some size (minimum 1 pixeloid)
     if (Math.abs(maxX - minX) >= 1 && Math.abs(maxY - minY) >= 1) {
-      const rectangle: GeometricRectangle = {
-        id: `rect_${Date.now()}`,
-        x: minX,
-        y: minY,
-        width: maxX - minX,
-        height: maxY - minY,
-        color: gameStore.geometry.drawing.settings.defaultColor,
-        strokeWidth: gameStore.geometry.drawing.settings.defaultStrokeWidth,
-        isVisible: true,
-        createdAt: Date.now()
-      }
-      
-      // Add to store
-      updateGameStore.addGeometricObject(rectangle)
+      updateGameStore.createRectangle(minX, minY, maxX - minX, maxY - minY)
     }
   }
 
@@ -428,20 +431,7 @@ export class InputManager {
     // Only create line if it has some length (minimum 1 pixeloid distance)
     const distance = Math.sqrt(Math.pow(endPoint.x - startPoint.x, 2) + Math.pow(endPoint.y - startPoint.y, 2))
     if (distance >= 1) {
-      const line: GeometricLine = {
-        id: `line_${Date.now()}`,
-        startX: startPoint.x,
-        startY: startPoint.y,
-        endX: endPoint.x,
-        endY: endPoint.y,
-        color: gameStore.geometry.drawing.settings.defaultColor,
-        strokeWidth: gameStore.geometry.drawing.settings.defaultStrokeWidth,
-        isVisible: true,
-        createdAt: Date.now()
-      }
-      
-      // Add to store
-      updateGameStore.addGeometricObject(line)
+      updateGameStore.createLine(startPoint.x, startPoint.y, endPoint.x, endPoint.y)
     }
   }
 
@@ -454,19 +444,7 @@ export class InputManager {
     
     // Only create circle if it has some size (minimum 1 pixeloid radius)
     if (radius >= 1) {
-      const circle: GeometricCircle = {
-        id: `circle_${Date.now()}`,
-        centerX: centerPoint.x,
-        centerY: centerPoint.y,
-        radius: Math.round(radius), // Make radius pixel perfect
-        color: gameStore.geometry.drawing.settings.defaultColor,
-        strokeWidth: gameStore.geometry.drawing.settings.defaultStrokeWidth,
-        isVisible: true,
-        createdAt: Date.now()
-      }
-      
-      // Add to store
-      updateGameStore.addGeometricObject(circle)
+      updateGameStore.createCircle(centerPoint.x, centerPoint.y, Math.round(radius))
     }
   }
 
@@ -479,20 +457,7 @@ export class InputManager {
     
     // Only create diamond if it has some size (minimum 2 pixeloids width)
     if (properties.width >= 2) {
-      const diamond: GeometricDiamond = {
-        id: `diamond_${Date.now()}`,
-        anchorX: properties.anchorX, // West vertex at original click position
-        anchorY: properties.anchorY, // Y stays at original click position
-        width: properties.width,
-        height: properties.height,
-        color: gameStore.geometry.drawing.settings.defaultColor,
-        strokeWidth: gameStore.geometry.drawing.settings.defaultStrokeWidth,
-        isVisible: true,
-        createdAt: Date.now()
-      }
-      
-      // Add to store
-      updateGameStore.addGeometricObject(diamond)
+      updateGameStore.createDiamond(properties.anchorX, properties.anchorY, properties.width, properties.height)
     }
   }
 
@@ -508,12 +473,34 @@ export class InputManager {
     const clickedObjects = gameStore.geometry.objects.filter(obj => {
       if (!obj.isVisible) return false
       
-      // For now, only handle diamond selection
+      // Check based on object type
       if ('anchorX' in obj && 'anchorY' in obj) {
+        // Diamond
         return GeometryHelper.isPointInsideDiamond(pixeloidPos, obj as any)
+      } else if ('width' in obj && 'height' in obj) {
+        // Rectangle
+        const rect = obj as GeometricRectangle
+        return pixeloidPos.x >= rect.x && pixeloidPos.x <= rect.x + rect.width &&
+               pixeloidPos.y >= rect.y && pixeloidPos.y <= rect.y + rect.height
+      } else if ('centerX' in obj && 'centerY' in obj && 'radius' in obj) {
+        // Circle
+        const circle = obj as GeometricCircle
+        const dx = pixeloidPos.x - circle.centerX
+        const dy = pixeloidPos.y - circle.centerY
+        return (dx * dx + dy * dy) <= (circle.radius * circle.radius)
+      } else if ('startX' in obj && 'startY' in obj && 'endX' in obj && 'endY' in obj) {
+        // Line - check if point is near the line (within stroke width tolerance)
+        const line = obj as GeometricLine
+        const tolerance = Math.max(line.strokeWidth * 0.5, 2) // Minimum 2 pixeloid tolerance
+        return this.isPointNearLine(pixeloidPos, line, tolerance)
+      } else if ('x' in obj && 'y' in obj && !('width' in obj)) {
+        // Point
+        const point = obj as GeometricPoint
+        const dx = Math.abs(pixeloidPos.x - point.x)
+        const dy = Math.abs(pixeloidPos.y - point.y)
+        return dx <= 2 && dy <= 2 // 4x4 pixeloid selection area
       }
       
-      // TODO: Add selection logic for other shapes
       return false
     })
     
@@ -527,11 +514,149 @@ export class InputManager {
       // If double-clicking on already selected object, open edit panel
       if (isDoubleClick && wasAlreadySelected) {
         updateGameStore.setEditPanelOpen(true)
+      } else if (wasAlreadySelected) {
+        // Start dragging if clicking on already selected object
+        this.startObjectDragging(selectedObject.id, pixeloidPos)
       }
     } else {
       // Clear selection if clicking on empty space
       updateGameStore.clearSelection()
     }
+  }
+
+  /**
+   * Start dragging an object
+   */
+  private startObjectDragging(objectId: string, startPos: { x: number, y: number }): void {
+    const obj = gameStore.geometry.objects.find(o => o.id === objectId)
+    if (!obj) return
+
+    this.isDragging = true
+    this.dragObjectId = objectId
+    this.dragStartPosition = { ...startPos }
+
+    // Store original position based on object type
+    if ('anchorX' in obj && 'anchorY' in obj) {
+      const diamond = obj as GeometricDiamond
+      this.dragObjectOriginalPosition = { x: diamond.anchorX, y: diamond.anchorY }
+    } else if ('centerX' in obj && 'centerY' in obj) {
+      const circle = obj as GeometricCircle
+      this.dragObjectOriginalPosition = { x: circle.centerX, y: circle.centerY }
+    } else if ('x' in obj && 'y' in obj && 'width' in obj && 'height' in obj) {
+      const rect = obj as GeometricRectangle
+      this.dragObjectOriginalPosition = { x: rect.x, y: rect.y }
+    } else if ('startX' in obj && 'startY' in obj && 'endX' in obj && 'endY' in obj) {
+      const line = obj as GeometricLine
+      this.dragObjectOriginalPosition = { x: line.startX, y: line.startY }
+      this.dragObjectOriginalEnd = { x: line.endX, y: line.endY }
+    } else if ('x' in obj && 'y' in obj) {
+      const point = obj as GeometricPoint
+      this.dragObjectOriginalPosition = { x: point.x, y: point.y }
+    }
+
+    console.log(`Started dragging object ${objectId}`)
+  }
+
+  /**
+   * Handle object dragging during mouse move
+   */
+  private handleObjectDragging(pixeloidPos: { x: number, y: number }): void {
+    if (!this.isDragging || !this.dragObjectId || !this.dragStartPosition || !this.dragObjectOriginalPosition) {
+      return
+    }
+
+    const obj = gameStore.geometry.objects.find(o => o.id === this.dragObjectId)
+    if (!obj) {
+      this.stopObjectDragging()
+      return
+    }
+
+    // Calculate drag offset
+    const deltaX = pixeloidPos.x - this.dragStartPosition.x
+    const deltaY = pixeloidPos.y - this.dragStartPosition.y
+
+    // Apply offset to object based on type
+    if ('anchorX' in obj && 'anchorY' in obj) {
+      const diamond = obj as GeometricDiamond
+      diamond.anchorX = this.dragObjectOriginalPosition.x + deltaX
+      diamond.anchorY = this.dragObjectOriginalPosition.y + deltaY
+    } else if ('centerX' in obj && 'centerY' in obj) {
+      const circle = obj as GeometricCircle
+      circle.centerX = this.dragObjectOriginalPosition.x + deltaX
+      circle.centerY = this.dragObjectOriginalPosition.y + deltaY
+    } else if ('x' in obj && 'y' in obj && 'width' in obj && 'height' in obj) {
+      const rect = obj as GeometricRectangle
+      rect.x = this.dragObjectOriginalPosition.x + deltaX
+      rect.y = this.dragObjectOriginalPosition.y + deltaY
+    } else if ('startX' in obj && 'startY' in obj && 'endX' in obj && 'endY' in obj) {
+      const line = obj as GeometricLine
+      if (this.dragObjectOriginalEnd) {
+        line.startX = this.dragObjectOriginalPosition.x + deltaX
+        line.startY = this.dragObjectOriginalPosition.y + deltaY
+        line.endX = this.dragObjectOriginalEnd.x + deltaX
+        line.endY = this.dragObjectOriginalEnd.y + deltaY
+      }
+    } else if ('x' in obj && 'y' in obj) {
+      const point = obj as GeometricPoint
+      point.x = this.dragObjectOriginalPosition.x + deltaX
+      point.y = this.dragObjectOriginalPosition.y + deltaY
+    }
+  }
+
+  /**
+   * Stop object dragging
+   */
+  private stopObjectDragging(): void {
+    if (this.isDragging && this.dragObjectId) {
+      console.log(`Stopped dragging object ${this.dragObjectId}`)
+    }
+
+    this.isDragging = false
+    this.dragObjectId = null
+    this.dragStartPosition = null
+    this.dragObjectOriginalPosition = null
+    this.dragObjectOriginalEnd = null
+  }
+
+  /**
+   * Check if a point is near a line within tolerance
+   */
+  private isPointNearLine(point: { x: number, y: number }, line: GeometricLine, tolerance: number): boolean {
+    const { startX, startY, endX, endY } = line
+    
+    // Calculate the distance from point to line segment
+    const A = point.x - startX
+    const B = point.y - startY
+    const C = endX - startX
+    const D = endY - startY
+    
+    const dot = A * C + B * D
+    const lenSq = C * C + D * D
+    
+    if (lenSq === 0) {
+      // Line is a point
+      const dx = point.x - startX
+      const dy = point.y - startY
+      return Math.sqrt(dx * dx + dy * dy) <= tolerance
+    }
+    
+    let param = dot / lenSq
+    
+    let xx, yy
+    if (param < 0) {
+      xx = startX
+      yy = startY
+    } else if (param > 1) {
+      xx = endX
+      yy = endY
+    } else {
+      xx = startX + param * C
+      yy = startY + param * D
+    }
+    
+    const dx = point.x - xx
+    const dy = point.y - yy
+    return Math.sqrt(dx * dx + dy * dy) <= tolerance
   }
 
   /**

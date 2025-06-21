@@ -2,7 +2,9 @@ import { Container } from 'pixi.js'
 import { InfiniteCanvas } from './InfiniteCanvas'
 import { BackgroundGridRenderer } from './BackgroundGridRenderer'
 import { GeometryRenderer } from './GeometryRenderer'
+import { SelectionHighlightRenderer } from './SelectionHighlightRenderer'
 import { MouseHighlightRenderer } from './MouseHighlightRenderer'
+import { TextureRegistry } from './TextureRegistry'
 import { gameStore } from '../store/gameStore'
 import { subscribe } from 'valtio'
 import type { ViewportCorners } from '../types'
@@ -19,6 +21,7 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
   // Layer containers for multi-layer rendering (now using Render Groups)
   private backgroundLayer: Container
   private geometryLayer: Container
+  private selectionLayer: Container  // NEW: Separate layer for selection highlighting
   private raycastLayer: Container
   private uiOverlayLayer: Container
   private mouseLayer: Container  // NEW: Separate layer for mouse visualization
@@ -29,8 +32,17 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
   // Geometry renderer for user-drawn shapes
   private geometryRenderer: GeometryRenderer
   
+  // Selection highlight renderer for reactive selection visualization
+  private selectionHighlightRenderer: SelectionHighlightRenderer
+  
   // Mouse visualization renderer (lightweight, updates every frame)
   private mouseHighlightRenderer: MouseHighlightRenderer
+  
+  // Texture registry for StoreExplorer previews (SAFE - no store subscriptions)
+  private textureRegistry: TextureRegistry | null = null
+  
+  // Track which objects need texture capture (performance optimization)
+  private objectsNeedingTexture: Set<string> = new Set()
   
   // Dirty tracking with smarter camera handling
   private backgroundDirty = true
@@ -39,12 +51,16 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
   private renderBufferPadding = 200 // Large buffer to avoid re-renders on movement
   private isBackgroundRendering = false
 
-  constructor() {
+  constructor(private app?: any) {
     super()
+
+    // TextureRegistry will be initialized lazily when first needed
+    this.textureRegistry = null
 
     // Create layer containers as Render Groups for better performance
     this.backgroundLayer = new Container({ isRenderGroup: true })
     this.geometryLayer = new Container({ isRenderGroup: true })
+    this.selectionLayer = new Container({ isRenderGroup: true }) // Selection layer on top of geometry
     this.raycastLayer = new Container({ isRenderGroup: true })
     this.uiOverlayLayer = new Container({ isRenderGroup: true })
     this.mouseLayer = new Container({ isRenderGroup: true }) // Mouse layer on top
@@ -54,6 +70,9 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
 
     // Initialize geometry renderer
     this.geometryRenderer = new GeometryRenderer()
+    
+    // Initialize selection highlight renderer (reactive)
+    this.selectionHighlightRenderer = new SelectionHighlightRenderer()
     
     // Initialize mouse highlight renderer (lightweight)
     this.mouseHighlightRenderer = new MouseHighlightRenderer()
@@ -78,8 +97,12 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
     // Add layers to camera transform in correct order (back to front)
     this.cameraTransform.addChild(this.backgroundLayer)    // Grid and background elements
     this.cameraTransform.addChild(this.geometryLayer)      // Geometric shapes and objects
+    this.cameraTransform.addChild(this.selectionLayer)     // Selection highlights on top of geometry
     this.cameraTransform.addChild(this.raycastLayer)       // Raycast lines and debug visuals
     this.cameraTransform.addChild(this.uiOverlayLayer)     // UI elements that follow camera
+    
+    // Selection layer gets the selection highlight renderer graphics
+    this.selectionLayer.addChild(this.selectionHighlightRenderer.getGraphics())
     
     // Mouse layer goes into camera transform so it scales and positions with the grid
     // This ensures perfect alignment with pixeloids
@@ -115,6 +138,9 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
       this.geometryDirty = false
     }
     
+    // Render selection highlights (reactive, always updates based on store state)
+    this.renderSelectionLayer(paddedCorners, pixeloidScale)
+    
     // Update tracking variables
     this.lastPixeloidScale = pixeloidScale
     
@@ -148,9 +174,17 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
     if (gameStore.geometry.layerVisibility.geometry) {
       this.geometryRenderer.render(corners, pixeloidScale)
       
-      // Only update if graphics changed
+      // CRITICAL: Always add the full renderer container (includes preview graphics)
       this.geometryLayer.removeChildren()
       this.geometryLayer.addChild(this.geometryRenderer.getGraphics())
+      
+      // IMPROVED: Capture textures synchronously after render is complete
+      if (this.objectsNeedingTexture.size > 0) {
+        // Use requestAnimationFrame to ensure render is complete before capture
+        requestAnimationFrame(() => {
+          this.captureSpecificObjectTexturesSync()
+        })
+      }
     } else {
       // Clear layer if not visible
       this.geometryLayer.removeChildren()
@@ -158,11 +192,25 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
   }
   
   /**
+   * Render selection layer - always reactive to current selection state
+   */
+  private renderSelectionLayer(corners: ViewportCorners, pixeloidScale: number): void {
+    // Selection highlighting is always rendered reactively based on current store state
+    this.selectionHighlightRenderer.render(corners, pixeloidScale)
+  }
+  
+  /**
    * Subscribe to store changes to mark layers as dirty when data changes
    */
   private subscribeToStoreChanges(): void {
-    // Subscribe to geometry changes using Valtio
-    subscribe(gameStore.geometry, () => {
+    // Subscribe to geometry objects specifically to track new/modified objects
+    subscribe(gameStore.geometry.objects, () => {
+      this.geometryDirty = true
+      this.markNewObjectsForTextureCapture()
+    })
+
+    // Subscribe to activeDrawing changes for preview rendering during drag-and-drop
+    subscribe(gameStore.geometry.drawing.activeDrawing, () => {
       this.geometryDirty = true
     })
 
@@ -179,6 +227,64 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
         this.backgroundDirty = true
       }
     })
+  }
+
+  /**
+   * Mark new objects for texture capture (called when store objects change)
+   */
+  private markNewObjectsForTextureCapture(): void {
+    const currentObjects = gameStore.geometry.objects
+    
+    // Find new objects that don't have textures yet
+    for (const obj of currentObjects) {
+      if (!gameStore.textureRegistry.objectTextures[obj.id]) {
+        this.objectsNeedingTexture.add(obj.id)
+      }
+    }
+  }
+
+  /**
+   * Capture textures only for specific objects that need it (performance optimized)
+   */
+  
+
+  /**
+   * Synchronous texture capture after render completion (improved timing)
+   */
+  private captureSpecificObjectTexturesSync(): void {
+    // Initialize texture registry lazily when first needed
+    if (!this.textureRegistry && this.app) {
+      this.textureRegistry = new TextureRegistry()
+    }
+    
+    if (!this.textureRegistry) {
+      console.warn('LayeredInfiniteCanvas: Cannot capture textures - no app instance provided')
+      return
+    }
+
+    try {
+      console.log(`LayeredInfiniteCanvas: Starting sync texture capture for ${this.objectsNeedingTexture.size} objects`)
+      
+      // Get all rendered object graphics from GeometryRenderer
+      const objectContainers = this.geometryRenderer.getObjectContainers()
+      
+      // Capture textures individually for better error handling
+      for (const objectId of this.objectsNeedingTexture) {
+        const graphics = objectContainers.get(objectId)
+        if (graphics) {
+          // Capture immediately - the improved TextureRegistry handles async internally
+          this.textureRegistry.captureObjectTexture(objectId)
+        } else {
+          console.warn(`LayeredInfiniteCanvas: No graphics found for object ${objectId}`)
+        }
+      }
+      
+      // Clear the list of objects needing texture capture
+      this.objectsNeedingTexture.clear()
+      
+    } catch (error) {
+      console.error('LayeredInfiniteCanvas: Failed to capture specific object textures sync:', error)
+    }
   }
 
   /**
@@ -236,6 +342,13 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
   }
 
   /**
+   * Get the selection layer container for adding selection highlights
+   */
+  public getSelectionLayer(): Container {
+    return this.selectionLayer
+  }
+
+  /**
    * Get the raycast layer container for adding raycast visualization
    */
   public getRaycastLayer(): Container {
@@ -257,10 +370,12 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
     // Destroy renderers
     this.backgroundGridRenderer.destroy()
     this.geometryRenderer.destroy()
+    this.selectionHighlightRenderer.destroy()
 
     // Destroy layer containers
     this.backgroundLayer.destroy()
     this.geometryLayer.destroy()
+    this.selectionLayer.destroy()
     this.raycastLayer.destroy()
     this.uiOverlayLayer.destroy()
 

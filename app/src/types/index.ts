@@ -52,6 +52,8 @@ export interface GameState {
   input: InputState
   // Geometry system state (Phase 1)
   geometry: GeometryState
+  // Texture registry for StoreExplorer (ISOLATED from main rendering)
+  textureRegistry: TextureRegistryState
 }
 
 // UI-related types
@@ -69,6 +71,18 @@ export interface StatusColors {
 }
 
 // Geometry-related types for Phase 1: Multi-Layer System
+
+// Metadata interface for geometric objects (for preview centering and bounds calculation)
+export interface GeometricMetadata {
+  center: PixeloidCoordinate
+  bounds: {
+    minX: number
+    maxX: number
+    minY: number
+    maxY: number
+  }
+}
+
 export interface GeometricPoint {
   id: string
   x: number
@@ -76,6 +90,7 @@ export interface GeometricPoint {
   color: number
   isVisible: boolean
   createdAt: number
+  metadata: GeometricMetadata
 }
 
 export interface GeometricLine {
@@ -88,6 +103,7 @@ export interface GeometricLine {
   strokeWidth: number
   isVisible: boolean
   createdAt: number
+  metadata: GeometricMetadata
 }
 
 export interface GeometricCircle {
@@ -100,6 +116,7 @@ export interface GeometricCircle {
   fillColor?: number
   isVisible: boolean
   createdAt: number
+  metadata: GeometricMetadata
 }
 
 export interface GeometricRectangle {
@@ -113,6 +130,7 @@ export interface GeometricRectangle {
   fillColor?: number
   isVisible: boolean
   createdAt: number
+  metadata: GeometricMetadata
 }
 
 export interface GeometricDiamond {
@@ -129,6 +147,7 @@ export interface GeometricDiamond {
   fillColor?: number
   isVisible: boolean
   createdAt: number
+  metadata: GeometricMetadata
 }
 
 export type GeometricObject = GeometricPoint | GeometricLine | GeometricCircle | GeometricRectangle | GeometricDiamond
@@ -189,5 +208,23 @@ export interface GeometryState {
   selection: {
     selectedObjectId: string | null
     isEditPanelOpen: boolean
+  }
+}
+
+// Texture Registry types for StoreExplorer previews (ISOLATED from main rendering)
+export interface ObjectTextureData {
+  objectId: string
+  base64Preview: string
+  capturedAt: number
+  isValid: boolean
+}
+
+export interface TextureRegistryState {
+  // Object texture cache for previews - using plain object instead of Map for Valtio compatibility
+  objectTextures: Record<string, ObjectTextureData>
+  // Statistics
+  stats: {
+    totalTextures: number
+    lastCaptureTime: number
   }
 }

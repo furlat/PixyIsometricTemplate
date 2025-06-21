@@ -17,6 +17,7 @@ export class StorePanel {
   constructor() {
     this.initializeElements();
     this.setupReactivity();
+    this.setupEventHandlers();
   }
   
   private initializeElements(): void {
@@ -64,6 +65,14 @@ export class StorePanel {
     
     // Initial update
     this.updateValues();
+  }
+  
+  private setupEventHandlers(): void {
+    // Close button
+    const closeBtn = document.getElementById('close-store-panel');
+    closeBtn?.addEventListener('click', () => {
+      this.toggle();
+    });
   }
   
   private updateValues(): void {

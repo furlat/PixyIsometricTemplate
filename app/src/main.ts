@@ -1,6 +1,6 @@
 import { Game } from './game'
 import { updateGameStore } from './store/gameStore'
-import { StorePanel, UIControlBar, GeometryPanel, LayerToggleBar, ObjectEditPanel } from './ui'
+import { StorePanel, UIControlBar, GeometryPanel, LayerToggleBar, ObjectEditPanel, StoreExplorer } from './ui'
 
 // Initialize the game when the DOM is loaded
 async function init() {
@@ -18,6 +18,7 @@ async function init() {
     // Initialize UI components for real-time data display and control
     const storePanel = new StorePanel()
     const geometryPanel = new GeometryPanel()
+    const storeExplorer = new StoreExplorer()
     const uiControlBar = new UIControlBar()
     const layerToggleBar = new LayerToggleBar()
     const objectEditPanel = new ObjectEditPanel()
@@ -25,6 +26,7 @@ async function init() {
     // Connect the control bar with the panels
     uiControlBar.registerStorePanel(storePanel)
     uiControlBar.registerGeometryPanel(geometryPanel)
+    uiControlBar.registerStoreExplorer(storeExplorer)
     
     console.log('🎮 Infinite Canvas Template initialized successfully!')
     console.log('✅ PixiJS Application:', game.application)
@@ -32,6 +34,7 @@ async function init() {
     console.log('✅ Fullscreen Canvas:', game.canvas)
     console.log('✅ Store Panel:', storePanel)
     console.log('✅ Geometry Panel:', geometryPanel)
+    console.log('✅ Store Explorer:', storeExplorer)
     console.log('✅ UI Control Bar:', uiControlBar)
     console.log('✅ Layer Toggle Bar:', layerToggleBar)
     console.log('✅ Object Edit Panel:', objectEditPanel)

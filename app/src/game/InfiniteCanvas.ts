@@ -56,6 +56,21 @@ export class InfiniteCanvas {
   }
 
   /**
+   * Directly move camera to specific position (like WASD movement)
+   * This bypasses store updates to avoid re-rendering cycles
+   */
+  public moveCameraToPosition(pixeloidX: number, pixeloidY: number): void {
+    // Directly update local camera position (same as WASD movement)
+    this.localCameraPosition.x = pixeloidX
+    this.localCameraPosition.y = pixeloidY
+    
+    // Sync to store once (same as WASD movement does)
+    this.syncToStore()
+    
+    console.log(`InfiniteCanvas: Camera moved directly to (${pixeloidX.toFixed(1)}, ${pixeloidY.toFixed(1)})`)
+  }
+
+  /**
    * Set initial camera position so (0,0) appears at top-left at default zoom
    */
   private setInitialCameraPosition(): void {
@@ -122,19 +137,33 @@ export class InfiniteCanvas {
       moved = true
     }
 
-    // Space to recenter camera to place (0,0) at top-left
+    // Space to recenter camera - smart behavior based on selection
     if (keys.space) {
-      // Reset camera to place pixeloid (0,0) at top-left corner
-      const centerPosition = CoordinateHelper.calculateInitialCameraPosition(
-        this.localViewportSize,
-        this.localPixeloidScale
-      )
-      this.localCameraPosition.x = centerPosition.x
-      this.localCameraPosition.y = centerPosition.y
-      moved = true
+      const selectedObjectId = gameStore.geometry.selection.selectedObjectId
+      
+      if (selectedObjectId) {
+        // If object is selected, center on that object
+        const selectedObject = gameStore.geometry.objects.find(obj => obj.id === selectedObjectId)
+        if (selectedObject && selectedObject.metadata) {
+          this.localCameraPosition.x = selectedObject.metadata.center.x
+          this.localCameraPosition.y = selectedObject.metadata.center.y
+          moved = true
+          console.log(`Camera recentered to selected object ${selectedObjectId} at (${selectedObject.metadata.center.x.toFixed(1)}, ${selectedObject.metadata.center.y.toFixed(1)})`)
+        }
+      } else {
+        // No selection, reset camera to place pixeloid (0,0) at top-left corner
+        const centerPosition = CoordinateHelper.calculateInitialCameraPosition(
+          this.localViewportSize,
+          this.localPixeloidScale
+        )
+        this.localCameraPosition.x = centerPosition.x
+        this.localCameraPosition.y = centerPosition.y
+        moved = true
+        console.log(`Camera recentered to place (0,0) at top-left at zoom level ${this.localPixeloidScale}`)
+      }
+      
       // Reset space key to prevent continuous recentering
       updateGameStore.setKeyState('space', false)
-      console.log(`Camera recentered to place (0,0) at top-left at zoom level ${this.localPixeloidScale}`)
     }
 
     // Only update store if camera moved
