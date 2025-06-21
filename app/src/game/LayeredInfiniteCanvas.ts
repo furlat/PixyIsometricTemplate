@@ -4,7 +4,8 @@ import { BackgroundGridRenderer } from './BackgroundGridRenderer'
 import { GeometryRenderer } from './GeometryRenderer'
 import { SelectionHighlightRenderer } from './SelectionHighlightRenderer'
 import { MouseHighlightRenderer } from './MouseHighlightRenderer'
-import { BoundingBoxMaskRenderer } from './BoundingBoxMaskRenderer'
+import { PixeloidMeshRenderer } from './PixeloidMeshRenderer'
+import { BoundingBoxRenderer } from './BoundingBoxRenderer'
 import { TextureRegistry } from './TextureRegistry'
 import { gameStore } from '../store/gameStore'
 import { subscribe } from 'valtio'
@@ -25,6 +26,7 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
   private selectionLayer: Container  // NEW: Separate layer for selection highlighting
   private raycastLayer: Container
   private maskLayer: Container      // NEW: Mask layer for collision/spatial analysis
+  private bboxLayer: Container      // NEW: Separate layer for bbox overlay
   private mouseLayer: Container     // NEW: Separate layer for mouse visualization
 
   // Background grid renderer using extracted logic
@@ -39,8 +41,11 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
   // Mouse visualization renderer (lightweight, updates every frame)
   private mouseHighlightRenderer: MouseHighlightRenderer
   
-  // Bounding box mask renderer for GPU-accelerated spatial analysis
-  private boundingBoxMaskRenderer: BoundingBoxMaskRenderer
+  // Pixeloid mesh renderer for GPU-accelerated spatial analysis
+  private pixeloidMeshRenderer: PixeloidMeshRenderer
+  
+  // Simple bounding box renderer for comparison
+  private boundingBoxRenderer: BoundingBoxRenderer
   
   // Texture registry for StoreExplorer previews (SAFE - no store subscriptions)
   private textureRegistry: TextureRegistry | null = null
@@ -67,6 +72,7 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
     this.selectionLayer = new Container({ isRenderGroup: true }) // Selection layer on top of geometry
     this.raycastLayer = new Container({ isRenderGroup: true })
     this.maskLayer = new Container({ isRenderGroup: true })     // Mask layer for spatial analysis
+    this.bboxLayer = new Container({ isRenderGroup: true })     // Bbox layer for comparison overlay
     this.mouseLayer = new Container({ isRenderGroup: true })    // Mouse layer on top
 
     // Initialize background grid renderer
@@ -81,8 +87,11 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
     // Initialize mouse highlight renderer (lightweight)
     this.mouseHighlightRenderer = new MouseHighlightRenderer()
     
-    // Initialize bounding box mask renderer
-    this.boundingBoxMaskRenderer = new BoundingBoxMaskRenderer()
+    // Initialize pixeloid mesh renderer
+    this.pixeloidMeshRenderer = new PixeloidMeshRenderer()
+    
+    // Initialize simple bounding box renderer for comparison
+    this.boundingBoxRenderer = new BoundingBoxRenderer()
 
     // Setup layer hierarchy within the existing camera transform
     // This maintains all existing InfiniteCanvas functionality
@@ -107,12 +116,16 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
     this.cameraTransform.addChild(this.selectionLayer)     // Selection highlights on top of geometry
     this.cameraTransform.addChild(this.raycastLayer)       // Raycast lines and debug visuals
     this.cameraTransform.addChild(this.maskLayer)          // Mask layer for spatial analysis
+    this.cameraTransform.addChild(this.bboxLayer)          // Bbox layer for comparison overlay
     
     // Selection layer gets the selection highlight renderer graphics
     this.selectionLayer.addChild(this.selectionHighlightRenderer.getGraphics())
     
-    // Mask layer gets the bounding box mask renderer graphics
-    this.maskLayer.addChild(this.boundingBoxMaskRenderer.getGraphics())
+    // Mask layer gets the pixeloid mesh renderer
+    this.maskLayer.addChild(this.pixeloidMeshRenderer.getContainer())
+    
+    // Bbox layer gets the simple bounding box renderer
+    this.bboxLayer.addChild(this.boundingBoxRenderer.getGraphics())
     
     // Mouse layer goes into camera transform so it scales and positions with the grid
     // This ensures perfect alignment with pixeloids
@@ -154,6 +167,9 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
     // Render mask layer (GPU-accelerated spatial analysis)
     this.renderMaskLayer(paddedCorners, pixeloidScale)
     
+    // Render bbox layer (comparison overlay)
+    this.renderBboxLayer(paddedCorners, pixeloidScale)
+    
     // Render UI overlay layer
     this.renderUIOverlayLayer(paddedCorners, pixeloidScale)
     
@@ -179,7 +195,10 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
     // Only render grid if background layer is visible
     if (gameStore.geometry.layerVisibility.background) {
       this.backgroundGridRenderer.render(corners, pixeloidScale)
-      this.backgroundLayer.addChild(this.backgroundGridRenderer.getGraphics())
+      const mesh = this.backgroundGridRenderer.getMesh()
+      if (mesh) {
+        this.backgroundLayer.addChild(mesh)
+      }
     }
   }
   
@@ -222,14 +241,27 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
   }
   
   /**
-   * Render mask layer - GPU-accelerated spatial analysis using bounding boxes
+   * Render mask layer - both pixeloid mesh and bbox for comparison
    */
   private renderMaskLayer(corners: ViewportCorners, pixeloidScale: number): void {
     if (gameStore.geometry.layerVisibility.mask) {
-      this.boundingBoxMaskRenderer.render(corners, pixeloidScale)
+      // Render pixeloid mesh (new implementation)
+      this.pixeloidMeshRenderer.render(corners, pixeloidScale, undefined)
       this.maskLayer.visible = true
     } else {
       this.maskLayer.visible = false
+    }
+  }
+  
+  /**
+   * Render bbox layer - separate from mask layer for independent control
+   */
+  private renderBboxLayer(corners: ViewportCorners, pixeloidScale: number): void {
+    if (gameStore.geometry.layerVisibility.bbox) {
+      this.boundingBoxRenderer.render(corners, pixeloidScale)
+      this.bboxLayer.visible = true
+    } else {
+      this.bboxLayer.visible = false
     }
   }
   
@@ -417,6 +449,13 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
   }
 
   /**
+   * Get the bbox layer container for adding bbox elements
+   */
+  public getBboxLayer(): Container {
+    return this.bboxLayer
+  }
+
+  /**
    * Override destroy to clean up layer resources
    */
   public destroy(): void {
@@ -424,7 +463,8 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
     this.backgroundGridRenderer.destroy()
     this.geometryRenderer.destroy()
     this.selectionHighlightRenderer.destroy()
-    this.boundingBoxMaskRenderer.destroy()
+    this.pixeloidMeshRenderer.destroy()
+    this.boundingBoxRenderer.destroy()
 
     // Destroy layer containers
     this.backgroundLayer.destroy()
@@ -432,6 +472,7 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
     this.selectionLayer.destroy()
     this.raycastLayer.destroy()
     this.maskLayer.destroy()
+    this.bboxLayer.destroy()
 
     // Call parent destroy
     super.destroy()

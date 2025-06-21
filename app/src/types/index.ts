@@ -54,6 +54,8 @@ export interface GameState {
   geometry: GeometryState
   // Texture registry for StoreExplorer (ISOLATED from main rendering)
   textureRegistry: TextureRegistryState
+  // Mesh registry for pixeloid mesh system
+  meshRegistry: MeshRegistryState
 }
 
 // UI-related types
@@ -216,6 +218,7 @@ export interface GeometryState {
     selection: boolean   // Selection highlights (selectionLayer)
     raycast: boolean     // Raycast lines and debug visuals (raycastLayer)
     mask: boolean        // Pixeloid mask layer for collision/spatial analysis (maskLayer)
+    bbox: boolean        // Bounding box overlay for comparison (bboxLayer)
     mouse: boolean       // Mouse visualization (mouseLayer)
   }
   // Selection state
@@ -260,5 +263,37 @@ export interface TextureRegistryState {
   stats: {
     totalTextures: number
     lastCaptureTime: number
+  }
+}
+
+// Mesh-related types for pixeloid mesh rendering
+export interface PixeloidMeshData {
+  objectId: string
+  pixeloidBounds: {
+    minX: number
+    maxX: number
+    minY: number
+    maxY: number
+  }
+  pixeloidCount: number
+  occupiedPixeloids: Set<string> // "x,y" coordinates as strings
+  meshCreatedAt: number
+  isValid: boolean
+}
+
+export interface MeshRegistryState {
+  // Track mesh data per object - using plain object for Valtio compatibility
+  objectMeshes: Record<string, PixeloidMeshData>
+  // Settings for mesh generation
+  meshSettings: {
+    samplingMode: 'fast' | 'precise' // fast = center only, precise = 5-point sampling
+    maxPixeloidsPerObject: number // Performance limit
+    enableDebugVisualization: boolean
+  }
+  // Statistics
+  stats: {
+    totalMeshes: number
+    totalPixeloids: number
+    lastMeshUpdate: number
   }
 }

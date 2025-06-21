@@ -1,5 +1,5 @@
 import { proxy } from 'valtio'
-import type { GameState, ViewportCorners, GeometricObject, ObjectTextureData, GeometricPoint, GeometricLine, GeometricCircle, GeometricRectangle, GeometricDiamond } from '../types'
+import type { GameState, ViewportCorners, GeometricObject, ObjectTextureData, GeometricPoint, GeometricLine, GeometricCircle, GeometricRectangle, GeometricDiamond, PixeloidMeshData } from '../types'
 import { GeometryHelper } from '../game/GeometryHelper'
 import type { InfiniteCanvas } from '../game/InfiniteCanvas'
 
@@ -75,6 +75,7 @@ export const gameStore = proxy<GameState>({
       selection: true,   // Selection highlights
       raycast: true,     // Raycast lines and debug visuals
       mask: false,       // Pixeloid mask layer for collision/spatial analysis (off by default)
+      bbox: false,       // Bounding box overlay for comparison (off by default)
       mouse: true        // Mouse visualization
     },
     selection: {
@@ -106,6 +107,20 @@ export const gameStore = proxy<GameState>({
     stats: {
       totalTextures: 0,
       lastCaptureTime: 0
+    }
+  },
+  // Mesh registry for pixeloid mesh system
+  meshRegistry: {
+    objectMeshes: {},
+    meshSettings: {
+      samplingMode: 'precise', // Use precise 5-point sampling by default
+      maxPixeloidsPerObject: 10000, // Reasonable limit for performance
+      enableDebugVisualization: false
+    },
+    stats: {
+      totalMeshes: 0,
+      totalPixeloids: 0,
+      lastMeshUpdate: 0
     }
   }
 })
@@ -389,7 +404,7 @@ export const updateGameStore = {
     }
   },
 
-  setLayerVisibility: (layer: 'background' | 'geometry' | 'selection' | 'raycast' | 'mask' | 'mouse', visible: boolean) => {
+  setLayerVisibility: (layer: 'background' | 'geometry' | 'selection' | 'raycast' | 'mask' | 'bbox' | 'mouse', visible: boolean) => {
     gameStore.geometry.layerVisibility[layer] = visible
   },
 
@@ -630,6 +645,55 @@ export const updateGameStore = {
 
   updateMaskVisualSettings: (settings: Partial<typeof gameStore.geometry.mask.visualSettings>) => {
     Object.assign(gameStore.geometry.mask.visualSettings, settings)
+  },
+
+  // Mesh Registry actions (for pixeloid mesh system)
+  setMeshData: (objectId: string, meshData: PixeloidMeshData) => {
+    gameStore.meshRegistry.objectMeshes[objectId] = meshData
+    gameStore.meshRegistry.stats.totalMeshes = Object.keys(gameStore.meshRegistry.objectMeshes).length
+    gameStore.meshRegistry.stats.totalPixeloids = Object.values(gameStore.meshRegistry.objectMeshes)
+      .reduce((total, mesh) => total + mesh.pixeloidCount, 0)
+    gameStore.meshRegistry.stats.lastMeshUpdate = Date.now()
+  },
+
+  removeMeshData: (objectId: string) => {
+    delete gameStore.meshRegistry.objectMeshes[objectId]
+    gameStore.meshRegistry.stats.totalMeshes = Object.keys(gameStore.meshRegistry.objectMeshes).length
+    gameStore.meshRegistry.stats.totalPixeloids = Object.values(gameStore.meshRegistry.objectMeshes)
+      .reduce((total, mesh) => total + mesh.pixeloidCount, 0)
+  },
+
+  clearAllMeshData: () => {
+    gameStore.meshRegistry.objectMeshes = {}
+    gameStore.meshRegistry.stats.totalMeshes = 0
+    gameStore.meshRegistry.stats.totalPixeloids = 0
+  },
+
+  getMeshData: (objectId: string): PixeloidMeshData | undefined => {
+    return gameStore.meshRegistry.objectMeshes[objectId]
+  },
+
+  hasMeshData: (objectId: string): boolean => {
+    return gameStore.meshRegistry.objectMeshes[objectId] !== undefined
+  },
+
+  updateMeshSettings: (settings: Partial<typeof gameStore.meshRegistry.meshSettings>) => {
+    Object.assign(gameStore.meshRegistry.meshSettings, settings)
+  },
+
+  // Mark mesh as invalid (needs regeneration)
+  invalidateMesh: (objectId: string) => {
+    const meshData = gameStore.meshRegistry.objectMeshes[objectId]
+    if (meshData) {
+      meshData.isValid = false
+    }
+  },
+
+  // Mark all meshes as invalid
+  invalidateAllMeshes: () => {
+    for (const meshData of Object.values(gameStore.meshRegistry.objectMeshes)) {
+      meshData.isValid = false
+    }
   }
 }
 

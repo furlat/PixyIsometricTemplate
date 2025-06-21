@@ -1,156 +1,193 @@
-import { Graphics, RenderTexture, Sprite } from 'pixi.js'
+import { MeshSimple, MeshGeometry, Shader, Texture } from 'pixi.js'
 import type { ViewportCorners } from '../types'
 import { CoordinateHelper } from './CoordinateHelper'
 
 /**
- * Dedicated renderer for the background grid pattern with texture caching
- * Uses pre-rendered textures to handle extreme zoom levels efficiently
+ * Mesh-based background grid renderer
+ * Creates individual quads for each grid square using MeshSimple
+ * This provides the foundation for shader-based effects like pixeloid masks
  */
 export class BackgroundGridRenderer {
-  private graphics: Graphics
-  private textureCache: Map<number, RenderTexture> = new Map()
-  private gridSprite: Sprite | null = null
+  private mesh: MeshSimple | null = null
+  private shader: Shader | null = null
   private lastScale: number = -1
   private lastViewport: string = ''
   
   constructor() {
-    this.graphics = new Graphics()
+    this.createGridShader()
+  }
+
+  /**
+   * Create shader for grid rendering with proper checkerboard pattern
+   */
+  private createGridShader(): void {
+    this.shader = Shader.from({
+      gl: {
+        vertex: `
+          attribute vec2 aPosition;
+          attribute vec2 aUV;
+          varying vec2 vUV;
+          varying vec2 vGridPos;
+          
+          uniform mat3 uProjectionMatrix;
+          uniform mat3 uWorldTransformMatrix;
+          uniform mat3 uTransformMatrix;
+          
+          void main() {
+            mat3 mvp = uProjectionMatrix * uWorldTransformMatrix * uTransformMatrix;
+            gl_Position = vec4((mvp * vec3(aPosition, 1.0)).xy, 0.0, 1.0);
+            vUV = aUV;
+            vGridPos = aPosition;
+          }
+        `,
+        fragment: `
+          precision mediump float;
+          varying vec2 vUV;
+          varying vec2 vGridPos;
+          
+          uniform float uPixeloidScale;
+          
+          void main() {
+            // Calculate checkerboard pattern based on grid position
+            // Each quad represents a 1x1 grid square
+            vec2 gridCoord = floor(vGridPos);
+            float checker = mod(gridCoord.x + gridCoord.y, 2.0);
+            
+            // Light and dark colors for checkerboard (matching original BackgroundGridRenderer)
+            vec3 lightColor = vec3(0.941, 0.941, 0.941); // 0xf0f0f0
+            vec3 darkColor = vec3(0.878, 0.878, 0.878);  // 0xe0e0e0
+            
+            // Mix between light and dark based on checker value
+            vec3 color = mix(lightColor, darkColor, checker);
+            
+            gl_FragColor = vec4(color, 1.0);
+          }
+        `
+      },
+      resources: {
+        uTexture: Texture.WHITE.source,
+        uPixeloidScale: 1.0
+      }
+    })
   }
   
   /**
-   * Render the checkered grid pattern using cached textures for performance
+   * Render the grid mesh using efficient viewport culling
    */
   public render(
     corners: ViewportCorners,
     pixeloidScale: number
   ): void {
-    // Create viewport hash for caching
-    const viewportHash = `${Math.floor(corners.topLeft.x/100)},${Math.floor(corners.topLeft.y/100)},${Math.floor(corners.bottomRight.x/100)},${Math.floor(corners.bottomRight.y/100)}`
+    // Create viewport hash for caching (using larger tile size for efficiency)
+    const viewportHash = `${Math.floor(corners.topLeft.x/50)},${Math.floor(corners.topLeft.y/50)},${Math.floor(corners.bottomRight.x/50)},${Math.floor(corners.bottomRight.y/50)}`
     
     // Check if we need to regenerate (scale changed or major viewport change)
     if (pixeloidScale !== this.lastScale || viewportHash !== this.lastViewport) {
-      this.regenerateGridTexture(corners, pixeloidScale)
+      this.regenerateGridMesh(corners, pixeloidScale)
       this.lastScale = pixeloidScale
       this.lastViewport = viewportHash
     }
-  }
-  
-  /**
-   * Generate cached grid texture for the current zoom level
-   */
-  private regenerateGridTexture(corners: ViewportCorners, pixeloidScale: number): void {
-    this.graphics.clear()
     
-    // For extreme zoom levels (1-2x), use efficient tiling pattern
-    if (pixeloidScale <= 2) {
-      this.renderTiledPattern(corners, pixeloidScale)
-    } else {
-      // Normal detailed rendering for higher zoom levels
-      this.renderDetailedGrid(corners, pixeloidScale)
+    // Update shader uniforms
+    if (this.shader) {
+      this.shader.resources.uPixeloidScale = pixeloidScale
     }
   }
   
   /**
-   * Render using efficient tiled pattern for extreme zoom
+   * Generate grid mesh for the current viewport
    */
-  private renderTiledPattern(corners: ViewportCorners, pixeloidScale: number): void {
-    // Calculate tile size - larger tiles for extreme zoom to reduce draw calls
-    const tileSize = pixeloidScale <= 1 ? 64 : 32 // 64x64 or 32x32 pixel tiles
-    
-    const bounds = CoordinateHelper.calculateVisibleGridBounds(corners, 2)
-    const { startX, endX, startY, endY } = bounds
-    
-    // Draw in tiles to reduce individual draw calls
-    for (let tileX = Math.floor(startX / tileSize) * tileSize; tileX < endX; tileX += tileSize) {
-      for (let tileY = Math.floor(startY / tileSize) * tileSize; tileY < endY; tileY += tileSize) {
-        // Draw tile-sized checkerboard pattern
-        for (let x = tileX; x < Math.min(tileX + tileSize, endX); x += 2) {
-          for (let y = tileY; y < Math.min(tileY + tileSize, endY); y += 2) {
-            // Draw 2x2 checkerboard pattern in one operation
-            const isLight = ((Math.floor(x/2) + Math.floor(y/2)) % 2) === 0
-            const color = isLight ? 0xf0f0f0 : 0xe0e0e0
-            
-            // Draw 2x2 block efficiently
-            this.graphics.rect(x, y, 2, 2).fill(color)
-          }
-        }
-      }
-    }
-    
-    this.drawOriginAndGridLines(corners, pixeloidScale)
-  }
-  
-  /**
-   * Render detailed grid for normal zoom levels
-   */
-  private renderDetailedGrid(corners: ViewportCorners, pixeloidScale: number): void {
+  private regenerateGridMesh(corners: ViewportCorners, pixeloidScale: number): void {
+    // Use same efficient bounds calculation
     const bounds = CoordinateHelper.calculateVisibleGridBounds(corners, 2)
     const { startX, endX, startY, endY } = bounds
 
-    // Draw individual squares (efficient for higher zoom levels)
+    console.log(`BackgroundGridRenderer: Generating mesh for bounds ${startX},${startY} to ${endX},${endY}`)
+
+    // Create mesh geometry for grid squares
+    this.createGridMesh(startX, endX, startY, endY)
+  }
+
+  /**
+   * Create MeshSimple with quads for each grid square
+   */
+  private createGridMesh(startX: number, endX: number, startY: number, endY: number): void {
+    const squareCount = (endX - startX) * (endY - startY)
+    console.log(`Creating grid mesh: ${squareCount} squares`)
+
+    // Create vertex arrays for all grid squares
+    const vertices: number[] = []
+    const uvs: number[] = []
+    const indices: number[] = []
+
+    let vertexIndex = 0
     for (let x = startX; x < endX; x++) {
       for (let y = startY; y < endY; y++) {
-        const isLight = (x + y) % 2 === 0
-        const color = isLight ? 0xf0f0f0 : 0xe0e0e0
-        this.graphics.rect(x, y, 1, 1).fill(color)
+        // Create quad for this grid square (x,y to x+1,y+1)
+        vertices.push(
+          x, y,       // top-left
+          x + 1, y,   // top-right
+          x + 1, y + 1, // bottom-right
+          x, y + 1    // bottom-left
+        )
+        
+        // UV coordinates (simple mapping)
+        uvs.push(
+          0, 0,
+          1, 0,
+          1, 1,
+          0, 1
+        )
+        
+        // Indices for two triangles per quad
+        const base = vertexIndex * 4
+        indices.push(
+          base + 0, base + 1, base + 2,  // First triangle
+          base + 0, base + 2, base + 3   // Second triangle
+        )
+        
+        vertexIndex++
       }
     }
-    
-    this.drawOriginAndGridLines(corners, pixeloidScale)
-  }
-  
-  /**
-   * Draw origin marker and grid lines
-   */
-  private drawOriginAndGridLines(corners: ViewportCorners, pixeloidScale: number): void {
-    const bounds = CoordinateHelper.calculateVisibleGridBounds(corners, 2)
-    const { startX, endX, startY, endY } = bounds
-    
-    // Draw origin marker
-    this.graphics
-      .setStrokeStyle({ width: Math.max(2 / pixeloidScale, 0.5), color: 0xff0000, alpha: 1 })
-      .moveTo(-0.5, 0).lineTo(0.5, 0)
-      .moveTo(0, -0.5).lineTo(0, 0.5)
-    
-    // Draw grid lines (less aggressive at extreme zoom)
-    if (pixeloidScale > 2) {
-      this.graphics.setStrokeStyle({ width: 1 / pixeloidScale, color: 0xcccccc, alpha: 0.5 })
-      
-      // Vertical lines
-      for (let x = startX; x <= endX; x++) {
-        this.graphics.moveTo(x, startY).lineTo(x, endY)
-      }
-      
-      // Horizontal lines
-      for (let y = startY; y <= endY; y++) {
-        this.graphics.moveTo(startX, y).lineTo(endX, y)
-      }
+
+    // Create or update mesh
+    if (this.mesh) {
+      this.mesh.destroy()
+    }
+
+    // Create mesh with checkerboard shader
+    this.mesh = new MeshSimple({
+      texture: Texture.WHITE,
+      vertices: new Float32Array(vertices),
+      uvs: new Float32Array(uvs),
+      indices: new Uint32Array(indices)
+    })
+
+    // Apply the checkerboard shader if available
+    if (this.shader) {
+      // Use type assertion to bypass the TypeScript texture requirement
+      (this.mesh as any).shader = this.shader
     }
   }
   
   /**
-   * Get the graphics object for adding to render layer
+   * Get the mesh for adding to render layer
    */
-  public getGraphics(): Graphics {
-    return this.graphics
+  public getMesh(): MeshSimple | null {
+    return this.mesh
   }
   
   /**
-   * Clean up resources including texture cache
+   * Clean up resources
    */
   public destroy(): void {
-    // Clean up cached textures
-    for (const texture of this.textureCache.values()) {
-      texture.destroy()
+    if (this.mesh) {
+      this.mesh.destroy()
+      this.mesh = null
     }
-    this.textureCache.clear()
-    
-    // Clean up sprite if exists
-    if (this.gridSprite) {
-      this.gridSprite.destroy()
-      this.gridSprite = null
+    if (this.shader) {
+      this.shader.destroy()
+      this.shader = null
     }
-    
-    this.graphics.destroy()
   }
 }
