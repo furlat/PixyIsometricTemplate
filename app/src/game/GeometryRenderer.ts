@@ -173,13 +173,17 @@ export class GeometryRenderer {
 
     // Apply fill if specified
     if (rect.fillColor !== undefined) {
-      graphics.fill(rect.fillColor)
+      graphics.fill({
+        color: rect.fillColor,
+        alpha: rect.fillAlpha ?? 0.5
+      })
     }
 
     // Apply stroke (scale stroke width by pixeloidScale for consistent thickness)
     graphics.stroke({
       width: rect.strokeWidth / pixeloidScale,
-      color: rect.color
+      color: rect.color,
+      alpha: rect.strokeAlpha
     })
   }
 
@@ -197,13 +201,17 @@ export class GeometryRenderer {
 
     // Apply fill if specified
     if (circle.fillColor !== undefined) {
-      graphics.fill(circle.fillColor)
+      graphics.fill({
+        color: circle.fillColor,
+        alpha: circle.fillAlpha ?? 0.5
+      })
     }
 
     // Apply stroke (scale stroke width by pixeloidScale for consistent thickness)
     graphics.stroke({
       width: circle.strokeWidth / pixeloidScale,
-      color: circle.color
+      color: circle.color,
+      alpha: circle.strokeAlpha
     })
   }
 
@@ -224,7 +232,8 @@ export class GeometryRenderer {
     // Apply stroke (scale stroke width by pixeloidScale for consistent thickness)
     graphics.stroke({
       width: line.strokeWidth / pixeloidScale,
-      color: line.color
+      color: line.color,
+      alpha: line.strokeAlpha
     })
   }
 
@@ -239,7 +248,10 @@ export class GeometryRenderer {
     // Draw point as small circle (scale radius by pixeloidScale for consistent size)
     const pointRadius = 2 / pixeloidScale
     graphics.circle(x, y, pointRadius)
-    graphics.fill(point.color)
+    graphics.fill({
+      color: point.color,
+      alpha: point.strokeAlpha
+    })
   }
 
   /**
@@ -258,13 +270,17 @@ export class GeometryRenderer {
 
     // Apply fill if specified
     if (diamond.fillColor !== undefined) {
-      graphics.fill(diamond.fillColor)
+      graphics.fill({
+        color: diamond.fillColor,
+        alpha: diamond.fillAlpha ?? 0.5
+      })
     }
 
     // Apply stroke (scale stroke width by pixeloidScale for consistent thickness)
     graphics.stroke({
       width: diamond.strokeWidth / pixeloidScale,
-      color: diamond.color
+      color: diamond.color,
+      alpha: diamond.strokeAlpha
     })
   }
 
@@ -297,10 +313,19 @@ export class GeometryRenderer {
       // Only render preview if it has some size
       if (width >= 1 && height >= 1) {
         this.previewGraphics.rect(minX, minY, width, height)
+        
+        // Apply fill if enabled
+        if (gameStore.geometry.drawing.settings.fillEnabled) {
+          this.previewGraphics.fill({
+            color: gameStore.geometry.drawing.settings.defaultFillColor,
+            alpha: previewAlpha * gameStore.geometry.drawing.settings.fillAlpha
+          })
+        }
+        
         this.previewGraphics.stroke({
           width: gameStore.geometry.drawing.settings.defaultStrokeWidth / pixeloidScale,
           color: gameStore.geometry.drawing.settings.defaultColor,
-          alpha: previewAlpha
+          alpha: previewAlpha * gameStore.geometry.drawing.settings.strokeAlpha
         })
       }
     } else if (activeDrawing.type === 'line') {
@@ -313,7 +338,7 @@ export class GeometryRenderer {
         this.previewGraphics.stroke({
           width: gameStore.geometry.drawing.settings.defaultStrokeWidth / pixeloidScale,
           color: gameStore.geometry.drawing.settings.defaultColor,
-          alpha: previewAlpha
+          alpha: previewAlpha * gameStore.geometry.drawing.settings.strokeAlpha
         })
       }
     } else if (activeDrawing.type === 'circle') {
@@ -322,10 +347,19 @@ export class GeometryRenderer {
       
       if (radius >= 1) {
         this.previewGraphics.circle(startPoint.x, startPoint.y, radius)
+        
+        // Apply fill if enabled
+        if (gameStore.geometry.drawing.settings.fillEnabled) {
+          this.previewGraphics.fill({
+            color: gameStore.geometry.drawing.settings.defaultFillColor,
+            alpha: previewAlpha * gameStore.geometry.drawing.settings.fillAlpha
+          })
+        }
+        
         this.previewGraphics.stroke({
           width: gameStore.geometry.drawing.settings.defaultStrokeWidth / pixeloidScale,
           color: gameStore.geometry.drawing.settings.defaultColor,
-          alpha: previewAlpha
+          alpha: previewAlpha * gameStore.geometry.drawing.settings.strokeAlpha
         })
       }
     } else if (activeDrawing.type === 'diamond') {
@@ -341,10 +375,19 @@ export class GeometryRenderer {
         this.previewGraphics.lineTo(vertices.east.x, vertices.east.y)    // East
         this.previewGraphics.lineTo(vertices.south.x, vertices.south.y)  // South
         this.previewGraphics.lineTo(vertices.west.x, vertices.west.y)    // Back to West
+        
+        // Apply fill if enabled
+        if (gameStore.geometry.drawing.settings.fillEnabled) {
+          this.previewGraphics.fill({
+            color: gameStore.geometry.drawing.settings.defaultFillColor,
+            alpha: previewAlpha * gameStore.geometry.drawing.settings.fillAlpha
+          })
+        }
+        
         this.previewGraphics.stroke({
           width: gameStore.geometry.drawing.settings.defaultStrokeWidth / pixeloidScale,
           color: gameStore.geometry.drawing.settings.defaultColor,
-          alpha: previewAlpha
+          alpha: previewAlpha * gameStore.geometry.drawing.settings.strokeAlpha
         })
       }
     }

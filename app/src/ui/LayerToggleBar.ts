@@ -8,6 +8,7 @@ export class LayerToggleBar {
     geometry: true,    // Geometric shapes and objects
     selection: true,   // Selection highlights
     raycast: true,     // Raycast lines and debug visuals
+    mask: false,       // Pixeloid mask layer for collision/spatial analysis (off by default)
     mouse: true        // Mouse visualization
   }
   
@@ -57,6 +58,14 @@ export class LayerToggleBar {
       })
     }
     
+    // Mask layer toggle
+    const maskToggle = document.getElementById('toggle-layer-mask')
+    if (maskToggle) {
+      maskToggle.addEventListener('click', () => {
+        this.toggleLayer('mask')
+      })
+    }
+    
     // Mouse layer toggle
     const mouseToggle = document.getElementById('toggle-layer-mouse')
     if (mouseToggle) {
@@ -66,13 +75,13 @@ export class LayerToggleBar {
     }
   }
   
-  private toggleLayer(layerName: 'background' | 'geometry' | 'selection' | 'raycast' | 'mouse'): void {
+  private toggleLayer(layerName: 'background' | 'geometry' | 'selection' | 'raycast' | 'mask' | 'mouse'): void {
     this.layerStates[layerName] = !this.layerStates[layerName]
     this.updateButtonState(layerName)
     this.notifyLayerChange(layerName, this.layerStates[layerName])
   }
   
-  private updateButtonState(layerName: 'background' | 'geometry' | 'selection' | 'raycast' | 'mouse'): void {
+  private updateButtonState(layerName: 'background' | 'geometry' | 'selection' | 'raycast' | 'mask' | 'mouse'): void {
     const buttonId = `toggle-layer-${layerName}`
     const button = document.getElementById(buttonId)
     if (!button) return
@@ -82,7 +91,8 @@ export class LayerToggleBar {
     const activeClass = layerName === 'background' ? 'btn-success' :
                        layerName === 'geometry' ? 'btn-secondary' :
                        layerName === 'selection' ? 'btn-primary' :
-                       layerName === 'raycast' ? 'btn-warning' : 'btn-accent'
+                       layerName === 'raycast' ? 'btn-warning' :
+                       layerName === 'mask' ? 'btn-info' : 'btn-accent'
     
     // Reset button classes
     button.className = baseClasses.join(' ')
@@ -99,13 +109,14 @@ export class LayerToggleBar {
     this.updateButtonState('geometry')
     this.updateButtonState('selection')
     this.updateButtonState('raycast')
+    this.updateButtonState('mask')
     this.updateButtonState('mouse')
   }
   
   private notifyLayerChange(layerName: string, isVisible: boolean): void {
     // Update the store with the layer visibility change
     if (layerName === 'background' || layerName === 'geometry' || layerName === 'selection' ||
-        layerName === 'raycast' || layerName === 'mouse') {
+        layerName === 'raycast' || layerName === 'mask' || layerName === 'mouse') {
       updateGameStore.setLayerVisibility(layerName as any, isVisible)
     }
     
@@ -123,11 +134,11 @@ export class LayerToggleBar {
     }
   }
   
-  public getLayerState(layerName: 'background' | 'geometry' | 'selection' | 'raycast' | 'mouse'): boolean {
+  public getLayerState(layerName: 'background' | 'geometry' | 'selection' | 'raycast' | 'mask' | 'mouse'): boolean {
     return this.layerStates[layerName]
   }
   
-  public setLayerState(layerName: 'background' | 'geometry' | 'selection' | 'raycast' | 'mouse', isVisible: boolean): void {
+  public setLayerState(layerName: 'background' | 'geometry' | 'selection' | 'raycast' | 'mask' | 'mouse', isVisible: boolean): void {
     this.layerStates[layerName] = isVisible
     this.updateButtonState(layerName)
     this.notifyLayerChange(layerName, isVisible)

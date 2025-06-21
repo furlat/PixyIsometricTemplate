@@ -24,6 +24,9 @@ export class GeometryPanel {
       'geometry-default-color',
       'geometry-default-stroke-width',
       'geometry-default-fill-color',
+      'geometry-fill-enabled',
+      'geometry-fill-alpha',
+      'geometry-stroke-alpha',
       'geometry-default-texture'
     ]
     
@@ -112,6 +115,38 @@ export class GeometryPanel {
         }
       })
     }
+
+    // Fill enabled toggle
+    const fillEnabledElement = this.elements.get('geometry-fill-enabled') as HTMLInputElement
+    if (fillEnabledElement) {
+      fillEnabledElement.addEventListener('change', (event) => {
+        const target = event.target as HTMLInputElement
+        updateGameStore.setDrawingSettings({ fillEnabled: target.checked })
+        console.log(`GeometryPanel: Fill enabled set to ${target.checked}`)
+      })
+    }
+
+    // Fill alpha slider
+    const fillAlphaElement = this.elements.get('geometry-fill-alpha') as HTMLInputElement
+    if (fillAlphaElement) {
+      fillAlphaElement.addEventListener('input', (event) => {
+        const target = event.target as HTMLInputElement
+        const alpha = parseFloat(target.value)
+        updateGameStore.setDrawingSettings({ fillAlpha: alpha })
+        console.log(`GeometryPanel: Fill alpha set to ${alpha}`)
+      })
+    }
+
+    // Stroke alpha slider
+    const strokeAlphaElement = this.elements.get('geometry-stroke-alpha') as HTMLInputElement
+    if (strokeAlphaElement) {
+      strokeAlphaElement.addEventListener('input', (event) => {
+        const target = event.target as HTMLInputElement
+        const alpha = parseFloat(target.value)
+        updateGameStore.setDrawingSettings({ strokeAlpha: alpha })
+        console.log(`GeometryPanel: Stroke alpha set to ${alpha}`)
+      })
+    }
     
     // Clear all button
     const clearButton = document.getElementById('geometry-clear-all')
@@ -180,6 +215,24 @@ export class GeometryPanel {
     updateElement(this.elements, 'geometry-default-fill-color',
       fillColorDisplay,
       'text-accent')
+
+    // Fill enabled toggle
+    const fillEnabledInput = this.elements.get('geometry-fill-enabled') as HTMLInputElement
+    if (fillEnabledInput) {
+      fillEnabledInput.checked = gameStore.geometry.drawing.settings.fillEnabled
+    }
+
+    // Fill alpha slider
+    const fillAlphaInput = this.elements.get('geometry-fill-alpha') as HTMLInputElement
+    if (fillAlphaInput) {
+      fillAlphaInput.value = gameStore.geometry.drawing.settings.fillAlpha.toString()
+    }
+
+    // Stroke alpha slider
+    const strokeAlphaInput = this.elements.get('geometry-stroke-alpha') as HTMLInputElement
+    if (strokeAlphaInput) {
+      strokeAlphaInput.value = gameStore.geometry.drawing.settings.strokeAlpha.toString()
+    }
     
     // Texture (placeholder for future implementation)
     updateElement(this.elements, 'geometry-default-texture',

@@ -4,6 +4,7 @@ import { BackgroundGridRenderer } from './BackgroundGridRenderer'
 import { GeometryRenderer } from './GeometryRenderer'
 import { SelectionHighlightRenderer } from './SelectionHighlightRenderer'
 import { MouseHighlightRenderer } from './MouseHighlightRenderer'
+import { BoundingBoxMaskRenderer } from './BoundingBoxMaskRenderer'
 import { TextureRegistry } from './TextureRegistry'
 import { gameStore } from '../store/gameStore'
 import { subscribe } from 'valtio'
@@ -23,8 +24,8 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
   private geometryLayer: Container
   private selectionLayer: Container  // NEW: Separate layer for selection highlighting
   private raycastLayer: Container
-  private uiOverlayLayer: Container
-  private mouseLayer: Container  // NEW: Separate layer for mouse visualization
+  private maskLayer: Container      // NEW: Mask layer for collision/spatial analysis
+  private mouseLayer: Container     // NEW: Separate layer for mouse visualization
 
   // Background grid renderer using extracted logic
   private backgroundGridRenderer: BackgroundGridRenderer
@@ -37,6 +38,9 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
   
   // Mouse visualization renderer (lightweight, updates every frame)
   private mouseHighlightRenderer: MouseHighlightRenderer
+  
+  // Bounding box mask renderer for GPU-accelerated spatial analysis
+  private boundingBoxMaskRenderer: BoundingBoxMaskRenderer
   
   // Texture registry for StoreExplorer previews (SAFE - no store subscriptions)
   private textureRegistry: TextureRegistry | null = null
@@ -62,8 +66,8 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
     this.geometryLayer = new Container({ isRenderGroup: true })
     this.selectionLayer = new Container({ isRenderGroup: true }) // Selection layer on top of geometry
     this.raycastLayer = new Container({ isRenderGroup: true })
-    this.uiOverlayLayer = new Container({ isRenderGroup: true })
-    this.mouseLayer = new Container({ isRenderGroup: true }) // Mouse layer on top
+    this.maskLayer = new Container({ isRenderGroup: true })     // Mask layer for spatial analysis
+    this.mouseLayer = new Container({ isRenderGroup: true })    // Mouse layer on top
 
     // Initialize background grid renderer
     this.backgroundGridRenderer = new BackgroundGridRenderer()
@@ -76,6 +80,9 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
     
     // Initialize mouse highlight renderer (lightweight)
     this.mouseHighlightRenderer = new MouseHighlightRenderer()
+    
+    // Initialize bounding box mask renderer
+    this.boundingBoxMaskRenderer = new BoundingBoxMaskRenderer()
 
     // Setup layer hierarchy within the existing camera transform
     // This maintains all existing InfiniteCanvas functionality
@@ -99,10 +106,13 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
     this.cameraTransform.addChild(this.geometryLayer)      // Geometric shapes and objects
     this.cameraTransform.addChild(this.selectionLayer)     // Selection highlights on top of geometry
     this.cameraTransform.addChild(this.raycastLayer)       // Raycast lines and debug visuals
-    this.cameraTransform.addChild(this.uiOverlayLayer)     // UI elements that follow camera
+    this.cameraTransform.addChild(this.maskLayer)          // Mask layer for spatial analysis
     
     // Selection layer gets the selection highlight renderer graphics
     this.selectionLayer.addChild(this.selectionHighlightRenderer.getGraphics())
+    
+    // Mask layer gets the bounding box mask renderer graphics
+    this.maskLayer.addChild(this.boundingBoxMaskRenderer.getGraphics())
     
     // Mouse layer goes into camera transform so it scales and positions with the grid
     // This ensures perfect alignment with pixeloids
@@ -140,6 +150,9 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
     
     // Render selection highlights (reactive, always updates based on store state)
     this.renderSelectionLayer(paddedCorners, pixeloidScale)
+    
+    // Render mask layer (GPU-accelerated spatial analysis)
+    this.renderMaskLayer(paddedCorners, pixeloidScale)
     
     // Render UI overlay layer
     this.renderUIOverlayLayer(paddedCorners, pixeloidScale)
@@ -209,15 +222,23 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
   }
   
   /**
+   * Render mask layer - GPU-accelerated spatial analysis using bounding boxes
+   */
+  private renderMaskLayer(corners: ViewportCorners, pixeloidScale: number): void {
+    if (gameStore.geometry.layerVisibility.mask) {
+      this.boundingBoxMaskRenderer.render(corners, pixeloidScale)
+      this.maskLayer.visible = true
+    } else {
+      this.maskLayer.visible = false
+    }
+  }
+  
+  /**
    * Render UI overlay layer - controls visibility of UI elements
    */
   private renderUIOverlayLayer(_corners: ViewportCorners, _pixeloidScale: number): void {
-    if (gameStore.geometry.layerVisibility.uiOverlay) {
-      this.uiOverlayLayer.visible = true
-      // UI overlay elements would be rendered here if any exist
-    } else {
-      this.uiOverlayLayer.visible = false
-    }
+    // UI overlay layer is no longer used - removed in favor of mask layer
+    // Method kept for backwards compatibility
   }
   
   /**
@@ -389,12 +410,11 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
   }
 
   /**
-   * Get the UI overlay layer container for adding UI elements
+   * Get the mask layer container for adding mask elements
    */
-  public getUIOverlayLayer(): Container {
-    return this.uiOverlayLayer
+  public getMaskLayer(): Container {
+    return this.maskLayer
   }
-
 
   /**
    * Override destroy to clean up layer resources
@@ -404,13 +424,14 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
     this.backgroundGridRenderer.destroy()
     this.geometryRenderer.destroy()
     this.selectionHighlightRenderer.destroy()
+    this.boundingBoxMaskRenderer.destroy()
 
     // Destroy layer containers
     this.backgroundLayer.destroy()
     this.geometryLayer.destroy()
     this.selectionLayer.destroy()
     this.raycastLayer.destroy()
-    this.uiOverlayLayer.destroy()
+    this.maskLayer.destroy()
 
     // Call parent destroy
     super.destroy()

@@ -101,6 +101,7 @@ export class GeometryHelper {
       height: properties.height,
       color: 0x0066cc,
       strokeWidth: 2,
+      strokeAlpha: 1.0,
       isVisible: true,
       createdAt: Date.now(),
       metadata: this.calculateDiamondMetadata(properties)

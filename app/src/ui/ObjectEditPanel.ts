@@ -133,6 +133,48 @@ export class ObjectEditPanel {
         </div>
       `
     }
+
+    // Stroke alpha for all objects
+    html += `
+      <div>
+        <label class="label">
+          <span class="label-text">Stroke Alpha:</span>
+        </label>
+        <input id="edit-stroke-alpha" type="range" min="0" max="1" step="0.1" value="${obj.strokeAlpha}" class="range range-primary" />
+        <span class="text-xs text-base-content/70">${obj.strokeAlpha}</span>
+      </div>
+    `
+
+    // Fill color and alpha for objects that support fill
+    if ('fillColor' in obj) {
+      const fillObj = obj as GeometricCircle | GeometricRectangle | GeometricDiamond
+      if (fillObj.fillColor !== undefined) {
+        html += `
+          <div>
+            <label class="label">
+              <span class="label-text">Fill Color:</span>
+            </label>
+            <input id="edit-fill-color" type="color" value="${this.numberToHex(fillObj.fillColor)}" class="input input-bordered w-full h-12" />
+          </div>
+          <div>
+            <label class="label">
+              <span class="label-text">Fill Alpha:</span>
+            </label>
+            <input id="edit-fill-alpha" type="range" min="0" max="1" step="0.1" value="${fillObj.fillAlpha ?? 0.5}" class="range range-primary" />
+            <span class="text-xs text-base-content/70">${fillObj.fillAlpha ?? 0.5}</span>
+          </div>
+        `
+      } else {
+        html += `
+          <div>
+            <label class="label">
+              <span class="label-text">Fill Color:</span>
+            </label>
+            <button id="edit-enable-fill" class="btn btn-outline btn-sm">Enable Fill</button>
+          </div>
+        `
+      }
+    }
     
     // Type-specific properties
     if ('anchorX' in obj && 'anchorY' in obj) {
@@ -327,6 +369,36 @@ export class ObjectEditPanel {
       const newStrokeWidth = parseFloat(strokeWidthInput.value) || 1
       if (newStrokeWidth !== (this.originalObject as any).strokeWidth) {
         (updates as any).strokeWidth = newStrokeWidth
+      }
+    }
+
+    // Stroke alpha (all objects have this)
+    const strokeAlphaInput = this.panel.querySelector('#edit-stroke-alpha') as HTMLInputElement
+    if (strokeAlphaInput) {
+      const newStrokeAlpha = parseFloat(strokeAlphaInput.value) || 1
+      if (newStrokeAlpha !== this.originalObject.strokeAlpha) {
+        (updates as any).strokeAlpha = newStrokeAlpha
+      }
+    }
+
+    // Fill color and alpha for objects that support fill
+    if ('fillColor' in this.originalObject) {
+      const fillObj = this.originalObject as GeometricCircle | GeometricRectangle | GeometricDiamond
+      
+      const fillColorInput = this.panel.querySelector('#edit-fill-color') as HTMLInputElement
+      if (fillColorInput && fillObj.fillColor !== undefined) {
+        const newFillColor = this.hexToNumber(fillColorInput.value)
+        if (newFillColor !== fillObj.fillColor) {
+          (updates as any).fillColor = newFillColor
+        }
+      }
+
+      const fillAlphaInput = this.panel.querySelector('#edit-fill-alpha') as HTMLInputElement
+      if (fillAlphaInput && fillObj.fillColor !== undefined) {
+        const newFillAlpha = parseFloat(fillAlphaInput.value) || 0.5
+        if (newFillAlpha !== (fillObj.fillAlpha ?? 0.5)) {
+          (updates as any).fillAlpha = newFillAlpha
+        }
       }
     }
     

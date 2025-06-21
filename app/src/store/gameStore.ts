@@ -54,7 +54,10 @@ export const gameStore = proxy<GameState>({
       settings: {
         defaultColor: 0x0066cc,
         defaultStrokeWidth: 2,
-        defaultFillColor: 0x99ccff
+        defaultFillColor: 0x99ccff,
+        fillEnabled: false,
+        fillAlpha: 0.5,
+        strokeAlpha: 1.0
       }
     },
     raycast: {
@@ -71,7 +74,7 @@ export const gameStore = proxy<GameState>({
       geometry: true,    // Geometric shapes and objects
       selection: true,   // Selection highlights
       raycast: true,     // Raycast lines and debug visuals
-      uiOverlay: true,   // UI elements that follow camera
+      mask: false,       // Pixeloid mask layer for collision/spatial analysis (off by default)
       mouse: true        // Mouse visualization
     },
     selection: {
@@ -83,6 +86,18 @@ export const gameStore = proxy<GameState>({
     },
     favorites: {
       favoriteObjectIds: []
+    },
+    // Mask layer state for GPU-based spatial analysis
+    mask: {
+      enabledObjects: new Set<string>(), // Objects contributing to mask
+      mode: 'boundingBox' as 'boundingBox' | 'precise', // boundingBox = use metadata bounds, precise = use shape geometry
+      visualSettings: {
+        fillColor: 0x000000,     // Black mask
+        fillAlpha: 0.3,          // Semi-transparent overlay
+        strokeColor: 0xff0000,   // Red outline for debugging
+        strokeAlpha: 0.5,        // Semi-transparent outline
+        strokeWidth: 0.1         // Thin outline
+      }
     }
   },
   // Texture registry for StoreExplorer previews (ISOLATED from main rendering)
@@ -163,6 +178,9 @@ export const updateGameStore = {
     // Check for duplicate IDs and generate new one if needed
     const ensuredObject = updateGameStore.ensureUniqueId(object)
     gameStore.geometry.objects.push(ensuredObject)
+    
+    // Auto-enable new objects in mask layer for immediate visibility
+    gameStore.geometry.mask.enabledObjects.add(ensuredObject.id)
   },
 
   // Ensure unique ID for objects (handles copying and duplicate prevention)
@@ -210,11 +228,14 @@ export const updateGameStore = {
       x,
       y,
       color: gameStore.geometry.drawing.settings.defaultColor,
+      strokeAlpha: gameStore.geometry.drawing.settings.strokeAlpha,
       isVisible: true,
       createdAt: Date.now(),
       metadata: GeometryHelper.calculatePointMetadata({ x, y })
     }
     gameStore.geometry.objects.push(point)
+    // Auto-enable in mask layer
+    gameStore.geometry.mask.enabledObjects.add(point.id)
     return point
   },
 
@@ -227,11 +248,14 @@ export const updateGameStore = {
       endY,
       color: gameStore.geometry.drawing.settings.defaultColor,
       strokeWidth: gameStore.geometry.drawing.settings.defaultStrokeWidth,
+      strokeAlpha: gameStore.geometry.drawing.settings.strokeAlpha,
       isVisible: true,
       createdAt: Date.now(),
       metadata: GeometryHelper.calculateLineMetadata({ startX, startY, endX, endY })
     }
     gameStore.geometry.objects.push(line)
+    // Auto-enable in mask layer
+    gameStore.geometry.mask.enabledObjects.add(line.id)
     return line
   },
 
@@ -243,11 +267,18 @@ export const updateGameStore = {
       radius,
       color: gameStore.geometry.drawing.settings.defaultColor,
       strokeWidth: gameStore.geometry.drawing.settings.defaultStrokeWidth,
+      strokeAlpha: gameStore.geometry.drawing.settings.strokeAlpha,
+      ...(gameStore.geometry.drawing.settings.fillEnabled && {
+        fillColor: gameStore.geometry.drawing.settings.defaultFillColor,
+        fillAlpha: gameStore.geometry.drawing.settings.fillAlpha
+      }),
       isVisible: true,
       createdAt: Date.now(),
       metadata: GeometryHelper.calculateCircleMetadata({ centerX, centerY, radius })
     }
     gameStore.geometry.objects.push(circle)
+    // Auto-enable in mask layer
+    gameStore.geometry.mask.enabledObjects.add(circle.id)
     return circle
   },
 
@@ -260,11 +291,18 @@ export const updateGameStore = {
       height,
       color: gameStore.geometry.drawing.settings.defaultColor,
       strokeWidth: gameStore.geometry.drawing.settings.defaultStrokeWidth,
+      strokeAlpha: gameStore.geometry.drawing.settings.strokeAlpha,
+      ...(gameStore.geometry.drawing.settings.fillEnabled && {
+        fillColor: gameStore.geometry.drawing.settings.defaultFillColor,
+        fillAlpha: gameStore.geometry.drawing.settings.fillAlpha
+      }),
       isVisible: true,
       createdAt: Date.now(),
       metadata: GeometryHelper.calculateRectangleMetadata({ x, y, width, height })
     }
     gameStore.geometry.objects.push(rectangle)
+    // Auto-enable in mask layer
+    gameStore.geometry.mask.enabledObjects.add(rectangle.id)
     return rectangle
   },
 
@@ -277,11 +315,18 @@ export const updateGameStore = {
       height,
       color: gameStore.geometry.drawing.settings.defaultColor,
       strokeWidth: gameStore.geometry.drawing.settings.defaultStrokeWidth,
+      strokeAlpha: gameStore.geometry.drawing.settings.strokeAlpha,
+      ...(gameStore.geometry.drawing.settings.fillEnabled && {
+        fillColor: gameStore.geometry.drawing.settings.defaultFillColor,
+        fillAlpha: gameStore.geometry.drawing.settings.fillAlpha
+      }),
       isVisible: true,
       createdAt: Date.now(),
       metadata: GeometryHelper.calculateDiamondMetadata({ anchorX, anchorY, width, height })
     }
     gameStore.geometry.objects.push(diamond)
+    // Auto-enable in mask layer
+    gameStore.geometry.mask.enabledObjects.add(diamond.id)
     return diamond
   },
 
@@ -344,7 +389,7 @@ export const updateGameStore = {
     }
   },
 
-  setLayerVisibility: (layer: 'background' | 'geometry' | 'selection' | 'raycast' | 'uiOverlay' | 'mouse', visible: boolean) => {
+  setLayerVisibility: (layer: 'background' | 'geometry' | 'selection' | 'raycast' | 'mask' | 'mouse', visible: boolean) => {
     gameStore.geometry.layerVisibility[layer] = visible
   },
 
@@ -549,6 +594,42 @@ export const updateGameStore = {
 
   hasObjectTexture: (objectId: string): boolean => {
     return gameStore.textureRegistry.objectTextures[objectId] !== undefined
+  },
+
+  // Mask layer controls
+  enableObjectInMask: (objectId: string) => {
+    gameStore.geometry.mask.enabledObjects.add(objectId)
+  },
+
+  disableObjectInMask: (objectId: string) => {
+    gameStore.geometry.mask.enabledObjects.delete(objectId)
+  },
+
+  toggleObjectInMask: (objectId: string) => {
+    if (gameStore.geometry.mask.enabledObjects.has(objectId)) {
+      gameStore.geometry.mask.enabledObjects.delete(objectId)
+    } else {
+      gameStore.geometry.mask.enabledObjects.add(objectId)
+    }
+  },
+
+  enableAllObjectsInMask: () => {
+    gameStore.geometry.objects.forEach(obj => {
+      gameStore.geometry.mask.enabledObjects.add(obj.id)
+    })
+    console.log(`Store: Enabled ${gameStore.geometry.objects.length} objects in mask layer`)
+  },
+
+  disableAllObjectsInMask: () => {
+    gameStore.geometry.mask.enabledObjects.clear()
+  },
+
+  setMaskMode: (mode: 'boundingBox' | 'precise') => {
+    gameStore.geometry.mask.mode = mode
+  },
+
+  updateMaskVisualSettings: (settings: Partial<typeof gameStore.geometry.mask.visualSettings>) => {
+    Object.assign(gameStore.geometry.mask.visualSettings, settings)
   }
 }
 

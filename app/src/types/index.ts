@@ -88,6 +88,7 @@ export interface GeometricPoint {
   x: number
   y: number
   color: number
+  strokeAlpha: number
   isVisible: boolean
   createdAt: number
   metadata: GeometricMetadata
@@ -101,6 +102,7 @@ export interface GeometricLine {
   endY: number
   color: number
   strokeWidth: number
+  strokeAlpha: number
   isVisible: boolean
   createdAt: number
   metadata: GeometricMetadata
@@ -114,6 +116,8 @@ export interface GeometricCircle {
   color: number
   strokeWidth: number
   fillColor?: number
+  fillAlpha?: number
+  strokeAlpha: number
   isVisible: boolean
   createdAt: number
   metadata: GeometricMetadata
@@ -128,6 +132,8 @@ export interface GeometricRectangle {
   color: number
   strokeWidth: number
   fillColor?: number
+  fillAlpha?: number
+  strokeAlpha: number
   isVisible: boolean
   createdAt: number
   metadata: GeometricMetadata
@@ -145,6 +151,8 @@ export interface GeometricDiamond {
   color: number
   strokeWidth: number
   fillColor?: number
+  fillAlpha?: number
+  strokeAlpha: number
   isVisible: boolean
   createdAt: number
   metadata: GeometricMetadata
@@ -167,6 +175,9 @@ export interface GeometryDrawingState {
     defaultColor: number
     defaultStrokeWidth: number
     defaultFillColor: number
+    fillEnabled: boolean
+    fillAlpha: number
+    strokeAlpha: number
   }
 }
 
@@ -204,7 +215,7 @@ export interface GeometryState {
     geometry: boolean    // Geometric shapes and objects (geometryLayer)
     selection: boolean   // Selection highlights (selectionLayer)
     raycast: boolean     // Raycast lines and debug visuals (raycastLayer)
-    uiOverlay: boolean   // UI elements that follow camera (uiOverlayLayer)
+    mask: boolean        // Pixeloid mask layer for collision/spatial analysis (maskLayer)
     mouse: boolean       // Mouse visualization (mouseLayer)
   }
   // Selection state
@@ -219,6 +230,18 @@ export interface GeometryState {
   // Favorites system
   favorites: {
     favoriteObjectIds: string[]
+  }
+  // Mask layer state for GPU-based spatial analysis
+  mask: {
+    enabledObjects: Set<string>    // Objects contributing to mask
+    mode: 'boundingBox' | 'precise'  // boundingBox = use metadata bounds, precise = use shape geometry
+    visualSettings: {
+      fillColor: number      // Mask fill color
+      fillAlpha: number      // Mask fill transparency
+      strokeColor: number    // Outline color for debugging
+      strokeAlpha: number    // Outline transparency
+      strokeWidth: number    // Outline thickness
+    }
   }
 }
 
