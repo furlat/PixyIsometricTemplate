@@ -88,8 +88,8 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
     // Initialize mouse highlight renderer (lightweight)
     this.mouseHighlightRenderer = new MouseHighlightRenderer()
     
-    // Initialize pixeloid mesh renderer with app instance
-    this.pixeloidMeshRenderer = new PixeloidMeshRenderer(this.app)
+    // Initialize pixeloid mesh renderer
+    this.pixeloidMeshRenderer = new PixeloidMeshRenderer()
     
     // Initialize simple bounding box renderer for comparison
     this.boundingBoxRenderer = new BoundingBoxRenderer()
@@ -245,8 +245,8 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
    * Render mask layer - GPU-accelerated pixeloid occupancy detection
    */
   private renderMaskLayer(corners: ViewportCorners, pixeloidScale: number): void {
-    // Always call renderer - it has internal state tracking to avoid redundant operations
-    this.pixeloidMeshRenderer.render(corners, pixeloidScale, this.cameraTransform)
+    // Back to simple camera transform approach that was working
+    this.pixeloidMeshRenderer.render(pixeloidScale, this.cameraTransform)
     
     // Set layer visibility based on store state
     this.maskLayer.visible = gameStore.geometry.layerVisibility.mask

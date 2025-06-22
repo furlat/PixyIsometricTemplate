@@ -45,7 +45,7 @@ export class GeometryRenderer {
     // Note: currentObjectIds tracking is handled by the objectContainers Map
 
     // Always render preview for active drawing
-    this.renderPreview(pixeloidScale)
+    this.renderPreview()
   }
 
   /**
@@ -146,13 +146,13 @@ export class GeometryRenderer {
   private renderGeometricObjectToGraphics(obj: GeometricObject, pixeloidScale: number, graphics: Graphics): void {
     // Type narrowing based on object properties
     if ('anchorX' in obj && 'anchorY' in obj) {
-      this.renderDiamondToGraphics(obj as GeometricDiamond, pixeloidScale, graphics)
+      this.renderDiamondToGraphics(obj as GeometricDiamond, graphics)
     } else if ('width' in obj && 'height' in obj) {
-      this.renderRectangleToGraphics(obj as GeometricRectangle, pixeloidScale, graphics)
+      this.renderRectangleToGraphics(obj as GeometricRectangle, graphics)
     } else if ('radius' in obj) {
-      this.renderCircleToGraphics(obj as GeometricCircle, pixeloidScale, graphics)
+      this.renderCircleToGraphics(obj as GeometricCircle, graphics)
     } else if ('startX' in obj && 'endX' in obj) {
-      this.renderLineToGraphics(obj as GeometricLine, pixeloidScale, graphics)
+      this.renderLineToGraphics(obj as GeometricLine, graphics)
     } else if ('x' in obj && 'y' in obj && !('width' in obj)) {
       this.renderPointToGraphics(obj as GeometricPoint, pixeloidScale, graphics)
     }
@@ -161,7 +161,7 @@ export class GeometryRenderer {
   /**
    * Render a rectangle shape to specific graphics
    */
-  private renderRectangleToGraphics(rect: GeometricRectangle, pixeloidScale: number, graphics: Graphics): void {
+  private renderRectangleToGraphics(rect: GeometricRectangle, graphics: Graphics): void {
     // Use raw pixeloid coordinates - camera transform handles scaling
     const x = rect.x
     const y = rect.y
@@ -190,7 +190,7 @@ export class GeometryRenderer {
   /**
    * Render a circle shape to specific graphics
    */
-  private renderCircleToGraphics(circle: GeometricCircle, pixeloidScale: number, graphics: Graphics): void {
+  private renderCircleToGraphics(circle: GeometricCircle, graphics: Graphics): void {
     // Use raw pixeloid coordinates - camera transform handles scaling
     const centerX = circle.centerX
     const centerY = circle.centerY
@@ -218,7 +218,7 @@ export class GeometryRenderer {
   /**
    * Render a line shape to specific graphics
    */
-  private renderLineToGraphics(line: GeometricLine, pixeloidScale: number, graphics: Graphics): void {
+  private renderLineToGraphics(line: GeometricLine, graphics: Graphics): void {
     // Use raw pixeloid coordinates - camera transform handles scaling
     const startX = line.startX
     const startY = line.startY
@@ -257,7 +257,7 @@ export class GeometryRenderer {
   /**
    * Render an isometric diamond shape to specific graphics
    */
-  private renderDiamondToGraphics(diamond: GeometricDiamond, pixeloidScale: number, graphics: Graphics): void {
+  private renderDiamondToGraphics(diamond: GeometricDiamond, graphics: Graphics): void {
     // Use centralized geometry calculations
     const vertices = GeometryHelper.calculateDiamondVertices(diamond)
     
@@ -287,7 +287,7 @@ export class GeometryRenderer {
   /**
    * Render preview for active drawing operations
    */
-  private renderPreview(pixeloidScale: number): void {
+  private renderPreview(): void {
     this.previewGraphics.clear()
     
     const activeDrawing = gameStore.geometry.drawing.activeDrawing

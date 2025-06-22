@@ -1,5 +1,6 @@
 import {
-  Container
+  Container,
+  Graphics
 } from 'pixi.js'
 import { PixelateFilter } from 'pixi-filters'
 import { gameStore } from '../store/gameStore'
@@ -22,7 +23,7 @@ export class PixeloidMeshRenderer {
   private isFilterApplied = false
   private lastFilterSize = 0
   
-  constructor(private app?: any) {
+  constructor() {
     this.container.label = 'PixeloidMaskLayer'
     this.createPixelateFilter()
   }
@@ -31,7 +32,6 @@ export class PixeloidMeshRenderer {
    * Main render method - applies/removes pixelate filter with state tracking
    */
   public render(
-    corners: ViewportCorners,
     pixeloidScale: number,
     cameraTransform?: Container
   ): void {
@@ -52,10 +52,9 @@ export class PixeloidMeshRenderer {
     // Remove filter if it should not be applied or target changed
     if (this.isFilterApplied && (!shouldApplyFilter || targetChanged)) {
       this.removePixelateFilter()
-      console.log('PixeloidMeshRenderer: Mask layer disabled or target changed, filter removed')
     }
 
-    // Apply filter if it should be applied and (not currently applied or size changed)
+    // Apply filter if it should be applied and (not currently applied or size changed or target changed)
     if (shouldApplyFilter && (!this.isFilterApplied || targetChanged || sizeChanged)) {
       try {
         this.applyPixelateFilter(cameraTransform, pixeloidScale)
@@ -75,19 +74,18 @@ export class PixeloidMeshRenderer {
   }
 
   /**
-   * Apply pixelate filter to camera transform for proper screen-space alignment
+   * Apply pixelate filter to camera transform for pixel-perfect alignment
    */
   private applyPixelateFilter(cameraTransform: Container, pixeloidScale: number): void {
     if (!this.pixelateFilter) {
       return
     }
 
-    // Apply filter to camera transform with pixeloidScale as the filter size
-    // This creates blocks that are exactly pixeloidScale pixels in screen space
+    // Apply filter with pixeloidScale as the filter size for pixel-perfect alignment
     const filterSize = Math.round(pixeloidScale)
     this.pixelateFilter.size = [filterSize, filterSize]
 
-    // Apply filter to the entire camera transform
+    // Apply filter to camera transform (this is what gives pixel-perfect alignment)
     cameraTransform.filters = [this.pixelateFilter]
     
     // Update state tracking
@@ -99,20 +97,22 @@ export class PixeloidMeshRenderer {
   }
 
   /**
-   * Remove pixelate filter from current target
+   * Remove pixelate filter from camera transform
    */
   private removePixelateFilter(): void {
     if (this.currentTarget) {
-      // Always clear filters completely when removing pixelate filter
+      // Clear filter from camera transform
       this.currentTarget.filters = null
-      console.log('PixeloidMeshRenderer: Removed PixelateFilter from camera transform')
     }
     
     // Update state tracking
     this.currentTarget = null
     this.isFilterApplied = false
     this.lastFilterSize = 0
+    
+    console.log('PixeloidMeshRenderer: Removed PixelateFilter from camera transform')
   }
+
 
   /**
    * Get container for layer system
