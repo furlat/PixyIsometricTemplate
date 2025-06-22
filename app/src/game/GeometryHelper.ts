@@ -17,6 +17,7 @@ import type {
 export class GeometryHelper {
   /**
    * Calculate diamond vertices from diamond properties
+   * anchorX = west vertex X position, anchorY = center Y position (east/west level)
    */
   static calculateDiamondVertices(diamond: GeometricDiamond): {
     west: PixeloidCoordinate
@@ -26,53 +27,64 @@ export class GeometryHelper {
   } {
     const { anchorX, anchorY, width, height } = diamond
 
-    // Calculate center position (all widths are forced to be even)
+    // Calculate center position for north/south vertices
     const centerX = anchorX + width / 2
 
-    // Calculate diamond vertices - ALL vertices snap to pixeloid centers
+    // Calculate diamond vertices:
+    // - West/East vertices: snap to pixeloid centers (top-left anchor)
+    // - North/South vertices: do NOT snap, use exact calculated positions
     return {
       west: { x: anchorX, y: anchorY },
-      north: { 
-        x: centerX, 
-        y: Math.floor(anchorY - height) + 0.5  // Snap to pixeloid center
+      north: {
+        x: centerX,
+        y: anchorY - height  // No snapping for north/south
       },
       east: { x: anchorX + width, y: anchorY },
-      south: { 
-        x: centerX, 
-        y: Math.floor(anchorY + height) + 0.5  // Snap to pixeloid center
+      south: {
+        x: centerX,
+        y: anchorY + height  // No snapping for north/south
       }
     }
   }
 
   /**
-   * Calculate diamond properties from anchor point and width
+   * Calculate diamond properties from origin vertex and target vertex
+   * Origin vertex (first click) stays FIXED, target vertex (drag position) determines the opposite vertex
    */
   static calculateDiamondProperties(
-    anchorPoint: PixeloidCoordinate, 
-    dragPoint: PixeloidCoordinate
+    originVertex: PixeloidCoordinate,   // First click - FIXED origin vertex
+    targetVertex: PixeloidCoordinate    // Drag position - target vertex
   ): {
     anchorX: number
     anchorY: number
     width: number
     height: number
   } {
-    // Calculate width from horizontal drag distance
-    let width = Math.abs(dragPoint.x - anchorPoint.x)
+    // Calculate width from horizontal distance (no constraints)
+    const width = Math.abs(targetVertex.x - originVertex.x)
     
-    // Force odd widths to even - snap down to prevent tiling issues
-    if (width % 2 === 1) {
-      width = width - 1  // 401 becomes 400, etc.
+    // Determine west and east vertices - origin vertex X is FIXED
+    let westX: number
+    
+    if (targetVertex.x >= originVertex.x) {
+      // Dragging RIGHT: origin = west vertex (FIXED)
+      westX = originVertex.x
+    } else {
+      // Dragging LEFT: origin = east vertex (FIXED), so west = origin - width
+      westX = originVertex.x - width
     }
     
-    // Height calculation for perfect tiling (even widths only)
-    const totalHeight = (width - 1) / 2
-    const height = totalHeight / 2  // Center to north/south distance
+    // Center Y = origin vertex Y (west and east vertices are at same Y level)
+    const centerY = originVertex.y
+    
+    // Height calculation: north/south vertices are ± width/4 from center
+    const height = width / 4
 
     return {
-      anchorX: anchorPoint.x,
-      anchorY: anchorPoint.y,
-      width,
-      height
+      anchorX: westX,       // Diamond anchor is always at west vertex X
+      anchorY: centerY,     // Diamond anchor Y is at center Y (= origin Y)
+      width,                // Width between west and east vertices
+      height                // Distance from center to north/south vertices
     }
   }
 
@@ -133,6 +145,54 @@ export class GeometryHelper {
     return {
       x: this.snapToPixeloidCenter(point.x),
       y: this.snapToPixeloidCenter(point.y)
+    }
+  }
+
+  /**
+   * Calculate precise anchor points for a pixeloid
+   * Given a pixeloid coordinate (from mouse), returns all key positions for precise anchoring
+   *
+   * COORDINATE SYSTEM:
+   * - Input: Raw pixeloid coordinates (e.g., mouse position 5.7, 3.2)
+   * - Output: Precise pixeloid coordinates for anchoring
+   * - A pixeloid at integer position (5, 3) spans from (5.0, 3.0) to (6.0, 4.0)
+   * - Top-left origin: Y increases downward
+   * - Integer coordinates are at pixeloid corners/edges
+   * - Half-integer coordinates (x.5, y.5) are at pixeloid centers
+   */
+  static calculatePixeloidAnchorPoints(pixeloidX: number, pixeloidY: number): {
+    // Corners of the pixeloid square
+    topLeft: PixeloidCoordinate
+    topRight: PixeloidCoordinate
+    bottomLeft: PixeloidCoordinate
+    bottomRight: PixeloidCoordinate
+    // Edge midpoints for precise edge-to-edge alignment
+    topMid: PixeloidCoordinate
+    rightMid: PixeloidCoordinate
+    bottomMid: PixeloidCoordinate
+    leftMid: PixeloidCoordinate
+    // Pixeloid center
+    center: PixeloidCoordinate
+  } {
+    // Floor the coordinates to get the pixeloid's integer grid position
+    const gridX = Math.floor(pixeloidX)
+    const gridY = Math.floor(pixeloidY)
+    
+    return {
+      // Four corners of the pixeloid square (integer coordinates)
+      topLeft: { x: gridX, y: gridY },
+      topRight: { x: gridX + 1, y: gridY },
+      bottomLeft: { x: gridX, y: gridY + 1 },
+      bottomRight: { x: gridX + 1, y: gridY + 1 },
+      
+      // Midpoints of each edge (half-integer on one axis)
+      topMid: { x: gridX + 0.5, y: gridY },           // Top edge center
+      rightMid: { x: gridX + 1, y: gridY + 0.5 },     // Right edge center
+      bottomMid: { x: gridX + 0.5, y: gridY + 1 },    // Bottom edge center
+      leftMid: { x: gridX, y: gridY + 0.5 },          // Left edge center
+      
+      // Center of the pixeloid (half-integer on both axes)
+      center: { x: gridX + 0.5, y: gridY + 0.5 }      // Pixeloid center
     }
   }
 

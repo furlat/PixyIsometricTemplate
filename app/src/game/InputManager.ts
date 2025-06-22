@@ -93,7 +93,6 @@ export class InputManager {
         event.preventDefault()
         break
       case 'delete':
-      case 'backspace':
         // Delete selected object
         if (gameStore.geometry.selection.selectedObjectId) {
           updateGameStore.removeGeometricObject(gameStore.geometry.selection.selectedObjectId)
@@ -233,48 +232,29 @@ export class InputManager {
       return
     }
     
-    // Different coordinate snapping for different shapes
-    let pixelPerfectPos: { x: number, y: number }
+    // Use consistent top-left pixeloid anchoring for ALL shapes (including diamonds)
+    const anchorPoints = GeometryHelper.calculatePixeloidAnchorPoints(pixeloidPos.x, pixeloidPos.y)
+    const topLeftPos = anchorPoints.topLeft
     
     if (mode === 'rectangle') {
-      // Rectangles: corner positioning (back to original)
-      pixelPerfectPos = {
-        x: Math.round(pixeloidPos.x),
-        y: Math.round(pixeloidPos.y)
-      }
       gameStore.geometry.drawing.activeDrawing.type = 'rectangle'
-      gameStore.geometry.drawing.activeDrawing.startPoint = pixelPerfectPos
+      gameStore.geometry.drawing.activeDrawing.startPoint = topLeftPos
       gameStore.geometry.drawing.activeDrawing.isDrawing = true
     } else if (mode === 'point') {
-      // Points: center of pixeloid
-      pixelPerfectPos = {
-        x: Math.floor(pixeloidPos.x) + 0.5,
-        y: Math.floor(pixeloidPos.y) + 0.5
-      }
-      this.createPoint(pixelPerfectPos)
+      // Points: create immediately at top-left
+      this.createPoint(topLeftPos)
     } else if (mode === 'line') {
-      // Lines: center of pixeloid
-      pixelPerfectPos = {
-        x: Math.floor(pixeloidPos.x) + 0.5,
-        y: Math.floor(pixeloidPos.y) + 0.5
-      }
       gameStore.geometry.drawing.activeDrawing.type = 'line'
-      gameStore.geometry.drawing.activeDrawing.startPoint = pixelPerfectPos
+      gameStore.geometry.drawing.activeDrawing.startPoint = topLeftPos
       gameStore.geometry.drawing.activeDrawing.isDrawing = true
     } else if (mode === 'circle') {
-      // Circles: center of pixeloid
-      pixelPerfectPos = {
-        x: Math.floor(pixeloidPos.x) + 0.5,
-        y: Math.floor(pixeloidPos.y) + 0.5
-      }
       gameStore.geometry.drawing.activeDrawing.type = 'circle'
-      gameStore.geometry.drawing.activeDrawing.startPoint = pixelPerfectPos
+      gameStore.geometry.drawing.activeDrawing.startPoint = topLeftPos
       gameStore.geometry.drawing.activeDrawing.isDrawing = true
     } else if (mode === 'diamond') {
-      // Diamonds: snap to pixeloid centers (0.5, 1.5, 2.5, etc.)
-      pixelPerfectPos = GeometryHelper.snapPointToPixeloidCenter(pixeloidPos)
+      // Diamonds: start point will become either west or east vertex based on drag direction
       gameStore.geometry.drawing.activeDrawing.type = 'diamond'
-      gameStore.geometry.drawing.activeDrawing.startPoint = pixelPerfectPos
+      gameStore.geometry.drawing.activeDrawing.startPoint = topLeftPos
       gameStore.geometry.drawing.activeDrawing.isDrawing = true
     }
   }
@@ -287,51 +267,24 @@ export class InputManager {
     
     if (activeDrawing.isDrawing && activeDrawing.startPoint) {
       const startPoint = activeDrawing.startPoint
-      let endPoint: { x: number, y: number }
       
-      // Use the same coordinate snapping logic as mouse move
-      if (activeDrawing.type === 'rectangle') {
-        // Rectangles: corner positioning
-        endPoint = {
-          x: Math.round(pixeloidPos.x),
-          y: Math.round(pixeloidPos.y)
-        }
-        this.createRectangle(startPoint, endPoint)
-      } else if (activeDrawing.type === 'line') {
-        // Lines: center of pixeloid
-        endPoint = {
-          x: Math.floor(pixeloidPos.x) + 0.5,
-          y: Math.floor(pixeloidPos.y) + 0.5
-        }
-        this.createLine(startPoint, endPoint)
-      } else if (activeDrawing.type === 'circle') {
-        // Circles: external midpoint of target pixeloid
-        const centerX = Math.floor(pixeloidPos.x) + 0.5
-        const centerY = Math.floor(pixeloidPos.y) + 0.5
+      if (activeDrawing.type === 'diamond') {
+        // Diamonds: use top-left anchoring for current position, then calculate directional vertices
+        const anchorPoints = GeometryHelper.calculatePixeloidAnchorPoints(pixeloidPos.x, pixeloidPos.y)
+        const currentPoint = anchorPoints.topLeft
+        this.createDiamond(startPoint, currentPoint)
+      } else {
+        // All other shapes: use consistent top-left pixeloid anchoring
+        const anchorPoints = GeometryHelper.calculatePixeloidAnchorPoints(pixeloidPos.x, pixeloidPos.y)
+        const endPoint = anchorPoints.topLeft
         
-        // Calculate direction from start to current
-        const deltaX = centerX - startPoint.x
-        const deltaY = centerY - startPoint.y
-        
-        // Find the external edge point
-        if (Math.abs(deltaX) > Math.abs(deltaY)) {
-          // Horizontal edge
-          endPoint = {
-            x: deltaX > 0 ? Math.ceil(pixeloidPos.x) : Math.floor(pixeloidPos.x),
-            y: centerY
-          }
-        } else {
-          // Vertical edge
-          endPoint = {
-            x: centerX,
-            y: deltaY > 0 ? Math.ceil(pixeloidPos.y) : Math.floor(pixeloidPos.y)
-          }
+        if (activeDrawing.type === 'rectangle') {
+          this.createRectangle(startPoint, endPoint)
+        } else if (activeDrawing.type === 'line') {
+          this.createLine(startPoint, endPoint)
+        } else if (activeDrawing.type === 'circle') {
+          this.createCircle(startPoint, endPoint)
         }
-        this.createCircle(startPoint, endPoint)
-      } else if (activeDrawing.type === 'diamond') {
-        // Diamonds: snap to pixeloid centers for perfect alignment
-        endPoint = GeometryHelper.snapPointToPixeloidCenter(pixeloidPos)
-        this.createDiamond(startPoint, endPoint)
       }
       
       // Clear active drawing
@@ -356,59 +309,12 @@ export class InputManager {
     const activeDrawing = gameStore.geometry.drawing.activeDrawing
     
     if (activeDrawing.isDrawing && activeDrawing.startPoint) {
-      // Different coordinate snapping for different shapes
-      let pixelPerfectPos: { x: number, y: number }
-      
-      if (activeDrawing.type === 'rectangle') {
-        // Rectangles: corner positioning
-        pixelPerfectPos = {
-          x: Math.round(pixeloidPos.x),
-          y: Math.round(pixeloidPos.y)
-        }
-      } else if (activeDrawing.type === 'line') {
-        // Lines: center of pixeloid
-        pixelPerfectPos = {
-          x: Math.floor(pixeloidPos.x) + 0.5,
-          y: Math.floor(pixeloidPos.y) + 0.5
-        }
-      } else if (activeDrawing.type === 'circle') {
-        // Circles: external midpoint of target pixeloid
-        // Calculate which edge is closest to the center
-        const centerX = Math.floor(pixeloidPos.x) + 0.5
-        const centerY = Math.floor(pixeloidPos.y) + 0.5
-        const startPoint = activeDrawing.startPoint
-        
-        // Calculate direction from start to current
-        const deltaX = centerX - startPoint.x
-        const deltaY = centerY - startPoint.y
-        
-        // Find the external edge point
-        if (Math.abs(deltaX) > Math.abs(deltaY)) {
-          // Horizontal edge
-          pixelPerfectPos = {
-            x: deltaX > 0 ? Math.ceil(pixeloidPos.x) : Math.floor(pixeloidPos.x),
-            y: centerY
-          }
-        } else {
-          // Vertical edge
-          pixelPerfectPos = {
-            x: centerX,
-            y: deltaY > 0 ? Math.ceil(pixeloidPos.y) : Math.floor(pixeloidPos.y)
-          }
-        }
-      } else if (activeDrawing.type === 'diamond') {
-        // Diamonds: snap to pixeloid centers for perfect alignment
-        pixelPerfectPos = GeometryHelper.snapPointToPixeloidCenter(pixeloidPos)
-      } else {
-        // Default: center of pixeloid
-        pixelPerfectPos = {
-          x: Math.floor(pixeloidPos.x) + 0.5,
-          y: Math.floor(pixeloidPos.y) + 0.5
-        }
-      }
+      // Use consistent top-left pixeloid anchoring for ALL shapes during preview
+      const anchorPoints = GeometryHelper.calculatePixeloidAnchorPoints(pixeloidPos.x, pixeloidPos.y)
+      const currentPoint = anchorPoints.topLeft
       
       // Update current point for preview
-      gameStore.geometry.drawing.activeDrawing.currentPoint = pixelPerfectPos
+      gameStore.geometry.drawing.activeDrawing.currentPoint = currentPoint
     }
   }
 
@@ -476,8 +382,8 @@ export class InputManager {
     // Use centralized geometry calculations
     const properties = GeometryHelper.calculateDiamondProperties(anchorPoint, dragPoint)
     
-    // Only create diamond if it has some size (minimum 2 pixeloids width)
-    if (properties.width >= 2) {
+    // Only create diamond if it has some size (any width > 0)
+    if (properties.width > 0) {
       updateGameStore.createDiamond(properties.anchorX, properties.anchorY, properties.width, properties.height)
     }
   }
@@ -596,31 +502,41 @@ export class InputManager {
     const deltaX = pixeloidPos.x - this.dragStartPosition.x
     const deltaY = pixeloidPos.y - this.dragStartPosition.y
 
-    // Apply offset to object based on type
+    // Calculate new position with snapping to pixeloid centers
+    const rawNewX = this.dragObjectOriginalPosition.x + deltaX
+    const rawNewY = this.dragObjectOriginalPosition.y + deltaY
+    
+    // Snap to pixeloid anchor points (top-left)
+    const anchorPoints = GeometryHelper.calculatePixeloidAnchorPoints(rawNewX, rawNewY)
+    const snappedPos = anchorPoints.topLeft
+
+    // Apply snapped position to object based on type
     if ('anchorX' in obj && 'anchorY' in obj) {
       const diamond = obj as GeometricDiamond
-      diamond.anchorX = this.dragObjectOriginalPosition.x + deltaX
-      diamond.anchorY = this.dragObjectOriginalPosition.y + deltaY
+      diamond.anchorX = snappedPos.x
+      diamond.anchorY = snappedPos.y
     } else if ('centerX' in obj && 'centerY' in obj) {
       const circle = obj as GeometricCircle
-      circle.centerX = this.dragObjectOriginalPosition.x + deltaX
-      circle.centerY = this.dragObjectOriginalPosition.y + deltaY
+      circle.centerX = snappedPos.x
+      circle.centerY = snappedPos.y
     } else if ('x' in obj && 'y' in obj && 'width' in obj && 'height' in obj) {
       const rect = obj as GeometricRectangle
-      rect.x = this.dragObjectOriginalPosition.x + deltaX
-      rect.y = this.dragObjectOriginalPosition.y + deltaY
+      rect.x = snappedPos.x
+      rect.y = snappedPos.y
     } else if ('startX' in obj && 'startY' in obj && 'endX' in obj && 'endY' in obj) {
       const line = obj as GeometricLine
       if (this.dragObjectOriginalEnd) {
-        line.startX = this.dragObjectOriginalPosition.x + deltaX
-        line.startY = this.dragObjectOriginalPosition.y + deltaY
-        line.endX = this.dragObjectOriginalEnd.x + deltaX
-        line.endY = this.dragObjectOriginalEnd.y + deltaY
+        const deltaSnappedX = snappedPos.x - this.dragObjectOriginalPosition.x
+        const deltaSnappedY = snappedPos.y - this.dragObjectOriginalPosition.y
+        line.startX = this.dragObjectOriginalPosition.x + deltaSnappedX
+        line.startY = this.dragObjectOriginalPosition.y + deltaSnappedY
+        line.endX = this.dragObjectOriginalEnd.x + deltaSnappedX
+        line.endY = this.dragObjectOriginalEnd.y + deltaSnappedY
       }
     } else if ('x' in obj && 'y' in obj) {
       const point = obj as GeometricPoint
-      point.x = this.dragObjectOriginalPosition.x + deltaX
-      point.y = this.dragObjectOriginalPosition.y + deltaY
+      point.x = snappedPos.x
+      point.y = snappedPos.y
     }
   }
 

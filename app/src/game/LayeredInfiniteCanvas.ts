@@ -1,7 +1,7 @@
 import { Container } from 'pixi.js'
 import { InfiniteCanvas } from './InfiniteCanvas'
 import { BackgroundGridRenderer } from './BackgroundGridRenderer'
-import { GeometryRenderer } from './GeometryRenderer'
+import { MeshGeometryRenderer } from './MeshGeometryRenderer'
 import { SelectionHighlightRenderer } from './SelectionHighlightRenderer'
 import { MouseHighlightRenderer } from './MouseHighlightRenderer'
 import { PixeloidMeshRenderer } from './PixeloidMeshRenderer'
@@ -32,8 +32,8 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
   // Background grid renderer using extracted logic
   private backgroundGridRenderer: BackgroundGridRenderer
   
-  // Geometry renderer for user-drawn shapes
-  private geometryRenderer: GeometryRenderer
+  // Mesh-based geometry renderer for user-drawn shapes (GPU-accelerated)
+  private geometryRenderer: MeshGeometryRenderer
   
   // Selection highlight renderer for reactive selection visualization
   private selectionHighlightRenderer: SelectionHighlightRenderer
@@ -78,8 +78,8 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
     // Initialize background grid renderer
     this.backgroundGridRenderer = new BackgroundGridRenderer()
 
-    // Initialize geometry renderer
-    this.geometryRenderer = new GeometryRenderer()
+    // Initialize mesh-based geometry renderer
+    this.geometryRenderer = new MeshGeometryRenderer()
     
     // Initialize selection highlight renderer (reactive)
     this.selectionHighlightRenderer = new SelectionHighlightRenderer()
@@ -209,9 +209,9 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
     if (gameStore.geometry.layerVisibility.geometry) {
       this.geometryRenderer.render(corners, pixeloidScale)
       
-      // CRITICAL: Always add the full renderer container (includes preview graphics)
+      // CRITICAL: Always add the full renderer container (includes preview meshes)
       this.geometryLayer.removeChildren()
-      this.geometryLayer.addChild(this.geometryRenderer.getGraphics())
+      this.geometryLayer.addChild(this.geometryRenderer.getContainer())
       
       // IMPROVED: Capture textures synchronously after render is complete
       if (this.objectsNeedingTexture.size > 0) {
@@ -351,17 +351,17 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
     try {
       console.log(`LayeredInfiniteCanvas: Starting sync texture capture for ${this.objectsNeedingTexture.size} objects`)
       
-      // Get all rendered object graphics from GeometryRenderer
+      // Get all rendered object containers from MeshGeometryRenderer
       const objectContainers = this.geometryRenderer.getObjectContainers()
       
       // Capture textures individually for better error handling
       for (const objectId of this.objectsNeedingTexture) {
-        const graphics = objectContainers.get(objectId)
-        if (graphics) {
+        const container = objectContainers.get(objectId)
+        if (container) {
           // Capture immediately - the improved TextureRegistry handles async internally
           this.textureRegistry.captureObjectTexture(objectId)
         } else {
-          console.warn(`LayeredInfiniteCanvas: No graphics found for object ${objectId}`)
+          console.warn(`LayeredInfiniteCanvas: No container found for object ${objectId}`)
         }
       }
       

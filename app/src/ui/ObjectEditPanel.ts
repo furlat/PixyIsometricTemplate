@@ -206,7 +206,7 @@ export class ObjectEditPanel {
           <label class="label">
             <span class="label-text">Width:</span>
           </label>
-          <input id="edit-width" type="number" step="1" min="2" value="${diamond.width}" class="input input-bordered w-full" />
+          <input id="edit-width" type="number" step="1" min="0" value="${diamond.width}" class="input input-bordered w-full" />
         </div>
       `
     } else if ('width' in obj && 'height' in obj) {
@@ -468,12 +468,10 @@ export class ObjectEditPanel {
         }
       }
       if (widthInput) {
-        let width = parseInt(widthInput.value) || 2
-        if (width % 2 === 1) width = width - 1 // Force even width
-        if (width < 2) width = 2
+        const width = parseFloat(widthInput.value) || 0
         if (width !== diamond.width) {
           (updates as any).width = width
-          ;(updates as any).height = (width - 1) / 4 // Calculate height
+          ;(updates as any).height = width / 4 // Calculate height
         }
       }
     } else if ('width' in this.originalObject && 'height' in this.originalObject) {
