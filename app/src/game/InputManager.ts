@@ -1,5 +1,6 @@
 import { updateGameStore, gameStore } from '../store/gameStore'
 import { GeometryHelper } from './GeometryHelper'
+import { CoordinateHelper } from './CoordinateHelper'
 import type { InfiniteCanvas } from './InfiniteCanvas'
 import type { GeometricRectangle, GeometricPoint, GeometricLine, GeometricCircle, GeometricDiamond } from '../types'
 
@@ -21,48 +22,44 @@ export class InputManager {
   // Store bound handlers for cleanup
   private keydownHandler: (event: KeyboardEvent) => void = () => {}
   private keyupHandler: (event: KeyboardEvent) => void = () => {}
-  private mouseMoveHandler: (event: MouseEvent) => void = () => {}
-  private mouseDownHandler: (event: MouseEvent) => void = () => {}
-  private mouseUpHandler: (event: MouseEvent) => void = () => {}
-  private wheelHandler: (event: WheelEvent) => void = () => {}
   private contextMenuHandler: (event: Event) => void = () => {}
 
   /**
-   * Initialize input management
+   * Initialize input management - MESH EVENT SYSTEM ONLY
    */
   public init(canvas: HTMLCanvasElement, infiniteCanvas: InfiniteCanvas): void {
     this.canvas = canvas
     this.infiniteCanvas = infiniteCanvas
     this.setupEventListeners()
+    
+    // Set global reference for BackgroundGridRenderer to access
+    ;(globalThis as any).inputManager = this
+    
+    console.log('InputManager: Initialized with MESH EVENT SYSTEM ONLY')
   }
 
   /**
-   * Setup all input event listeners
+   * Setup ONLY keyboard and context menu event listeners
+   * All mouse/pointer events are handled by the mesh in BackgroundGridRenderer
    */
   private setupEventListeners(): void {
     if (!this.canvas) return
 
-    // Bind handlers
+    // Bind handlers - NO MOUSE EVENTS
     this.keydownHandler = this.handleKeyDown.bind(this)
     this.keyupHandler = this.handleKeyUp.bind(this)
-    this.mouseMoveHandler = this.handleMouseMove.bind(this)
-    this.mouseDownHandler = this.handleMouseDown.bind(this)
-    this.mouseUpHandler = this.handleMouseUp.bind(this)
-    this.wheelHandler = this.handleWheel.bind(this)
     this.contextMenuHandler = (e) => e.preventDefault()
 
-    // Add listeners
+    // Add ONLY keyboard and context menu listeners
     document.addEventListener('keydown', this.keydownHandler)
     document.addEventListener('keyup', this.keyupHandler)
-    this.canvas.addEventListener('mousemove', this.mouseMoveHandler)
-    this.canvas.addEventListener('mousedown', this.mouseDownHandler)
-    this.canvas.addEventListener('mouseup', this.mouseUpHandler)
-    this.canvas.addEventListener('wheel', this.wheelHandler)
     this.canvas.addEventListener('contextmenu', this.contextMenuHandler)
     
     // Focus canvas to receive keyboard events
     this.canvas.tabIndex = 0
     this.canvas.focus()
+    
+    console.log('InputManager: Setup keyboard events only - mouse events handled by mesh')
   }
 
   /**
@@ -150,78 +147,68 @@ export class InputManager {
   }
 
   /**
-   * Handle mouse movement (restored full functionality for mouse layer)
+   * Handle mesh events from BackgroundGridRenderer - REPLACES ALL MOUSE EVENT HANDLING
    */
-  private handleMouseMove(event: MouseEvent): void {
-    if (!this.canvas || !this.infiniteCanvas) return
-
-    const rect = this.canvas.getBoundingClientRect()
-    const x = event.clientX - rect.left
-    const y = event.clientY - rect.top
+  public handleMeshEvent(
+    eventType: 'move' | 'down' | 'up',
+    vertexX: number,
+    vertexY: number,
+    pixeloidPos: { x: number, y: number },
+    originalEvent: any
+  ): void {
+    console.log(`InputManager: Mesh event ${eventType} at Vertex(${vertexX}, ${vertexY}) → Pixeloid(${pixeloidPos.x.toFixed(2)}, ${pixeloidPos.y.toFixed(2)})`)
     
-    // Update screen mouse position in store
-    updateGameStore.updateMousePosition(x, y)
-    
-    // Convert to pixeloid coordinates
-    const pixeloidPos = this.infiniteCanvas.screenToPixeloid(x, y)
-    updateGameStore.updateMousePixeloidPosition(pixeloidPos.x, pixeloidPos.y)
-    
-    // Handle preview during drawing or object dragging
-    if (this.isDragging) {
-      this.handleObjectDragging(pixeloidPos)
-    } else {
-      this.handleGeometryMouseMove(pixeloidPos)
+    if (eventType === 'move') {
+      // Handle preview during drawing or object dragging
+      if (this.isDragging) {
+        this.handleObjectDragging(pixeloidPos)
+      } else {
+        this.handleGeometryMouseMove(pixeloidPos)
+      }
+    } else if (eventType === 'down') {
+      // Only handle left mouse button
+      if (originalEvent.button !== 0) return
+      this.handleGeometryMouseDown(pixeloidPos)
+    } else if (eventType === 'up') {
+      // Only handle left mouse button
+      if (originalEvent.button !== 0) return
+      
+      // Stop object dragging if active
+      if (this.isDragging) {
+        this.stopObjectDragging()
+        return
+      }
+      
+      // Handle geometry drawing
+      this.handleGeometryMouseUp(pixeloidPos)
     }
   }
 
   /**
-   * Handle mouse down - start drawing
+   * Handle mesh wheel events from BackgroundGridRenderer
    */
-  private handleMouseDown(event: MouseEvent): void {
-    if (!this.canvas || !this.infiniteCanvas) return
-
-    // Only handle left mouse button
-    if (event.button !== 0) return
-
-    const rect = this.canvas.getBoundingClientRect()
-    const x = event.clientX - rect.left
-    const y = event.clientY - rect.top
+  public handleMeshWheelEvent(vertexX: number, vertexY: number, wheelEvent: any): void {
+    if (!this.infiniteCanvas) return
     
-    // Convert to pixeloid coordinates (reuse existing logic)
-    const pixeloidPos = this.infiniteCanvas.screenToPixeloid(x, y)
+    wheelEvent.preventDefault()
     
-    // Handle geometry drawing
-    this.handleGeometryMouseDown(pixeloidPos)
+    // Use the vertex coordinates for zoom-to-center functionality
+    // Convert back to screen coordinates for the InfiniteCanvas zoom method
+    const activeMesh = gameStore.staticMesh.activeMesh
+    if (!activeMesh) return
+    
+    const { level } = activeMesh.resolution
+    const screenX = vertexX * level
+    const screenY = vertexY * level
+    
+    // Handle zoom with vertex position for zoom-to-center functionality
+    this.infiniteCanvas.handleZoom(wheelEvent.deltaY, screenX, screenY)
+    
+    console.log(`InputManager: Mesh wheel event at Vertex(${vertexX}, ${vertexY}) → Screen(${screenX}, ${screenY})`)
   }
 
   /**
-   * Handle mouse up - finish drawing or stop dragging
-   */
-  private handleMouseUp(event: MouseEvent): void {
-    if (!this.canvas || !this.infiniteCanvas) return
-
-    // Only handle left mouse button
-    if (event.button !== 0) return
-
-    const rect = this.canvas.getBoundingClientRect()
-    const x = event.clientX - rect.left
-    const y = event.clientY - rect.top
-    
-    // Convert to pixeloid coordinates (reuse existing logic)
-    const pixeloidPos = this.infiniteCanvas.screenToPixeloid(x, y)
-    
-    // Stop object dragging if active
-    if (this.isDragging) {
-      this.stopObjectDragging()
-      return
-    }
-    
-    // Handle geometry drawing
-    this.handleGeometryMouseUp(pixeloidPos)
-  }
-
-  /**
-   * Handle geometry drawing on mouse down
+   * Handle geometry drawing on mouse down with vertex alignment
    */
   private handleGeometryMouseDown(pixeloidPos: { x: number, y: number }): void {
     const mode = gameStore.geometry.drawing.mode
@@ -232,8 +219,11 @@ export class InputManager {
       return
     }
     
+    // Apply vertex alignment for transform coherence
+    const alignedPos = CoordinateHelper.getVertexAlignedPixeloid(pixeloidPos)
+    
     // Use consistent top-left pixeloid anchoring for ALL shapes (including diamonds)
-    const anchorPoints = GeometryHelper.calculatePixeloidAnchorPoints(pixeloidPos.x, pixeloidPos.y)
+    const anchorPoints = GeometryHelper.calculatePixeloidAnchorPoints(alignedPos.x, alignedPos.y)
     const topLeftPos = anchorPoints.topLeft
     
     if (mode === 'rectangle') {
@@ -318,22 +308,6 @@ export class InputManager {
     }
   }
 
-  /**
-   * Handle mouse wheel for zooming with mouse position for center-zoom
-   */
-  private handleWheel(event: WheelEvent): void {
-    if (!this.canvas || !this.infiniteCanvas) return
-    
-    event.preventDefault()
-    
-    // Get mouse position relative to canvas
-    const rect = this.canvas.getBoundingClientRect()
-    const mouseX = event.clientX - rect.left
-    const mouseY = event.clientY - rect.top
-    
-    // Handle zoom with mouse position for zoom-to-center functionality
-    this.infiniteCanvas.handleZoom(event.deltaY, mouseX, mouseY)
-  }
 
   /**
    * Create a rectangle from start and end points
@@ -597,22 +571,23 @@ export class InputManager {
   }
 
   /**
-   * Clean up event listeners
+   * Clean up event listeners - MESH EVENT SYSTEM ONLY
    */
   public destroy(): void {
-    // Remove all event listeners
+    // Remove keyboard and context menu event listeners only
     document.removeEventListener('keydown', this.keydownHandler)
     document.removeEventListener('keyup', this.keyupHandler)
     
     if (this.canvas) {
-      this.canvas.removeEventListener('mousemove', this.mouseMoveHandler)
-      this.canvas.removeEventListener('mousedown', this.mouseDownHandler)
-      this.canvas.removeEventListener('mouseup', this.mouseUpHandler)
-      this.canvas.removeEventListener('wheel', this.wheelHandler)
       this.canvas.removeEventListener('contextmenu', this.contextMenuHandler)
     }
     
+    // Clear global reference
+    ;(globalThis as any).inputManager = null
+    
     this.canvas = null
     this.infiniteCanvas = null
+    
+    console.log('InputManager: Destroyed - mesh handles all mouse events')
   }
 }

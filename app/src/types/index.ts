@@ -5,6 +5,64 @@ export interface PixeloidCoordinate {
   y: number
 }
 
+// Static Mesh Architecture Types - for transform coherence
+export interface MeshVertexCoordinate {
+  x: number
+  y: number
+}
+
+export interface MeshResolution {
+  level: number // 1, 2, 4, 8, 16, 32, 64, 128
+  pixeloidScale: number // Corresponding pixeloid scale
+  oversizePercent: number // Always 20%
+  meshBounds: {
+    vertexWidth: number
+    vertexHeight: number
+  }
+}
+
+export interface StaticMeshData {
+  resolution: MeshResolution
+  vertices: Float32Array
+  indices: Uint16Array
+  createdAt: number
+  isValid: boolean
+}
+
+export interface PixeloidVertexMapping {
+  meshToPixeloid: Map<string, PixeloidCoordinate> // "x,y" vertex -> pixeloid
+  pixeloidToMesh: Map<string, MeshVertexCoordinate> // "x,y" pixeloid -> vertex
+  currentResolution: MeshResolution
+  viewportBounds: {
+    minVertexX: number
+    maxVertexX: number
+    minVertexY: number
+    maxVertexY: number
+  }
+}
+
+export interface StaticMeshState {
+  // Current active mesh for rendering
+  activeMesh: StaticMeshData | null
+  // Cached mesh levels for different resolutions
+  meshCache: Map<number, StaticMeshData> // level -> mesh data
+  // Current coordinate mapping between mesh vertices and pixeloids
+  coordinateMapping: PixeloidVertexMapping | null
+  // Mesh configuration
+  config: {
+    oversizePercent: number // Always 20%
+    cacheMaxLevels: number // Maximum cached mesh levels
+    autoSwitchThreshold: number // Pixeloid scale threshold for mesh switching
+  }
+  // Performance stats
+  stats: {
+    activeMeshLevel: number
+    totalCachedMeshes: number
+    lastMeshSwitch: number
+    coordinateMappingUpdates: number
+  }
+}
+
 export interface ViewportCorners {
   topLeft: PixeloidCoordinate
   topRight: PixeloidCoordinate
@@ -47,6 +105,11 @@ export interface GameState {
     x: number
     y: number
   }
+  // Mouse position in mesh vertex coordinates (for debugging)
+  mouseVertexPosition: {
+    x: number
+    y: number
+  }
   // Camera and canvas state
   camera: CameraState
   input: InputState
@@ -56,6 +119,8 @@ export interface GameState {
   textureRegistry: TextureRegistryState
   // Mesh registry for pixeloid mesh system
   meshRegistry: MeshRegistryState
+  // Static mesh system for transform coherence
+  staticMesh: StaticMeshState
 }
 
 // UI-related types

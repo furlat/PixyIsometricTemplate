@@ -23,6 +23,10 @@ export class InfiniteCanvas {
   
   // Mouse-centered zooming
   private zoomTargetScreen: { x: number, y: number } | null = null
+  
+  // Key state tracking for vertex snapping on release
+  private previousKeyState = { w: false, a: false, s: false, d: false }
+  private isMoving = false
 
   constructor() {
     this.container = new Container()
@@ -110,32 +114,58 @@ export class InfiniteCanvas {
   }
 
   /**
-   * Update camera position based on input
+   * Update camera position based on input with vertex alignment on key release
    */
   public updateCamera(deltaTime: number): void {
     // Sync input state from store
     const keys = gameStore.input.keys
     
     let moved = false
-    const moveDistance = this.CAMERA_SPEED * deltaTime
+    const baseDistance = this.CAMERA_SPEED * deltaTime
+    
+    // Calculate movement deltas for all pressed keys
+    let deltaX = 0
+    let deltaY = 0
+    
+    if (keys.w) deltaY -= baseDistance
+    if (keys.s) deltaY += baseDistance
+    if (keys.a) deltaX -= baseDistance
+    if (keys.d) deltaX += baseDistance
 
-    // WASD movement
-    if (keys.w) {
-      this.localCameraPosition.y -= moveDistance
+    // Check if we're currently moving
+    const isCurrentlyMoving = deltaX !== 0 || deltaY !== 0
+    
+    // Apply free movement if any WASD keys are pressed (no snapping during movement)
+    if (isCurrentlyMoving) {
+      this.localCameraPosition.x += deltaX
+      this.localCameraPosition.y += deltaY
+      this.isMoving = true
       moved = true
+      
+      console.log(`InfiniteCanvas: Free movement (${deltaX.toFixed(2)}, ${deltaY.toFixed(2)}) -> Camera(${this.localCameraPosition.x.toFixed(2)}, ${this.localCameraPosition.y.toFixed(2)})`)
     }
-    if (keys.s) {
-      this.localCameraPosition.y += moveDistance
+    
+    // Check for key releases and snap to vertex alignment
+    const anyKeyReleased = (
+      (this.previousKeyState.w && !keys.w) ||
+      (this.previousKeyState.a && !keys.a) ||
+      (this.previousKeyState.s && !keys.s) ||
+      (this.previousKeyState.d && !keys.d)
+    )
+    
+    // Snap to vertex alignment when movement stops
+    if (this.isMoving && !isCurrentlyMoving && anyKeyReleased) {
+      const snappedPosition = CoordinateHelper.getVertexAlignedPixeloid(this.localCameraPosition)
+      this.localCameraPosition.x = snappedPosition.x
+      this.localCameraPosition.y = snappedPosition.y
+      this.isMoving = false
       moved = true
+      
+      console.log(`InfiniteCanvas: Snapped to vertex alignment at (${snappedPosition.x.toFixed(2)}, ${snappedPosition.y.toFixed(2)})`)
     }
-    if (keys.a) {
-      this.localCameraPosition.x -= moveDistance
-      moved = true
-    }
-    if (keys.d) {
-      this.localCameraPosition.x += moveDistance
-      moved = true
-    }
+    
+    // Update previous key state
+    this.previousKeyState = { ...keys }
 
     // Space to recenter camera - smart behavior based on selection
     if (keys.space) {
@@ -224,11 +254,18 @@ export class InfiniteCanvas {
     this.pendingZoomDelta = 0
     this.zoomTargetScreen = null
     
+    // Snap camera position to vertex alignment after zoom
+    const snappedPosition = CoordinateHelper.getVertexAlignedPixeloid(this.localCameraPosition)
+    this.localCameraPosition.x = snappedPosition.x
+    this.localCameraPosition.y = snappedPosition.y
+    
     // Update store once with final value
     updateGameStore.setPixeloidScale(this.localPixeloidScale)
     
     // Update viewport corners since scale changed
     this.syncToStore()
+    
+    console.log(`InfiniteCanvas: Zoom completed and snapped to vertex alignment at (${snappedPosition.x.toFixed(2)}, ${snappedPosition.y.toFixed(2)})`)
   }
   
   /**

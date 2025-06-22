@@ -32,12 +32,20 @@ export class StorePanel {
       'bottom-right-corner',
       'window-size',
       'mouse-position',
+      'mouse-vertex-position',
       'mouse-pixeloid-position',
       'key-w',
       'key-a',
       'key-s',
       'key-d',
       'key-space',
+      // Static Mesh Debug elements
+      'static-mesh-level',
+      'static-mesh-ready',
+      'coordinate-mapping-ready',
+      'mesh-cache-size',
+      'viewport-corners-pixel',
+      'current-resolution',
       // Geometry Debug elements (Phase 1: Multi-Layer System)
       'drawing-mode',
       'objects-count',
@@ -118,12 +126,17 @@ export class StorePanel {
       'text-info'
     );
     
-    updateElement(this.elements, 'mouse-position', 
+    updateElement(this.elements, 'mouse-position',
       formatCoordinates(gameStore.mousePosition.x, gameStore.mousePosition.y, 0),
       STATUS_COLORS.mouse
     );
     
-    updateElement(this.elements, 'mouse-pixeloid-position', 
+    updateElement(this.elements, 'mouse-vertex-position',
+      formatCoordinates(gameStore.mouseVertexPosition.x, gameStore.mouseVertexPosition.y, 0),
+      'text-purple-400'
+    );
+    
+    updateElement(this.elements, 'mouse-pixeloid-position',
       formatCoordinates(gameStore.mousePixeloidPosition.x, gameStore.mousePixeloidPosition.y, 2),
       STATUS_COLORS.mouse
     );
@@ -153,6 +166,47 @@ export class StorePanel {
       getKeyStatusText(gameStore.input.keys.space),
       getBooleanStatusClass(gameStore.input.keys.space)
     );
+
+    // Static Mesh Debug Information
+    updateElement(this.elements, 'static-mesh-level',
+      gameStore.staticMesh.stats.activeMeshLevel.toString(),
+      'text-purple-400'
+    );
+
+    updateElement(this.elements, 'static-mesh-ready',
+      getBooleanStatusText(gameStore.staticMesh.activeMesh !== null),
+      getBooleanStatusClass(gameStore.staticMesh.activeMesh !== null)
+    );
+
+    updateElement(this.elements, 'coordinate-mapping-ready',
+      getBooleanStatusText(gameStore.staticMesh.coordinateMapping !== null),
+      getBooleanStatusClass(gameStore.staticMesh.coordinateMapping !== null)
+    );
+
+    updateElement(this.elements, 'mesh-cache-size',
+      gameStore.staticMesh.stats.totalCachedMeshes.toString(),
+      'text-info'
+    );
+
+    // Viewport corners in pixel coordinates (should be constant unless window resizes)
+    updateElement(this.elements, 'viewport-corners-pixel',
+      `TL:(0,0) BR:(${gameStore.windowWidth},${gameStore.windowHeight})`,
+      'text-cyan-400'
+    );
+
+    // Current mesh resolution info
+    const currentResolution = gameStore.staticMesh.coordinateMapping?.currentResolution
+    if (currentResolution) {
+      updateElement(this.elements, 'current-resolution',
+        `Level:${currentResolution.level} Bounds:${currentResolution.meshBounds.vertexWidth}x${currentResolution.meshBounds.vertexHeight}`,
+        'text-yellow-400'
+      );
+    } else {
+      updateElement(this.elements, 'current-resolution',
+        'No mapping available',
+        'text-red-400'
+      );
+    }
 
     // Geometry Debug (Phase 1: Multi-Layer System)
     updateElement(this.elements, 'drawing-mode',

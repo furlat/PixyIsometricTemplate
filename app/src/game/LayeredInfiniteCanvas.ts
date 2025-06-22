@@ -7,6 +7,7 @@ import { MouseHighlightRenderer } from './MouseHighlightRenderer'
 import { PixeloidMeshRenderer } from './PixeloidMeshRenderer'
 import { BoundingBoxRenderer } from './BoundingBoxRenderer'
 import { TextureRegistry } from './TextureRegistry'
+import { StaticMeshManager } from './StaticMeshManager'
 import { gameStore } from '../store/gameStore'
 import { subscribe } from 'valtio'
 import type { ViewportCorners } from '../types'
@@ -49,6 +50,9 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
   
   // Texture registry for StoreExplorer previews (SAFE - no store subscriptions)
   private textureRegistry: TextureRegistry | null = null
+  
+  // Static mesh manager for transform coherence
+  private staticMeshManager: StaticMeshManager
   
   // Track which objects need texture capture (performance optimization)
   private objectsNeedingTexture: Set<string> = new Set()
@@ -94,12 +98,18 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
     // Initialize simple bounding box renderer for comparison
     this.boundingBoxRenderer = new BoundingBoxRenderer()
 
+    // Initialize static mesh manager for transform coherence
+    this.staticMeshManager = new StaticMeshManager()
+
     // Setup layer hierarchy within the existing camera transform
     // This maintains all existing InfiniteCanvas functionality
     this.setupLayers()
     
     // Subscribe to store changes to mark layers as dirty
     this.subscribeToStoreChanges()
+    
+    // Initialize static mesh system with current pixeloid scale
+    this.initializeStaticMeshSystem()
   }
 
   /**
@@ -132,6 +142,16 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
     // This ensures perfect alignment with pixeloids
     this.mouseLayer.addChild(this.mouseHighlightRenderer.getGraphics())
     this.cameraTransform.addChild(this.mouseLayer)
+  }
+
+  /**
+   * Initialize the static mesh system with current camera state
+   */
+  private initializeStaticMeshSystem(): void {
+    const initialPixeloidScale = this.localPixeloidScale || gameStore.camera.pixeloidScale
+    this.staticMeshManager.initialize(initialPixeloidScale)
+    
+    console.log(`LayeredInfiniteCanvas: Initialized static mesh system with scale ${initialPixeloidScale}`)
   }
 
   /**
@@ -173,6 +193,11 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
     
     // Render UI overlay layer
     this.renderUIOverlayLayer(paddedCorners, pixeloidScale)
+    
+    // Handle static mesh zoom changes for efficient mesh switching
+    if (pixeloidScale !== this.lastPixeloidScale) {
+      this.staticMeshManager.handleZoomChange(pixeloidScale)
+    }
     
     // Update tracking variables
     this.lastPixeloidScale = pixeloidScale
@@ -458,6 +483,9 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
    * Override destroy to clean up layer resources
    */
   public destroy(): void {
+    // Destroy static mesh manager
+    this.staticMeshManager.clearCache()
+    
     // Destroy renderers
     this.backgroundGridRenderer.destroy()
     this.geometryRenderer.destroy()
@@ -475,5 +503,12 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
 
     // Call parent destroy
     super.destroy()
+  }
+
+  /**
+   * Get the static mesh manager for external access
+   */
+  public getStaticMeshManager(): StaticMeshManager {
+    return this.staticMeshManager
   }
 }

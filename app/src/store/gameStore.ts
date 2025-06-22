@@ -1,5 +1,5 @@
 import { proxy } from 'valtio'
-import type { GameState, ViewportCorners, GeometricObject, ObjectTextureData, GeometricPoint, GeometricLine, GeometricCircle, GeometricRectangle, GeometricDiamond, PixeloidMeshData } from '../types'
+import type { GameState, ViewportCorners, GeometricObject, ObjectTextureData, GeometricPoint, GeometricLine, GeometricCircle, GeometricRectangle, GeometricDiamond, PixeloidMeshData, StaticMeshData, PixeloidVertexMapping, MeshResolution } from '../types'
 import { GeometryHelper } from '../game/GeometryHelper'
 import type { InfiniteCanvas } from '../game/InfiniteCanvas'
 
@@ -18,6 +18,11 @@ export const gameStore = proxy<GameState>({
     y: 0
   },
   mousePixeloidPosition: {
+    x: 0,
+    y: 0
+  },
+  // Mouse position in mesh vertex coordinates for debugging
+  mouseVertexPosition: {
     x: 0,
     y: 0
   },
@@ -122,6 +127,23 @@ export const gameStore = proxy<GameState>({
       totalPixeloids: 0,
       lastMeshUpdate: 0
     }
+  },
+  // Static mesh system for transform coherence
+  staticMesh: {
+    activeMesh: null,
+    meshCache: new Map(),
+    coordinateMapping: null,
+    config: {
+      oversizePercent: 20, // Always 20% oversized viewports
+      cacheMaxLevels: 7, // Maximum cached mesh levels (1,2,4,8,16,32,64)
+      autoSwitchThreshold: 0.5 // Switch when scale changes by 50%
+    },
+    stats: {
+      activeMeshLevel: 1,
+      totalCachedMeshes: 0,
+      lastMeshSwitch: 0,
+      coordinateMappingUpdates: 0
+    }
   }
 })
 
@@ -177,6 +199,12 @@ export const updateGameStore = {
   updateMousePixeloidPosition: (pixeloidX: number, pixeloidY: number) => {
     gameStore.mousePixeloidPosition.x = pixeloidX
     gameStore.mousePixeloidPosition.y = pixeloidY
+  },
+
+  // Mouse position in mesh vertex coordinates (for debugging)
+  updateMouseVertexPosition: (vertexX: number, vertexY: number) => {
+    gameStore.mouseVertexPosition.x = vertexX
+    gameStore.mouseVertexPosition.y = vertexY
   },
 
   // Geometry controls (Phase 1: Multi-Layer System)
@@ -694,6 +722,39 @@ export const updateGameStore = {
     for (const meshData of Object.values(gameStore.meshRegistry.objectMeshes)) {
       meshData.isValid = false
     }
+  },
+
+  // Static mesh system actions
+  setActiveMesh: (meshData: StaticMeshData) => {
+    gameStore.staticMesh.activeMesh = meshData
+    gameStore.staticMesh.stats.activeMeshLevel = meshData.resolution.level
+    gameStore.staticMesh.stats.lastMeshSwitch = Date.now()
+  },
+
+  setCoordinateMapping: (mapping: PixeloidVertexMapping) => {
+    gameStore.staticMesh.coordinateMapping = mapping
+    gameStore.staticMesh.stats.coordinateMappingUpdates++
+  },
+
+  cacheStaticMesh: (level: number, meshData: StaticMeshData) => {
+    gameStore.staticMesh.meshCache.set(level, meshData)
+    gameStore.staticMesh.stats.totalCachedMeshes = gameStore.staticMesh.meshCache.size
+  },
+
+  clearStaticMeshCache: () => {
+    gameStore.staticMesh.meshCache.clear()
+    gameStore.staticMesh.activeMesh = null
+    gameStore.staticMesh.coordinateMapping = null
+    gameStore.staticMesh.stats.totalCachedMeshes = 0
+    gameStore.staticMesh.stats.activeMeshLevel = 1
+  },
+
+  updateStaticMeshConfig: (config: Partial<typeof gameStore.staticMesh.config>) => {
+    Object.assign(gameStore.staticMesh.config, config)
+  },
+
+  getStaticMeshStats: () => {
+    return gameStore.staticMesh.stats
   }
 }
 
