@@ -3,12 +3,13 @@ import { InfiniteCanvas } from './InfiniteCanvas'
 import { BackgroundGridRenderer } from './BackgroundGridRenderer'
 import { GeometryRenderer } from './GeometryRenderer'
 import { SelectionHighlightRenderer } from './SelectionHighlightRenderer'
-import { MouseHighlightRenderer } from './MouseHighlightRenderer'
+import { MouseHighlightShader } from './MouseHighlightShader'
 import { PixeloidMeshRenderer } from './PixeloidMeshRenderer'
 import { BoundingBoxRenderer } from './BoundingBoxRenderer'
 import { TextureRegistry } from './TextureRegistry'
 import { StaticMeshManager } from './StaticMeshManager'
-import { gameStore } from '../store/gameStore'
+import { gameStore, createPixeloidCoordinate } from '../store/gameStore'
+import { CoordinateHelper } from './CoordinateHelper'
 import { subscribe } from 'valtio'
 import type { ViewportCorners } from '../types'
 
@@ -40,7 +41,7 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
   private selectionHighlightRenderer: SelectionHighlightRenderer
   
   // Mouse visualization renderer (lightweight, updates every frame)
-  private mouseHighlightRenderer: MouseHighlightRenderer
+  private mouseHighlightShader: MouseHighlightShader
   
   // Pixeloid mesh renderer for GPU-accelerated spatial analysis
   private pixeloidMeshRenderer: PixeloidMeshRenderer
@@ -90,7 +91,7 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
     this.selectionHighlightRenderer = new SelectionHighlightRenderer()
     
     // Initialize mouse highlight renderer (lightweight)
-    this.mouseHighlightRenderer = new MouseHighlightRenderer()
+    this.mouseHighlightShader = new MouseHighlightShader()
     
     // Initialize pixeloid mesh renderer
     this.pixeloidMeshRenderer = new PixeloidMeshRenderer()
@@ -140,7 +141,7 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
     
     // Mouse layer goes into camera transform so it scales and positions with the grid
     // This ensures perfect alignment with pixeloids
-    this.mouseLayer.addChild(this.mouseHighlightRenderer.getGraphics())
+    this.mouseLayer.addChild(this.mouseHighlightShader.getGraphics())
     this.cameraTransform.addChild(this.mouseLayer)
   }
 
@@ -148,7 +149,7 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
    * Initialize the static mesh system with current camera state
    */
   private initializeStaticMeshSystem(): void {
-    const initialPixeloidScale = this.localPixeloidScale || gameStore.camera.pixeloidScale
+    const initialPixeloidScale = this.localPixeloidScale || gameStore.camera.pixeloid_scale
     this.staticMeshManager.initialize(initialPixeloidScale)
     
     console.log(`LayeredInfiniteCanvas: Initialized static mesh system with scale ${initialPixeloidScale}`)
@@ -161,8 +162,14 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
     // Call parent render to handle camera transforms and viewport updates
     super.render()
 
-    // Calculate viewport corners for layer rendering
-    const corners = this.calculateViewportCorners()
+    // Use pre-calculated viewport bounds from store (no recomputation)
+    const viewportBounds = CoordinateHelper.getCurrentViewportBounds()
+    const corners = {
+      topLeft: viewportBounds.world.top_left,
+      topRight: createPixeloidCoordinate(viewportBounds.world.bottom_right.x, viewportBounds.world.top_left.y),
+      bottomLeft: createPixeloidCoordinate(viewportBounds.world.top_left.x, viewportBounds.world.bottom_right.y),
+      bottomRight: viewportBounds.world.bottom_right
+    }
     const pixeloidScale = this.localPixeloidScale
     
     // Use much larger viewport with padding to avoid constant re-renders during navigation
@@ -194,9 +201,9 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
     // Render UI overlay layer
     this.renderUIOverlayLayer(paddedCorners, pixeloidScale)
     
-    // Handle static mesh zoom changes for efficient mesh switching
+    // Handle static mesh zoom changes with smart caching
     if (pixeloidScale !== this.lastPixeloidScale) {
-      this.staticMeshManager.handleZoomChange(pixeloidScale)
+      this.staticMeshManager.handleScaleChange(pixeloidScale)
     }
     
     // Update tracking variables
@@ -302,7 +309,7 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
    */
   private renderMouseLayer(): void {
     if (gameStore.geometry.layerVisibility.mouse) {
-      this.mouseHighlightRenderer.render()
+      this.mouseHighlightShader.render()
       this.mouseLayer.visible = true
     } else {
       this.mouseLayer.visible = false
@@ -333,8 +340,9 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
     // Subscribe to camera changes for background re-rendering (less aggressive)
     subscribe(gameStore.camera, () => {
       // Only mark background dirty on significant changes (zoom, not position)
-      if (gameStore.camera.pixeloidScale !== this.lastPixeloidScale) {
+      if (gameStore.camera.pixeloid_scale !== this.lastPixeloidScale) {
         this.backgroundDirty = true
+        this.lastPixeloidScale = gameStore.camera.pixeloid_scale
       }
     })
   }
@@ -402,22 +410,22 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
    */
   private calculatePaddedViewport(corners: ViewportCorners): ViewportCorners {
     return {
-      topLeft: {
-        x: corners.topLeft.x - this.renderBufferPadding,
-        y: corners.topLeft.y - this.renderBufferPadding
-      },
-      topRight: {
-        x: corners.topRight.x + this.renderBufferPadding,
-        y: corners.topRight.y - this.renderBufferPadding
-      },
-      bottomLeft: {
-        x: corners.bottomLeft.x - this.renderBufferPadding,
-        y: corners.bottomLeft.y + this.renderBufferPadding
-      },
-      bottomRight: {
-        x: corners.bottomRight.x + this.renderBufferPadding,
-        y: corners.bottomRight.y + this.renderBufferPadding
-      }
+      topLeft: createPixeloidCoordinate(
+        corners.topLeft.x - this.renderBufferPadding,
+        corners.topLeft.y - this.renderBufferPadding
+      ),
+      topRight: createPixeloidCoordinate(
+        corners.topRight.x + this.renderBufferPadding,
+        corners.topRight.y - this.renderBufferPadding
+      ),
+      bottomLeft: createPixeloidCoordinate(
+        corners.bottomLeft.x - this.renderBufferPadding,
+        corners.bottomLeft.y + this.renderBufferPadding
+      ),
+      bottomRight: createPixeloidCoordinate(
+        corners.bottomRight.x + this.renderBufferPadding,
+        corners.bottomRight.y + this.renderBufferPadding
+      )
     }
   }
 

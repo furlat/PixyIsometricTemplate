@@ -1,5 +1,5 @@
 import { subscribe } from 'valtio';
-import { gameStore } from '../store/gameStore';
+import { gameStore, updateGameStore } from '../store/gameStore';
 import {
   updateElement,
   formatCoordinates,
@@ -45,6 +45,9 @@ export class StorePanel {
       'coordinate-mapping-ready',
       'mesh-cache-size',
       'viewport-corners-pixel',
+      'viewport-corners-pixeloids',
+      'viewport-corners-vertices',
+      'viewport-offset',
       'current-resolution',
       // Geometry Debug elements (Phase 1: Multi-Layer System)
       'drawing-mode',
@@ -99,25 +102,25 @@ export class StorePanel {
     
     updateElement(this.elements, 'game-scene', gameStore.currentScene, STATUS_COLORS.system);
     
-    // Camera & Canvas
-    updateElement(this.elements, 'camera-position', 
-      formatCoordinates(gameStore.camera.position.x, gameStore.camera.position.y),
+    // Simple Coordinate System - Show actual camera world position
+    updateElement(this.elements, 'camera-position',
+      formatCoordinates(gameStore.camera.world_position.x, gameStore.camera.world_position.y),
       STATUS_COLORS.camera
     );
     
-    updateElement(this.elements, 'pixeloid-scale', 
-      gameStore.camera.pixeloidScale.toString(),
+    updateElement(this.elements, 'pixeloid-scale',
+      gameStore.camera.pixeloid_scale.toString(),
       'text-primary'
     );
     
-    updateElement(this.elements, 'top-left-corner', 
-      formatCoordinates(gameStore.camera.viewportCorners.topLeft.x, gameStore.camera.viewportCorners.topLeft.y, 0),
-      STATUS_COLORS.camera
+    updateElement(this.elements, 'top-left-corner',
+      'N/A (simple system)',
+      'text-gray-400'
     );
     
-    updateElement(this.elements, 'bottom-right-corner', 
-      formatCoordinates(gameStore.camera.viewportCorners.bottomRight.x, gameStore.camera.viewportCorners.bottomRight.y, 0),
-      STATUS_COLORS.camera
+    updateElement(this.elements, 'bottom-right-corner',
+      'N/A (simple system)',
+      'text-gray-400'
     );
     
     // Window & Mouse
@@ -127,17 +130,17 @@ export class StorePanel {
     );
     
     updateElement(this.elements, 'mouse-position',
-      formatCoordinates(gameStore.mousePosition.x, gameStore.mousePosition.y, 0),
+      formatCoordinates(gameStore.mouse.screen_position.x, gameStore.mouse.screen_position.y, 0),
       STATUS_COLORS.mouse
     );
     
     updateElement(this.elements, 'mouse-vertex-position',
-      formatCoordinates(gameStore.mouseVertexPosition.x, gameStore.mouseVertexPosition.y, 0),
+      formatCoordinates(gameStore.mouse.vertex_position.x, gameStore.mouse.vertex_position.y, 0),
       'text-purple-400'
     );
     
     updateElement(this.elements, 'mouse-pixeloid-position',
-      formatCoordinates(gameStore.mousePixeloidPosition.x, gameStore.mousePixeloidPosition.y, 2),
+      formatCoordinates(gameStore.mouse.pixeloid_position.x, gameStore.mouse.pixeloid_position.y, 2),
       STATUS_COLORS.mouse
     );
     
@@ -179,12 +182,12 @@ export class StorePanel {
     );
 
     updateElement(this.elements, 'coordinate-mapping-ready',
-      getBooleanStatusText(gameStore.staticMesh.coordinateMapping !== null),
-      getBooleanStatusClass(gameStore.staticMesh.coordinateMapping !== null)
+      getBooleanStatusText(gameStore.staticMesh.coordinateMappings.size > 0),
+      getBooleanStatusClass(gameStore.staticMesh.coordinateMappings.size > 0)
     );
 
     updateElement(this.elements, 'mesh-cache-size',
-      gameStore.staticMesh.stats.totalCachedMeshes.toString(),
+      `Meshes:${gameStore.staticMesh.stats.totalCachedMeshes} Mappings:${gameStore.staticMesh.stats.totalCachedMappings}`,
       'text-info'
     );
 
@@ -194,17 +197,66 @@ export class StorePanel {
       'text-cyan-400'
     );
 
-    // Current mesh resolution info
-    const currentResolution = gameStore.staticMesh.coordinateMapping?.currentResolution
-    if (currentResolution) {
+    // Viewport corners in pixeloid coordinates (simple system - no corners)
+    updateElement(this.elements, 'viewport-corners-pixeloids',
+      'N/A (simple offset system)',
+      'text-gray-400'
+    );
+
+    // Viewport corners in vertex coordinates (from stored vertexBounds)
+    // Get current coordinate mapping for the active pixeloid scale
+    const coordinateMapping = updateGameStore.getCurrentCoordinateMapping();
+    const currentScale = gameStore.camera.pixeloid_scale;
+    
+    if (coordinateMapping) {
+      const { currentResolution, vertexBounds, viewportOffset } = coordinateMapping;
+      
+      // ✅ Calculate screen mesh dimensions once for reuse
+      const scale = gameStore.camera.pixeloid_scale;
+      const screenVertexWidth = Math.ceil(gameStore.windowWidth / scale);
+      const screenVertexHeight = Math.ceil(gameStore.windowHeight / scale);
+      
+      // ✅ FIXED: Show actual screen mesh bounds (what we render)
+      updateElement(this.elements, 'viewport-corners-vertices',
+        `TL:(0,0) BR:(${screenVertexWidth},${screenVertexHeight}) [Screen Mesh]`,
+        'text-green-400'
+      );
+
+      // ✅ FIXED: Always show real offset from store (not from coordinateMapping)
+      const actualOffset = gameStore.mesh.vertex_to_pixeloid_offset;
+      updateElement(this.elements, 'viewport-offset',
+        `Vertex→Pixeloid Offset:(${actualOffset.x.toFixed(2)},${actualOffset.y.toFixed(2)})`,
+        'text-purple-400'
+      );
+
+      // ✅ FIXED: Show both screen mesh and static mesh info for clear distinction
       updateElement(this.elements, 'current-resolution',
-        `Level:${currentResolution.level} Bounds:${currentResolution.meshBounds.vertexWidth}x${currentResolution.meshBounds.vertexHeight}`,
+        `Screen: ${screenVertexWidth}x${screenVertexHeight} | Static: ${currentResolution.meshBounds.vertexWidth}x${currentResolution.meshBounds.vertexHeight} | Scale:${currentScale}`,
         'text-yellow-400'
       );
     } else {
+      // ✅ FIXED: Show real data even when mapping is missing
+      const totalMappings = gameStore.staticMesh.coordinateMappings.size;
+      const actualOffset = gameStore.mesh.vertex_to_pixeloid_offset;
+      
+      // Calculate screen mesh dimensions even without coordinate mapping
+      const scale = gameStore.camera.pixeloid_scale;
+      const screenVertexWidth = Math.ceil(gameStore.windowWidth / scale);
+      const screenVertexHeight = Math.ceil(gameStore.windowHeight / scale);
+      
+      updateElement(this.elements, 'viewport-corners-vertices',
+        `TL:(0,0) BR:(${screenVertexWidth},${screenVertexHeight}) [Screen Mesh] - No static mapping`,
+        'text-orange-400'
+      );
+      
+      updateElement(this.elements, 'viewport-offset',
+        `Vertex→Pixeloid Offset:(${actualOffset.x.toFixed(2)},${actualOffset.y.toFixed(2)}) - No static mapping`,
+        'text-orange-400'
+      );
+      
       updateElement(this.elements, 'current-resolution',
-        'No mapping available',
-        'text-red-400'
+        `Screen: ${screenVertexWidth}x${screenVertexHeight} | Scale:${currentScale} - No static mapping (${totalMappings} total)`,
+        'text-orange-400'
       );
     }
 

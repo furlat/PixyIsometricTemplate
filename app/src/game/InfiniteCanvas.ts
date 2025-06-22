@@ -1,6 +1,6 @@
 import { Container, Graphics, Point } from 'pixi.js'
-import { gameStore, updateGameStore } from '../store/gameStore'
-import type { ViewportCorners } from '../types'
+import { gameStore, updateGameStore, createPixeloidCoordinate, createScreenCoordinate } from '../store/gameStore'
+import type { ViewportCorners, PixeloidCoordinate } from '../types'
 import { CoordinateHelper } from './CoordinateHelper'
 
 export class InfiniteCanvas {
@@ -24,9 +24,7 @@ export class InfiniteCanvas {
   // Mouse-centered zooming
   private zoomTargetScreen: { x: number, y: number } | null = null
   
-  // Key state tracking for vertex snapping on release
-  private previousKeyState = { w: false, a: false, s: false, d: false }
-  private isMoving = false
+  // ✅ REMOVED: Movement state tracking - now handled by InputManager
 
   constructor() {
     this.container = new Container()
@@ -40,7 +38,7 @@ export class InfiniteCanvas {
     // Initialize local state from store
     this.syncFromStore()
     
-    // Set initial camera position to place (0,0) at top-left at default zoom
+    // Set initial camera position (now defaults to (0,0) for top-left alignment)
     this.setInitialCameraPosition()
     
     // Calculate initial viewport corners to sync to store
@@ -52,9 +50,10 @@ export class InfiniteCanvas {
    * Called only when we need to read from store, not during rendering
    */
   private syncFromStore(): void {
-    this.localCameraPosition.x = gameStore.camera.position.x
-    this.localCameraPosition.y = gameStore.camera.position.y
-    this.localPixeloidScale = gameStore.camera.pixeloidScale
+    // Use new coordinate system
+    this.localCameraPosition.x = gameStore.camera.world_position.x
+    this.localCameraPosition.y = gameStore.camera.world_position.y
+    this.localPixeloidScale = gameStore.camera.pixeloid_scale
     this.localViewportSize.width = gameStore.windowWidth
     this.localViewportSize.height = gameStore.windowHeight
   }
@@ -75,7 +74,7 @@ export class InfiniteCanvas {
   }
 
   /**
-   * Set initial camera position so (0,0) appears at top-left at default zoom
+   * Set initial camera position - now defaults to (0,0) for clean top-left alignment
    */
   private setInitialCameraPosition(): void {
     const initialPosition = CoordinateHelper.calculateInitialCameraPosition(
@@ -86,7 +85,7 @@ export class InfiniteCanvas {
     this.localCameraPosition.x = initialPosition.x
     this.localCameraPosition.y = initialPosition.y
     
-    console.log(`Initial camera position set to (${this.localCameraPosition.x.toFixed(1)}, ${this.localCameraPosition.y.toFixed(1)}) to place (0,0) at top-left`)
+    console.log(`Initial camera position set to (${this.localCameraPosition.x.toFixed(1)}, ${this.localCameraPosition.y.toFixed(1)}) - camera now represents top-left corner`)
   }
 
   /**
@@ -94,113 +93,14 @@ export class InfiniteCanvas {
    * Called only when local state changes, not during rendering
    */
   private syncToStore(): void {
-    // Update camera position
-    updateGameStore.setCameraPosition(this.localCameraPosition.x, this.localCameraPosition.y)
-    
-    // Calculate and update viewport corners
-    const corners = this.calculateViewportCorners()
-    updateGameStore.updateViewportCorners(corners)
+    // Update camera position using new coordinate system
+    updateGameStore.setCameraPosition(createPixeloidCoordinate(this.localCameraPosition.x, this.localCameraPosition.y))
   }
 
-  /**
-   * Calculate viewport corners in pixeloid coordinates
-   */
-  protected calculateViewportCorners(): ViewportCorners {
-    return CoordinateHelper.calculateViewportCorners(
-      this.localCameraPosition,
-      this.localViewportSize,
-      this.localPixeloidScale
-    )
-  }
+  // calculateViewportCorners method removed - use CoordinateHelper.getCurrentViewportBounds() directly
 
-  /**
-   * Update camera position based on input with vertex alignment on key release
-   */
-  public updateCamera(deltaTime: number): void {
-    // Sync input state from store
-    const keys = gameStore.input.keys
-    
-    let moved = false
-    const baseDistance = this.CAMERA_SPEED * deltaTime
-    
-    // Calculate movement deltas for all pressed keys
-    let deltaX = 0
-    let deltaY = 0
-    
-    if (keys.w) deltaY -= baseDistance
-    if (keys.s) deltaY += baseDistance
-    if (keys.a) deltaX -= baseDistance
-    if (keys.d) deltaX += baseDistance
-
-    // Check if we're currently moving
-    const isCurrentlyMoving = deltaX !== 0 || deltaY !== 0
-    
-    // Apply free movement if any WASD keys are pressed (no snapping during movement)
-    if (isCurrentlyMoving) {
-      this.localCameraPosition.x += deltaX
-      this.localCameraPosition.y += deltaY
-      this.isMoving = true
-      moved = true
-      
-      console.log(`InfiniteCanvas: Free movement (${deltaX.toFixed(2)}, ${deltaY.toFixed(2)}) -> Camera(${this.localCameraPosition.x.toFixed(2)}, ${this.localCameraPosition.y.toFixed(2)})`)
-    }
-    
-    // Check for key releases and snap to vertex alignment
-    const anyKeyReleased = (
-      (this.previousKeyState.w && !keys.w) ||
-      (this.previousKeyState.a && !keys.a) ||
-      (this.previousKeyState.s && !keys.s) ||
-      (this.previousKeyState.d && !keys.d)
-    )
-    
-    // Snap to vertex alignment when movement stops
-    if (this.isMoving && !isCurrentlyMoving && anyKeyReleased) {
-      const snappedPosition = CoordinateHelper.getVertexAlignedPixeloid(this.localCameraPosition)
-      this.localCameraPosition.x = snappedPosition.x
-      this.localCameraPosition.y = snappedPosition.y
-      this.isMoving = false
-      moved = true
-      
-      console.log(`InfiniteCanvas: Snapped to vertex alignment at (${snappedPosition.x.toFixed(2)}, ${snappedPosition.y.toFixed(2)})`)
-    }
-    
-    // Update previous key state
-    this.previousKeyState = { ...keys }
-
-    // Space to recenter camera - smart behavior based on selection
-    if (keys.space) {
-      const selectedObjectId = gameStore.geometry.selection.selectedObjectId
-      
-      if (selectedObjectId) {
-        // If object is selected, center on that object
-        const selectedObject = gameStore.geometry.objects.find(obj => obj.id === selectedObjectId)
-        if (selectedObject && selectedObject.metadata) {
-          this.localCameraPosition.x = selectedObject.metadata.center.x
-          this.localCameraPosition.y = selectedObject.metadata.center.y
-          moved = true
-          console.log(`Camera recentered to selected object ${selectedObjectId} at (${selectedObject.metadata.center.x.toFixed(1)}, ${selectedObject.metadata.center.y.toFixed(1)})`)
-        }
-      } else {
-        // No selection, reset camera to place pixeloid (0,0) at top-left corner
-        const centerPosition = CoordinateHelper.calculateInitialCameraPosition(
-          this.localViewportSize,
-          this.localPixeloidScale
-        )
-        this.localCameraPosition.x = centerPosition.x
-        this.localCameraPosition.y = centerPosition.y
-        moved = true
-        console.log(`Camera recentered to place (0,0) at top-left at zoom level ${this.localPixeloidScale}`)
-      }
-      
-      // Reset space key to prevent continuous recentering
-      updateGameStore.setKeyState('space', false)
-    }
-
-    // Only update store if camera moved
-    if (moved) {
-      this.syncToStore()
-    }
-  }
+  // ✅ REMOVED: updateCamera method - input handling moved to InputManager
+  // InfiniteCanvas now focuses purely on rendering, not input processing
 
   /**
    * Handle zoom input (mouse wheel) with batching and mouse-centered zooming
@@ -254,46 +154,43 @@ export class InfiniteCanvas {
     this.pendingZoomDelta = 0
     this.zoomTargetScreen = null
     
-    // Snap camera position to vertex alignment after zoom
-    const snappedPosition = CoordinateHelper.getVertexAlignedPixeloid(this.localCameraPosition)
-    this.localCameraPosition.x = snappedPosition.x
-    this.localCameraPosition.y = snappedPosition.y
-    
-    // Update store once with final value
+    // ✅ FIXED: No camera snapping - camera stays fixed for static mesh design
+    // Only update scale in store (offset changes handled separately if needed)
     updateGameStore.setPixeloidScale(this.localPixeloidScale)
     
-    // Update viewport corners since scale changed
-    this.syncToStore()
-    
-    console.log(`InfiniteCanvas: Zoom completed and snapped to vertex alignment at (${snappedPosition.x.toFixed(2)}, ${snappedPosition.y.toFixed(2)})`)
+    console.log(`InfiniteCanvas: Zoom completed - scale: ${this.localPixeloidScale} (static mesh design)`)
   }
   
   /**
-   * Adjust camera position so the target pixeloid ends up at screen center
+   * ✅ FIXED: Adjust OFFSET so target pixeloid stays under mouse (static mesh design)
+   * Camera stays fixed, only offset changes to maintain static mesh
    */
   private applyMouseCenteredZoom(oldScale: number, newScale: number): void {
     if (!this.zoomTargetScreen) return
     
-    // Convert mouse screen position to pixeloid coordinates at old scale
-    const targetPixeloid = CoordinateHelper.screenToPixeloid(
-      this.zoomTargetScreen.x,
-      this.zoomTargetScreen.y,
-      this.localCameraPosition,
-      this.localViewportSize,
-      oldScale
+    // Convert mouse screen to vertex coordinates (screen → vertex is simple division)
+    const mouseVertexX = this.zoomTargetScreen.x / oldScale
+    const mouseVertexY = this.zoomTargetScreen.y / oldScale
+    
+    // Calculate what pixeloid was under the mouse before zoom
+    const currentOffset = gameStore.mesh.vertex_to_pixeloid_offset
+    const targetPixeloidX = mouseVertexX + currentOffset.x
+    const targetPixeloidY = mouseVertexY + currentOffset.y
+    
+    // Calculate new vertex position after scale change
+    const newMouseVertexX = this.zoomTargetScreen.x / newScale
+    const newMouseVertexY = this.zoomTargetScreen.y / newScale
+    
+    // Calculate new offset to keep same pixeloid under mouse
+    const newOffsetX = targetPixeloidX - newMouseVertexX
+    const newOffsetY = targetPixeloidY - newMouseVertexY
+    
+    // ✅ FIXED: Update offset (NOT camera) to maintain static mesh
+    updateGameStore.setVertexToPixeloidOffset(
+      createPixeloidCoordinate(newOffsetX, newOffsetY)
     )
     
-    // Calculate screen center
-    const screenCenterX = this.localViewportSize.width / 2
-    const screenCenterY = this.localViewportSize.height / 2
-    
-    // Calculate what camera position would put the target pixeloid at screen center with new scale
-    const newCameraX = targetPixeloid.x - (screenCenterX - this.localViewportSize.width / 2) / newScale
-    const newCameraY = targetPixeloid.y - (screenCenterY - this.localViewportSize.height / 2) / newScale
-    
-    // Update camera position
-    this.localCameraPosition.x = newCameraX
-    this.localCameraPosition.y = newCameraY
+    console.log(`InfiniteCanvas: Mouse-centered zoom - offset adjusted to (${newOffsetX.toFixed(2)}, ${newOffsetY.toFixed(2)})`)
   }
 
   /**
@@ -325,7 +222,7 @@ export class InfiniteCanvas {
     // Update camera transform
     this.cameraTransform.scale.set(this.localPixeloidScale)
     const transformPosition = CoordinateHelper.calculateCameraTransformPosition(
-      this.localCameraPosition,
+      createPixeloidCoordinate(this.localCameraPosition.x, this.localCameraPosition.y),
       this.localViewportSize,
       this.localPixeloidScale
     )
@@ -341,32 +238,25 @@ export class InfiniteCanvas {
   protected renderGrid(): void {
     this.gridGraphics.clear()
 
-    // Calculate visible area in pixeloid coordinates
-    const corners = this.calculateViewportCorners()
+    // Use pre-calculated viewport bounds from store (no recomputation)
+    const viewportBounds = CoordinateHelper.getCurrentViewportBounds()
+    const corners = {
+      topLeft: viewportBounds.world.top_left,
+      topRight: createPixeloidCoordinate(viewportBounds.world.bottom_right.x, viewportBounds.world.top_left.y),
+      bottomLeft: createPixeloidCoordinate(viewportBounds.world.top_left.x, viewportBounds.world.bottom_right.y),
+      bottomRight: viewportBounds.world.bottom_right
+    }
     
     // Get visible grid bounds with padding
     const bounds = CoordinateHelper.calculateVisibleGridBounds(corners, 2)
     const { startX, endX, startY, endY } = bounds
 
-    // Get mouse pixeloid position for highlighting
-    const mousePixeloidX = Math.floor(gameStore.mousePixeloidPosition.x)
-    const mousePixeloidY = Math.floor(gameStore.mousePixeloidPosition.y)
-
-    // Draw checkered pattern
+    // Draw checkered pattern (mouse highlighting now handled by MouseHighlightShader)
     for (let x = startX; x < endX; x++) {
       for (let y = startY; y < endY; y++) {
-        // Check if this is the targeted pixeloid
-        const isTargeted = (x === mousePixeloidX && y === mousePixeloidY)
-        
-        let color: number
-        if (isTargeted) {
-          // Highlight targeted pixeloid in bright green
-          color = 0x00ff00
-        } else {
-          // Checkered pattern: alternate colors
-          const isLight = (x + y) % 2 === 0
-          color = isLight ? 0xf0f0f0 : 0xe0e0e0
-        }
+        // Checkered pattern: alternate colors
+        const isLight = (x + y) % 2 === 0
+        const color = isLight ? 0xf0f0f0 : 0xe0e0e0
         
         // Draw pixeloid square using PixiJS v8 API
         this.gridGraphics
@@ -398,31 +288,7 @@ export class InfiniteCanvas {
     }
   }
 
-  /**
-   * Convert screen coordinates to pixeloid coordinates
-   */
-  public screenToPixeloid(screenX: number, screenY: number): Point {
-    return CoordinateHelper.screenToPixeloid(
-      screenX,
-      screenY,
-      this.localCameraPosition,
-      this.localViewportSize,
-      this.localPixeloidScale
-    )
-  }
-
-  /**
-   * Convert pixeloid coordinates to screen coordinates
-   */
-  public pixeloidToScreen(pixeloidX: number, pixeloidY: number): Point {
-    return CoordinateHelper.pixeloidToScreen(
-      pixeloidX,
-      pixeloidY,
-      this.localCameraPosition,
-      this.localViewportSize,
-      this.localPixeloidScale
-    )
-  }
+  // Coordinate conversion methods removed - use CoordinateHelper directly
 
   /**
    * Get the container for adding to the stage

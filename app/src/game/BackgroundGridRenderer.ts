@@ -1,7 +1,7 @@
-import { MeshSimple, MeshGeometry, Shader, Texture } from 'pixi.js'
+import { MeshSimple, Shader, Texture } from 'pixi.js'
 import type { ViewportCorners } from '../types'
 import { CoordinateHelper } from './CoordinateHelper'
-import { gameStore } from '../store/gameStore'
+import { gameStore, updateGameStore, createScreenCoordinate, createVertexCoordinate } from '../store/gameStore'
 
 /**
  * Mesh-based background grid renderer
@@ -102,14 +102,20 @@ export class BackgroundGridRenderer {
   }
   
   /**
-   * Generate grid mesh for the current viewport
+   * Generate grid mesh for screen bounds (always starts at 0,0)
    */
   private regenerateGridMesh(corners: ViewportCorners, pixeloidScale: number): void {
-    // Use same efficient bounds calculation
-    const bounds = CoordinateHelper.calculateVisibleGridBounds(corners, 2)
-    const { startX, endX, startY, endY } = bounds
+    // ✅ FIXED: Always use screen bounds, mesh is screen-aligned
+    const screenVertexWidth = Math.ceil(gameStore.windowWidth / pixeloidScale)
+    const screenVertexHeight = Math.ceil(gameStore.windowHeight / pixeloidScale)
+    
+    // Mesh always spans from Vertex(0,0) to screen dimensions
+    const startX = 0
+    const startY = 0
+    const endX = screenVertexWidth
+    const endY = screenVertexHeight
 
-    console.log(`BackgroundGridRenderer: Generating mesh for bounds ${startX},${startY} to ${endX},${endY}`)
+    console.log(`BackgroundGridRenderer: Generating screen-aligned mesh for bounds ${startX},${startY} to ${endX},${endY}`)
 
     // Create mesh geometry for grid squares
     this.createGridMesh(startX, endX, startY, endY)
@@ -186,7 +192,7 @@ export class BackgroundGridRenderer {
    */
   private tryUseStaticMesh(corners: ViewportCorners, pixeloidScale: number): boolean {
     const staticMeshData = gameStore.staticMesh.activeMesh
-    const coordinateMapping = gameStore.staticMesh.coordinateMapping
+    const coordinateMapping = updateGameStore.getCurrentCoordinateMapping()
     
     if (!staticMeshData || !coordinateMapping || !staticMeshData.isValid) {
       return false // Static mesh system not ready
@@ -200,7 +206,7 @@ export class BackgroundGridRenderer {
   }
 
   /**
-   * Create grid using static mesh vertices for perfect alignment
+   * Create grid using static mesh vertices for perfect screen alignment
    */
   private createStaticMeshGrid(
     staticMeshData: any,
@@ -212,27 +218,31 @@ export class BackgroundGridRenderer {
     
     console.log(`Creating static mesh grid with ${vertices.length / 2} vertices`)
 
-    // Calculate visible bounds for culling
-    const bounds = CoordinateHelper.calculateVisibleGridBounds(corners, 2)
-    const { startX, endX, startY, endY } = bounds
+    // ✅ FIXED: Always use screen bounds for static mesh
+    const level = currentResolution.level
+    const screenVertexWidth = Math.ceil(gameStore.windowWidth / gameStore.camera.pixeloid_scale)
+    const screenVertexHeight = Math.ceil(gameStore.windowHeight / gameStore.camera.pixeloid_scale)
     
-    // Filter vertices to visible area and create grid quads
+    // Filter vertices to screen area and create grid quads
     const visibleVertices: number[] = []
     const visibleUvs: number[] = []
     const visibleIndices: number[] = []
     
     let vertexIndex = 0
-    const level = currentResolution.level
 
-    // Generate grid quads aligned to static mesh vertices
-    for (let x = Math.floor(startX / level) * level; x < endX; x += level) {
-      for (let y = Math.floor(startY / level) * level; y < endY; y += level) {
+    // Generate grid quads aligned to screen bounds (always start at 0,0)
+    for (let x = 0; x < screenVertexWidth; x += level) {
+      for (let y = 0; y < screenVertexHeight; y += level) {
+        // Ensure we don't exceed screen bounds
+        const quadWidth = Math.min(level, screenVertexWidth - x)
+        const quadHeight = Math.min(level, screenVertexHeight - y)
+        
         // Create quad for this grid square using mesh vertex positions
         visibleVertices.push(
-          x, y,           // top-left
-          x + level, y,   // top-right
-          x + level, y + level, // bottom-right
-          x, y + level    // bottom-left
+          x, y,                    // top-left
+          x + quadWidth, y,        // top-right
+          x + quadWidth, y + quadHeight, // bottom-right
+          x, y + quadHeight        // bottom-left
         )
         
         // UV coordinates
@@ -326,13 +336,17 @@ export class BackgroundGridRenderer {
     const vertexY = Math.floor(localPos.y)
     
     // Update store with vertex position (no conversion needed!)
-    gameStore.mouseVertexPosition.x = vertexX
-    gameStore.mouseVertexPosition.y = vertexY
+    gameStore.mouse.vertex_position.x = vertexX
+    gameStore.mouse.vertex_position.y = vertexY
     
-    // Convert to pixeloid using mesh vertex to pixeloid conversion
-    const pixeloidCoord = CoordinateHelper.meshVertexToPixeloid({ x: vertexX, y: vertexY })
-    gameStore.mousePixeloidPosition.x = pixeloidCoord.x
-    gameStore.mousePixeloidPosition.y = pixeloidCoord.y
+    // Convert to pixeloid using unified coordinate system
+    const offset = CoordinateHelper.getCurrentOffset()
+    const pixeloidCoord = CoordinateHelper.vertexToPixeloid(
+      createVertexCoordinate(vertexX, vertexY),
+      offset
+    )
+    gameStore.mouse.pixeloid_position.x = pixeloidCoord.x
+    gameStore.mouse.pixeloid_position.y = pixeloidCoord.y
     
     // Get InputManager instance and delegate the event
     // We need to access this through the game instance

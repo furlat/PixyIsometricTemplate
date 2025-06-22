@@ -1,4 +1,4 @@
-import { updateGameStore, gameStore } from '../store/gameStore'
+import { updateGameStore, gameStore, createPixeloidCoordinate } from '../store/gameStore'
 import { GeometryHelper } from './GeometryHelper'
 import { CoordinateHelper } from './CoordinateHelper'
 import type { InfiniteCanvas } from './InfiniteCanvas'
@@ -64,6 +64,7 @@ export class InputManager {
 
   /**
    * Handle keyboard key press
+   * ✅ CLEANED: WASD movement now handled by InfiniteCanvas offset system
    */
   private handleKeyDown(event: KeyboardEvent): void {
     const key = event.key.toLowerCase()
@@ -110,7 +111,7 @@ export class InputManager {
       case 'v':
         // Paste object at mouse position
         if (gameStore.geometry.clipboard.copiedObject) {
-          const mousePos = gameStore.mousePixeloidPosition
+          const mousePos = gameStore.mouse.pixeloid_position
           const newObject = updateGameStore.pasteObjectAtPosition(mousePos.x, mousePos.y)
           if (newObject) {
             console.log(`InputManager: Pasted object at (${mousePos.x.toFixed(1)}, ${mousePos.y.toFixed(1)})`)
@@ -123,6 +124,7 @@ export class InputManager {
 
   /**
    * Handle keyboard key release
+   * ✅ CLEANED: WASD movement now handled by InfiniteCanvas offset system
    */
   private handleKeyUp(event: KeyboardEvent): void {
     const key = event.key.toLowerCase()
@@ -220,7 +222,7 @@ export class InputManager {
     }
     
     // Apply vertex alignment for transform coherence
-    const alignedPos = CoordinateHelper.getVertexAlignedPixeloid(pixeloidPos)
+    const alignedPos = CoordinateHelper.getVertexAlignedPixeloid(createPixeloidCoordinate(pixeloidPos.x, pixeloidPos.y))
     
     // Use consistent top-left pixeloid anchoring for ALL shapes (including diamonds)
     const anchorPoints = GeometryHelper.calculatePixeloidAnchorPoints(alignedPos.x, alignedPos.y)
@@ -354,7 +356,10 @@ export class InputManager {
    */
   private createDiamond(anchorPoint: { x: number, y: number }, dragPoint: { x: number, y: number }): void {
     // Use centralized geometry calculations
-    const properties = GeometryHelper.calculateDiamondProperties(anchorPoint, dragPoint)
+    const properties = GeometryHelper.calculateDiamondProperties(
+      createPixeloidCoordinate(anchorPoint.x, anchorPoint.y),
+      createPixeloidCoordinate(dragPoint.x, dragPoint.y)
+    )
     
     // Only create diamond if it has some size (any width > 0)
     if (properties.width > 0) {
@@ -377,7 +382,7 @@ export class InputManager {
       // Check based on object type
       if ('anchorX' in obj && 'anchorY' in obj) {
         // Diamond
-        return GeometryHelper.isPointInsideDiamond(pixeloidPos, obj as any)
+        return GeometryHelper.isPointInsideDiamond(createPixeloidCoordinate(pixeloidPos.x, pixeloidPos.y), obj as any)
       } else if ('width' in obj && 'height' in obj) {
         // Rectangle
         const rect = obj as GeometricRectangle
@@ -589,5 +594,61 @@ export class InputManager {
     this.infiniteCanvas = null
     
     console.log('InputManager: Destroyed - mesh handles all mouse events')
+  }
+
+  /**
+   * Update movement based on current key states - called from game loop
+   * ✅ NEW: Proper separation of input tracking vs action execution
+   */
+  public updateMovement(deltaTime: number): void {
+    const keys = gameStore.input.keys
+    const moveSpeed = 50 // pixeloids per second
+    const baseDistance = moveSpeed * deltaTime
+    
+    // Calculate movement deltas for all pressed keys
+    let deltaX = 0
+    let deltaY = 0
+    
+    if (keys.w) deltaY -= baseDistance  // Move up = decrease offset Y
+    if (keys.s) deltaY += baseDistance  // Move down = increase offset Y
+    if (keys.a) deltaX -= baseDistance  // Move left = decrease offset X
+    if (keys.d) deltaX += baseDistance  // Move right = increase offset X
+
+    // Apply movement if any keys are pressed
+    if (deltaX !== 0 || deltaY !== 0) {
+      const currentOffset = gameStore.mesh.vertex_to_pixeloid_offset
+      updateGameStore.setVertexToPixeloidOffset(
+        createPixeloidCoordinate(currentOffset.x + deltaX, currentOffset.y + deltaY)
+      )
+      
+      console.log(`InputManager: Movement (${deltaX.toFixed(2)}, ${deltaY.toFixed(2)}) -> Offset(${(currentOffset.x + deltaX).toFixed(2)}, ${(currentOffset.y + deltaY).toFixed(2)})`)
+    }
+
+    // Handle space key for recentering
+    if (keys.space) {
+      const selectedObjectId = gameStore.geometry.selection.selectedObjectId
+      
+      if (selectedObjectId) {
+        // Center selected object at screen center
+        const selectedObject = gameStore.geometry.objects.find(obj => obj.id === selectedObjectId)
+        if (selectedObject && selectedObject.metadata) {
+          const screenCenterX = gameStore.windowWidth / 2 / gameStore.camera.pixeloid_scale
+          const screenCenterY = gameStore.windowHeight / 2 / gameStore.camera.pixeloid_scale
+          const targetOffset = createPixeloidCoordinate(
+            selectedObject.metadata.center.x - screenCenterX,
+            selectedObject.metadata.center.y - screenCenterY
+          )
+          updateGameStore.setVertexToPixeloidOffset(targetOffset)
+          console.log(`InputManager: Centered object ${selectedObjectId} at screen center, offset: (${targetOffset.x.toFixed(1)}, ${targetOffset.y.toFixed(1)})`)
+        }
+      } else {
+        // Reset offset to (0,0) - pixeloid (0,0) appears at screen (0,0)
+        updateGameStore.setVertexToPixeloidOffset(createPixeloidCoordinate(0, 0))
+        console.log(`InputManager: Reset offset to (0,0) - pixeloid (0,0) now at screen (0,0)`)
+      }
+      
+      // Reset space key to prevent continuous recentering
+      updateGameStore.setKeyState('space', false)
+    }
   }
 }

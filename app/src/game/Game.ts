@@ -84,8 +84,8 @@ export class Game {
     // Calculate delta time in seconds
     const deltaTime = ticker.deltaTime / 60; // Convert from frames to seconds (assuming 60 FPS base)
 
-    // Update camera based on input
-    this.infiniteCanvas.updateCamera(deltaTime);
+    // ✅ FIXED: Update movement through InputManager (proper separation of concerns)
+    this.inputManager.updateMovement(deltaTime);
 
     // Render the infinite canvas
     this.infiniteCanvas.render();

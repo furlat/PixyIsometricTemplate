@@ -1,10 +1,41 @@
 import { proxy } from 'valtio'
-import type { GameState, ViewportCorners, GeometricObject, ObjectTextureData, GeometricPoint, GeometricLine, GeometricCircle, GeometricRectangle, GeometricDiamond, PixeloidMeshData, StaticMeshData, PixeloidVertexMapping, MeshResolution } from '../types'
+import type { GameState, ViewportCorners, GeometricObject, ObjectTextureData, GeometricPoint, GeometricLine, GeometricCircle, GeometricRectangle, GeometricDiamond, PixeloidMeshData, StaticMeshData, PixeloidVertexMapping, MeshResolution, PixeloidCoordinate, VertexCoordinate, ScreenCoordinate, ViewportBounds } from '../types'
 import { GeometryHelper } from '../game/GeometryHelper'
+import { CoordinateCalculations } from '../game/CoordinateCalculations'
 import type { InfiniteCanvas } from '../game/InfiniteCanvas'
 
 // Global reference to InfiniteCanvas for direct camera control
 let infiniteCanvasRef: InfiniteCanvas | null = null
+
+// ================================
+// INFINITE LOOP PREVENTION
+// ================================
+let isUpdatingCoordinates = false // Prevent cascading updates
+
+// Coordinate helper functions to create properly branded coordinates
+const createPixeloidCoordinate = (x: number, y: number): PixeloidCoordinate => ({ __brand: 'pixeloid', x, y })
+const createVertexCoordinate = (x: number, y: number): VertexCoordinate => ({ __brand: 'vertex', x, y })
+const createScreenCoordinate = (x: number, y: number): ScreenCoordinate => ({ __brand: 'screen', x, y })
+
+// Initialize empty viewport bounds
+const createEmptyViewportBounds = (): ViewportBounds => ({
+  screen: {
+    width: window.innerWidth,
+    height: window.innerHeight,
+    center: createScreenCoordinate(window.innerWidth / 2, window.innerHeight / 2)
+  },
+  world: {
+    top_left: createPixeloidCoordinate(0, 0),
+    bottom_right: createPixeloidCoordinate(100, 100),
+    center: createPixeloidCoordinate(50, 50)
+  },
+  vertex: {
+    top_left: createVertexCoordinate(0, 0),
+    bottom_right: createVertexCoordinate(10, 10),
+    width: 10,
+    height: 10
+  }
+})
 
 // Create the game store using Valtio
 export const gameStore = proxy<GameState>({
@@ -13,28 +44,32 @@ export const gameStore = proxy<GameState>({
   currentScene: 'menu',
   windowWidth: window.innerWidth,
   windowHeight: window.innerHeight,
-  mousePosition: {
-    x: 0,
-    y: 0
-  },
-  mousePixeloidPosition: {
-    x: 0,
-    y: 0
-  },
-  // Mouse position in mesh vertex coordinates for debugging
-  mouseVertexPosition: {
-    x: 0,
-    y: 0
-  },
+  
+  // ================================
+  // CLEAN COORDINATE STATE
+  // ================================
+  
   camera: {
-    position: { x: 0, y: 0 },
-    pixeloidScale: 10, // Start with 10 pixels per pixeloid
-    viewportCorners: {
-      topLeft: { x: 0, y: 0 },
-      topRight: { x: 0, y: 0 },
-      bottomLeft: { x: 0, y: 0 },
-      bottomRight: { x: 0, y: 0 }
-    }
+    world_position: createPixeloidCoordinate(0, 0),
+    screen_center: { x: window.innerWidth / 2, y: window.innerHeight / 2 },
+    pixeloid_scale: 10,
+    viewport_bounds: createEmptyViewportBounds()
+  },
+  
+  mesh: {
+    vertex_to_pixeloid_offset: createPixeloidCoordinate(0, 0),
+    active_resolution: 1,
+    vertex_bounds: {
+      width: 100,
+      height: 100
+    },
+    screen_to_vertex_scale: 10
+  },
+  
+  mouse: {
+    screen_position: { x: 0, y: 0 },
+    vertex_position: { x: 0, y: 0 },
+    pixeloid_position: createPixeloidCoordinate(0, 0)
   },
   input: {
     keys: {
@@ -132,7 +167,7 @@ export const gameStore = proxy<GameState>({
   staticMesh: {
     activeMesh: null,
     meshCache: new Map(),
-    coordinateMapping: null,
+    coordinateMappings: new Map(),
     config: {
       oversizePercent: 20, // Always 20% oversized viewports
       cacheMaxLevels: 7, // Maximum cached mesh levels (1,2,4,8,16,32,64)
@@ -141,6 +176,7 @@ export const gameStore = proxy<GameState>({
     stats: {
       activeMeshLevel: 1,
       totalCachedMeshes: 0,
+      totalCachedMappings: 0,
       lastMeshSwitch: 0,
       coordinateMappingUpdates: 0
     }
@@ -160,28 +196,156 @@ export const updateGameStore = {
     gameStore.currentScene = scene
   },
   
-  updateWindowSize: (width: number, height: number) => {
-    gameStore.windowWidth = width
-    gameStore.windowHeight = height
-  },
-  
   setLoading: (loading: boolean) => {
     gameStore.isLoading = loading
   },
 
-  // Camera controls
-  setCameraPosition: (x: number, y: number) => {
-    gameStore.camera.position.x = x
-    gameStore.camera.position.y = y
-  },
+  // ================================
+  // ATOMIC COORDINATE UPDATES (Infinite Loop Prevention)
+  // ================================
 
+  // ATOMIC CAMERA UPDATE - Updates all related values in one action
+  setCameraPosition: (worldPos: PixeloidCoordinate) => {
+    if (isUpdatingCoordinates) return // Prevent infinite loops
+    
+    isUpdatingCoordinates = true
+    try {
+      // Update primary value
+      gameStore.camera.world_position = worldPos
+      
+      // Batch update all derived values in one transaction
+      const scale = gameStore.camera.pixeloid_scale
+      const offset = gameStore.mesh.vertex_to_pixeloid_offset
+      const screenSize = { width: gameStore.windowWidth, height: gameStore.windowHeight }
+      
+      // Recalculate derived values using pure functions (no store dependencies)
+      const updatedBounds = CoordinateCalculations.calculateViewportBounds(
+        screenSize, scale, worldPos, offset
+      )
+      const updatedScreenCenter = CoordinateCalculations.pixeloidToScreen(
+        worldPos, scale, offset
+      )
+      
+      // Apply all updates atomically
+      gameStore.camera.screen_center = { x: updatedScreenCenter.x, y: updatedScreenCenter.y }
+      gameStore.camera.viewport_bounds = updatedBounds
+      gameStore.mesh.screen_to_vertex_scale = scale
+      
+    } finally {
+      isUpdatingCoordinates = false
+    }
+  },
+  
+  // ATOMIC SCALE UPDATE - Updates all scale-dependent values
   setPixeloidScale: (scale: number) => {
+    if (isUpdatingCoordinates) return // Prevent infinite loops
+    
     // Clamp scale between reasonable values (minimum 1 pixeloid - full zoom out unlocked)
-    gameStore.camera.pixeloidScale = Math.max(1, Math.min(100, scale))
+    const clampedScale = Math.max(1, Math.min(100, scale))
+    
+    isUpdatingCoordinates = true
+    try {
+      // Update primary value
+      gameStore.camera.pixeloid_scale = clampedScale
+      
+      // Batch update all derived values
+      const worldPos = gameStore.camera.world_position
+      const offset = gameStore.mesh.vertex_to_pixeloid_offset
+      const screenSize = { width: gameStore.windowWidth, height: gameStore.windowHeight }
+      
+      // Recalculate everything that depends on scale
+      const updatedBounds = CoordinateCalculations.calculateViewportBounds(
+        screenSize, clampedScale, worldPos, offset
+      )
+      const updatedScreenCenter = CoordinateCalculations.pixeloidToScreen(
+        worldPos, clampedScale, offset
+      )
+      
+      // Apply atomically
+      gameStore.camera.screen_center = { x: updatedScreenCenter.x, y: updatedScreenCenter.y }
+      gameStore.camera.viewport_bounds = updatedBounds
+      gameStore.mesh.screen_to_vertex_scale = clampedScale
+      
+    } finally {
+      isUpdatingCoordinates = false
+    }
   },
-
-  updateViewportCorners: (corners: ViewportCorners) => {
-    gameStore.camera.viewportCorners = corners
+  
+  // ATOMIC OFFSET UPDATE - Updates all offset-dependent values
+  setVertexToPixeloidOffset: (offset: PixeloidCoordinate) => {
+    if (isUpdatingCoordinates) return // Prevent infinite loops
+    
+    isUpdatingCoordinates = true
+    try {
+      // Update primary value
+      gameStore.mesh.vertex_to_pixeloid_offset = offset
+      
+      // Batch update all derived values
+      const worldPos = gameStore.camera.world_position
+      const scale = gameStore.camera.pixeloid_scale
+      const screenSize = { width: gameStore.windowWidth, height: gameStore.windowHeight }
+      
+      // Recalculate everything that depends on offset
+      const updatedBounds = CoordinateCalculations.calculateViewportBounds(
+        screenSize, scale, worldPos, offset
+      )
+      
+      // Apply atomically
+      gameStore.camera.viewport_bounds = updatedBounds
+      
+    } finally {
+      isUpdatingCoordinates = false
+    }
+  },
+  
+  // ATOMIC MOUSE UPDATE - Updates all mouse coordinate systems
+  updateMousePositions: (screenPos: { x: number, y: number }) => {
+    if (isUpdatingCoordinates) return // Prevent infinite loops
+    
+    // This is safe because it only updates mouse state, no cascading effects
+    const scale = gameStore.camera.pixeloid_scale
+    const offset = gameStore.mesh.vertex_to_pixeloid_offset
+    
+    const vertexPos = CoordinateCalculations.screenToVertex(
+      createScreenCoordinate(screenPos.x, screenPos.y),
+      scale
+    )
+    const pixeloidPos = CoordinateCalculations.screenToPixeloid(
+      createScreenCoordinate(screenPos.x, screenPos.y),
+      scale,
+      offset
+    )
+    
+    // Update all mouse positions atomically
+    gameStore.mouse.screen_position = screenPos
+    gameStore.mouse.vertex_position = { x: vertexPos.x, y: vertexPos.y }
+    gameStore.mouse.pixeloid_position = { __brand: 'pixeloid', x: pixeloidPos.x, y: pixeloidPos.y }
+  },
+  
+  // WINDOW RESIZE - Recalculates viewport bounds
+  updateWindowSize: (width: number, height: number) => {
+    if (isUpdatingCoordinates) return // Prevent infinite loops
+    
+    isUpdatingCoordinates = true
+    try {
+      // Update window size
+      gameStore.windowWidth = width
+      gameStore.windowHeight = height
+      
+      // Recalculate viewport bounds with new screen size
+      const worldPos = gameStore.camera.world_position
+      const scale = gameStore.camera.pixeloid_scale
+      const offset = gameStore.mesh.vertex_to_pixeloid_offset
+      
+      const updatedBounds = CoordinateCalculations.calculateViewportBounds(
+        { width, height }, scale, worldPos, offset
+      )
+      
+      gameStore.camera.viewport_bounds = updatedBounds
+      
+    } finally {
+      isUpdatingCoordinates = false
+    }
   },
 
   // Input controls
@@ -189,22 +353,31 @@ export const updateGameStore = {
     gameStore.input.keys[key] = pressed
   },
 
-  // Mouse position (called from input events, not during rendering)
+  // Legacy compatibility methods (will be removed after migration)
   updateMousePosition: (x: number, y: number) => {
-    gameStore.mousePosition.x = x
-    gameStore.mousePosition.y = y
+    updateGameStore.updateMousePositions({ x, y })
   },
 
-  // Mouse position in pixeloid coordinates
   updateMousePixeloidPosition: (pixeloidX: number, pixeloidY: number) => {
-    gameStore.mousePixeloidPosition.x = pixeloidX
-    gameStore.mousePixeloidPosition.y = pixeloidY
+    // Delegate to the new system
+    gameStore.mouse.pixeloid_position = createPixeloidCoordinate(pixeloidX, pixeloidY)
   },
 
-  // Mouse position in mesh vertex coordinates (for debugging)
   updateMouseVertexPosition: (vertexX: number, vertexY: number) => {
-    gameStore.mouseVertexPosition.x = vertexX
-    gameStore.mouseVertexPosition.y = vertexY
+    // Delegate to the new system
+    gameStore.mouse.vertex_position = { x: vertexX, y: vertexY }
+  },
+
+  // Legacy methods for backward compatibility during migration
+  setViewportOffset: (x: number, y: number) => {
+    updateGameStore.setVertexToPixeloidOffset(createPixeloidCoordinate(x, y))
+  },
+
+  updateViewportOffset: (deltaX: number, deltaY: number) => {
+    const currentOffset = gameStore.mesh.vertex_to_pixeloid_offset
+    updateGameStore.setVertexToPixeloidOffset(
+      createPixeloidCoordinate(currentOffset.x + deltaX, currentOffset.y + deltaY)
+    )
   },
 
   // Geometry controls (Phase 1: Multi-Layer System)
@@ -600,15 +773,9 @@ export const updateGameStore = {
   centerCameraOnObject: (objectId: string) => {
     const object = gameStore.geometry.objects.find(obj => obj.id === objectId)
     if (object && object.metadata) {
-      if (infiniteCanvasRef) {
-        // Use direct camera movement to avoid store update loops
-        infiniteCanvasRef.moveCameraToPosition(object.metadata.center.x, object.metadata.center.y)
-        console.log(`Store: Centered camera on object ${objectId} at (${object.metadata.center.x.toFixed(1)}, ${object.metadata.center.y.toFixed(1)}) via direct movement`)
-      } else {
-        // Fallback to store update if no canvas reference
-        updateGameStore.setCameraPosition(object.metadata.center.x, object.metadata.center.y)
-        console.warn(`Store: Used fallback camera positioning for object ${objectId} - no InfiniteCanvas reference`)
-      }
+      // Set camera position to center on object
+      updateGameStore.setCameraPosition(createPixeloidCoordinate(object.metadata.center.x, object.metadata.center.y))
+      console.log(`Store: Centered camera on object ${objectId} at position (${object.metadata.center.x.toFixed(1)}, ${object.metadata.center.y.toFixed(1)})`)
     } else {
       console.warn(`Store: Cannot center on object ${objectId} - object not found or missing metadata`)
     }
@@ -731,8 +898,9 @@ export const updateGameStore = {
     gameStore.staticMesh.stats.lastMeshSwitch = Date.now()
   },
 
-  setCoordinateMapping: (mapping: PixeloidVertexMapping) => {
-    gameStore.staticMesh.coordinateMapping = mapping
+  setCoordinateMapping: (pixeloidScale: number, mapping: PixeloidVertexMapping) => {
+    gameStore.staticMesh.coordinateMappings.set(pixeloidScale, mapping)
+    gameStore.staticMesh.stats.totalCachedMappings = gameStore.staticMesh.coordinateMappings.size
     gameStore.staticMesh.stats.coordinateMappingUpdates++
   },
 
@@ -743,9 +911,10 @@ export const updateGameStore = {
 
   clearStaticMeshCache: () => {
     gameStore.staticMesh.meshCache.clear()
+    gameStore.staticMesh.coordinateMappings.clear()
     gameStore.staticMesh.activeMesh = null
-    gameStore.staticMesh.coordinateMapping = null
     gameStore.staticMesh.stats.totalCachedMeshes = 0
+    gameStore.staticMesh.stats.totalCachedMappings = 0
     gameStore.staticMesh.stats.activeMeshLevel = 1
   },
 
@@ -755,6 +924,14 @@ export const updateGameStore = {
 
   getStaticMeshStats: () => {
     return gameStore.staticMesh.stats
+  },
+
+  getCurrentCoordinateMapping: (): PixeloidVertexMapping | null => {
+    return gameStore.staticMesh.coordinateMappings.get(gameStore.camera.pixeloid_scale) || null
+  },
+
+  getCoordinateMappingForScale: (pixeloidScale: number): PixeloidVertexMapping | null => {
+    return gameStore.staticMesh.coordinateMappings.get(pixeloidScale) || null
   }
 }
 
@@ -762,3 +939,9 @@ export const updateGameStore = {
 window.addEventListener('resize', () => {
   updateGameStore.updateWindowSize(window.innerWidth, window.innerHeight)
 })
+
+// ================================
+// COORDINATE HELPER EXPORTS FOR OTHER FILES
+// ================================
+
+export { createPixeloidCoordinate, createVertexCoordinate, createScreenCoordinate }

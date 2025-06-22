@@ -13,7 +13,7 @@ export class MouseHighlightRenderer {
 
   constructor() {
     // Subscribe ONLY to mouse position changes (not the entire store)
-    subscribe(gameStore.mousePixeloidPosition, () => {
+    subscribe(gameStore.mouse.pixeloid_position, () => {
       this.isDirty = true
     })
   }
@@ -28,8 +28,8 @@ export class MouseHighlightRenderer {
     this.graphics.clear()
 
     // Get current mouse position in pixeloid coordinates
-    const mouseX = Math.floor(gameStore.mousePixeloidPosition.x)
-    const mouseY = Math.floor(gameStore.mousePixeloidPosition.y)
+    const mouseX = Math.floor(gameStore.mouse.pixeloid_position.x)
+    const mouseY = Math.floor(gameStore.mouse.pixeloid_position.y)
     
     // Draw mouse highlight square directly in pixeloid coordinates
     // The camera transform will handle the scaling and positioning automatically

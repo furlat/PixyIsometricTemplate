@@ -1,254 +1,98 @@
-import { Point } from 'pixi.js'
-import type { ViewportCorners, PixeloidCoordinate, MeshVertexCoordinate, MeshResolution } from '../types'
+import type {
+  ViewportCorners,
+  PixeloidCoordinate,
+  VertexCoordinate,
+  ScreenCoordinate,
+  ViewportBounds
+} from '../types'
+import { CoordinateCalculations } from './CoordinateCalculations'
 import { gameStore } from '../store/gameStore'
 
 /**
- * Centralized coordinate computation helper
- * Handles all conversions between screen, pixeloid, and viewport coordinates
+ * Unified coordinate computation helper
+ * DELEGATES to pure calculation functions + provides store getters
+ * All conversions use branded types to prevent coordinate mixing
  */
 export class CoordinateHelper {
+  
+  // ================================
+  // PURE CALCULATION DELEGATES (to avoid duplication)
+  // ================================
+  
+  static screenToVertex = CoordinateCalculations.screenToVertex
+  static vertexToScreen = CoordinateCalculations.vertexToScreen
+  static vertexToPixeloid = CoordinateCalculations.vertexToPixeloid
+  static pixeloidToVertex = CoordinateCalculations.pixeloidToVertex
+  static screenToPixeloid = CoordinateCalculations.screenToPixeloid
+  static pixeloidToScreen = CoordinateCalculations.pixeloidToScreen
+  static calculateViewportBounds = CoordinateCalculations.calculateViewportBounds
+  static calculateViewportCorners = CoordinateCalculations.calculateViewportCorners
+  static calculateVisibleGridBounds = CoordinateCalculations.calculateVisibleGridBounds
+  static calculateCameraTransformPosition = CoordinateCalculations.calculateCameraTransformPosition
+  static calculateInitialCameraPosition = CoordinateCalculations.calculateInitialCameraPosition
+  static snapPixeloidToVertexAlignment = CoordinateCalculations.snapPixeloidToVertexAlignment
+  static getVertexAlignedPixeloid = CoordinateCalculations.getVertexAlignedPixeloid
+  static calculatePixeloidMovement = CoordinateCalculations.calculatePixeloidMovement
+  
+  // ================================
+  // SAFE STORE GETTERS (read-only, no side effects)
+  // ================================
+  
+  static getCurrentOffset(): PixeloidCoordinate {
+    return gameStore.mesh.vertex_to_pixeloid_offset
+  }
+  
+  static getCurrentPixeloidScale(): number {
+    return gameStore.camera.pixeloid_scale
+  }
+  
+  static getCurrentViewportBounds(): ViewportBounds {
+    return gameStore.camera.viewport_bounds
+  }
+  
+  static getMousePixeloidPosition(): PixeloidCoordinate {
+    return gameStore.mouse.pixeloid_position
+  }
+
+  static getMouseVertexPosition(): { x: number, y: number } {
+    return gameStore.mouse.vertex_position
+  }
+
+  static getMouseScreenPosition(): { x: number, y: number } {
+    return gameStore.mouse.screen_position
+  }
+
+  static getCameraWorldPosition(): PixeloidCoordinate {
+    return gameStore.camera.world_position
+  }
+
+  static getCameraScreenCenter(): { x: number, y: number } {
+    return gameStore.camera.screen_center
+  }
+
+  // ================================
+  // LEGACY COMPATIBILITY (will be removed after migration)
+  // ================================
+
   /**
-   * Calculate viewport corners in pixeloid coordinates
+   * Legacy: Convert mesh vertex coordinates to pixeloid coordinates
+   * @deprecated Use vertexToPixeloid with explicit offset parameter
    */
-  static calculateViewportCorners(
-    cameraPosition: PixeloidCoordinate,
-    viewportSize: { width: number; height: number },
-    pixeloidScale: number
-  ): ViewportCorners {
-    const halfWidth = (viewportSize.width / pixeloidScale) / 2
-    const halfHeight = (viewportSize.height / pixeloidScale) / 2
-    
-    return {
-      topLeft: {
-        x: cameraPosition.x - halfWidth,
-        y: cameraPosition.y - halfHeight
-      },
-      topRight: {
-        x: cameraPosition.x + halfWidth,
-        y: cameraPosition.y - halfHeight
-      },
-      bottomLeft: {
-        x: cameraPosition.x - halfWidth,
-        y: cameraPosition.y + halfHeight
-      },
-      bottomRight: {
-        x: cameraPosition.x + halfWidth,
-        y: cameraPosition.y + halfHeight
-      }
-    }
+  static meshVertexToPixeloid(vertex: { x: number, y: number }): PixeloidCoordinate {
+    const offset = this.getCurrentOffset()
+    return this.vertexToPixeloid(
+      { __brand: 'vertex', x: vertex.x, y: vertex.y },
+      offset
+    )
   }
 
   /**
-   * Convert screen coordinates to pixeloid coordinates
+   * Legacy: Convert pixeloid coordinates to mesh vertex coordinates
+   * @deprecated Use pixeloidToVertex with explicit offset parameter
    */
-  static screenToPixeloid(
-    screenX: number,
-    screenY: number,
-    cameraPosition: PixeloidCoordinate,
-    viewportSize: { width: number; height: number },
-    pixeloidScale: number
-  ): Point {
-    const worldX = (screenX - viewportSize.width / 2) / pixeloidScale + cameraPosition.x
-    const worldY = (screenY - viewportSize.height / 2) / pixeloidScale + cameraPosition.y
-    
-    return new Point(worldX, worldY)
-  }
-
-  /**
-   * Convert pixeloid coordinates to screen coordinates
-   */
-  static pixeloidToScreen(
-    pixeloidX: number,
-    pixeloidY: number,
-    cameraPosition: PixeloidCoordinate,
-    viewportSize: { width: number; height: number },
-    pixeloidScale: number
-  ): Point {
-    const screenX = (pixeloidX - cameraPosition.x) * pixeloidScale + viewportSize.width / 2
-    const screenY = (pixeloidY - cameraPosition.y) * pixeloidScale + viewportSize.height / 2
-    
-    return new Point(screenX, screenY)
-  }
-
-  /**
-   * Calculate initial camera position to place (0,0) at top-left at given zoom level
-   */
-  static calculateInitialCameraPosition(
-    viewportSize: { width: number; height: number },
-    pixeloidScale: number
-  ): PixeloidCoordinate {
-    return {
-      x: viewportSize.width / (2 * pixeloidScale),
-      y: viewportSize.height / (2 * pixeloidScale)
-    }
-  }
-
-  /**
-   * Calculate camera transform position for rendering
-   */
-  static calculateCameraTransformPosition(
-    cameraPosition: PixeloidCoordinate,
-    viewportSize: { width: number; height: number },
-    pixeloidScale: number
-  ): PixeloidCoordinate {
-    return {
-      x: viewportSize.width / 2 - cameraPosition.x * pixeloidScale,
-      y: viewportSize.height / 2 - cameraPosition.y * pixeloidScale
-    }
-  }
-
-  /**
-   * Calculate visible grid bounds for rendering optimization
-   */
-  static calculateVisibleGridBounds(
-    corners: ViewportCorners,
-    padding: number = 2
-  ): {
-    startX: number
-    endX: number
-    startY: number
-    endY: number
-  } {
-    return {
-      startX: Math.floor(corners.topLeft.x) - padding,
-      endX: Math.ceil(corners.topRight.x) + padding,
-      startY: Math.floor(corners.topLeft.y) - padding,
-      endY: Math.ceil(corners.bottomLeft.y) + padding
-    }
-  }
-
-  /**
-   * REMOVED: Manual screen-to-mesh conversion
-   * Now using ONLY the mesh event system with event.getLocalPosition(mesh)
-   * This provides vertex coordinates directly without manual conversion
-   */
-
-  /**
-   * Convert mesh vertex coordinates to pixeloid coordinates (Layer 2: Mesh → Pixeloid)
-   * Uses the coordinate mapping from the static mesh system
-   */
-  static meshVertexToPixeloid(
-    vertex: MeshVertexCoordinate,
-    currentResolution?: MeshResolution
-  ): PixeloidCoordinate {
-    const coordinateMapping = gameStore.staticMesh.coordinateMapping
-    
-    if (!coordinateMapping) {
-      // Fallback conversion using resolution level
-      const resolution = currentResolution || { level: 1 } as MeshResolution
-      return {
-        x: vertex.x * resolution.level,
-        y: vertex.y * resolution.level
-      }
-    }
-
-    // Use direct mapping from mesh vertex to pixeloid
-    const meshKey = `${vertex.x},${vertex.y}`
-    const pixeloidCoord = coordinateMapping.meshToPixeloid.get(meshKey)
-    
-    if (pixeloidCoord) {
-      return pixeloidCoord
-    }
-
-    // Fallback calculation if not in mapping
-    const { level } = coordinateMapping.currentResolution
-    return {
-      x: vertex.x * level,
-      y: vertex.y * level
-    }
-  }
-
-  /**
-   * Convert pixeloid coordinates to mesh vertex coordinates (Layer 2: Pixeloid → Mesh)
-   * Uses the coordinate mapping from the static mesh system
-   */
-  static pixeloidToMeshVertex(
-    pixeloid: PixeloidCoordinate,
-    currentResolution?: MeshResolution
-  ): MeshVertexCoordinate {
-    const coordinateMapping = gameStore.staticMesh.coordinateMapping
-    
-    if (!coordinateMapping) {
-      // Fallback conversion using resolution level
-      const resolution = currentResolution || { level: 1 } as MeshResolution
-      return {
-        x: Math.round(pixeloid.x / resolution.level),
-        y: Math.round(pixeloid.y / resolution.level)
-      }
-    }
-
-    // Use direct mapping from pixeloid to mesh vertex
-    const pixeloidKey = `${pixeloid.x},${pixeloid.y}`
-    const meshVertex = coordinateMapping.pixeloidToMesh.get(pixeloidKey)
-    
-    if (meshVertex) {
-      return meshVertex
-    }
-
-    // Fallback calculation if not in mapping
-    const { level } = coordinateMapping.currentResolution
-    return {
-      x: Math.round(pixeloid.x / level),
-      y: Math.round(pixeloid.y / level)
-    }
-  }
-
-  /**
-   * Snap pixeloid coordinates to mesh vertex alignment
-   * Ensures coordinates align with mesh vertices for transform coherence
-   */
-  static snapPixeloidToVertexAlignment(pixeloid: PixeloidCoordinate): PixeloidCoordinate {
-    const coordinateMapping = gameStore.staticMesh.coordinateMapping
-    
-    if (!coordinateMapping) {
-      // Fallback to basic integer snapping
-      return {
-        x: Math.round(pixeloid.x),
-        y: Math.round(pixeloid.y)
-      }
-    }
-
-    // Convert to mesh vertex and back to get vertex-aligned pixeloid
-    const meshVertex = this.pixeloidToMeshVertex(pixeloid)
-    return this.meshVertexToPixeloid(meshVertex)
-  }
-
-  /**
-   * Calculate vertex-aligned movement delta
-   * Ensures WASD movement aligns with mesh vertices
-   */
-  static calculateVertexAlignedMovement(
-    deltaX: number,
-    deltaY: number,
-    currentResolution?: MeshResolution
-  ): PixeloidCoordinate {
-    const coordinateMapping = gameStore.staticMesh.coordinateMapping
-    const resolution = coordinateMapping?.currentResolution || currentResolution
-    
-    if (!resolution) {
-      // Fallback to basic movement
-      return { x: deltaX, y: deltaY }
-    }
-
-    // Snap movement to mesh vertex grid
-    const { level } = resolution
-    
-    return {
-      x: Math.round(deltaX / level) * level,
-      y: Math.round(deltaY / level) * level
-    }
-  }
-
-  /**
-   * REMOVED: Manual screen-to-pixeloid conversion via mesh
-   * Now using ONLY the mesh event system with direct vertex coordinates from events
-   */
-
-  /**
-   * Get vertex-aligned pixeloid for input snapping
-   * Ensures input coordinates align with mesh vertices
-   */
-  static getVertexAlignedPixeloid(pixeloid: PixeloidCoordinate): PixeloidCoordinate {
-    return this.snapPixeloidToVertexAlignment(pixeloid)
+  static pixeloidToMeshVertex(pixeloid: PixeloidCoordinate): { x: number, y: number } {
+    const offset = this.getCurrentOffset()
+    const vertex = this.pixeloidToVertex(pixeloid, offset)
+    return { x: Math.round(vertex.x), y: Math.round(vertex.y) }
   }
 }

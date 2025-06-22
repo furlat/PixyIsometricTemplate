@@ -146,35 +146,40 @@
                 <span id="static-mesh-ready" class="font-bold font-mono status-inactive">false</span>
               </div>
               <div class="flex justify-between items-center text-xs">
-                <span class="text-base-content/70">Cache Size:</span>
-                <span id="static-mesh-cache-size" class="font-bold font-mono text-info">0</span>
+                <span class="text-base-content/70">Coordinate Mapping:</span>
+                <span id="coordinate-mapping-ready" class="font-bold font-mono status-inactive">false</span>
               </div>
               <div class="flex justify-between items-center text-xs">
-                <span class="text-base-content/70">Mesh Resolution:</span>
-                <span id="mesh-resolution" class="font-bold font-mono text-primary">50</span>
+                <span class="text-base-content/70">Cache Size:</span>
+                <span id="mesh-cache-size" class="font-bold font-mono text-info">0</span>
+              </div>
+              <div class="flex justify-between items-center text-xs">
+                <span class="text-base-content/70">Current Resolution:</span>
+                <span id="current-resolution" class="font-bold font-mono text-yellow-400">No mapping</span>
               </div>
             </div>
             
-            <!-- Viewport Corners -->
-            <div class="divider my-2 text-xs text-base-content/50">Viewport Corners (Pixels)</div>
-            <div class="grid grid-cols-2 gap-2">
-              <div class="flex flex-col items-center text-xs">
-                <span class="text-base-content/70 mb-1">Top-Left</span>
-                <span id="viewport-tl-pixel" class="font-bold font-mono status-camera">0, 0</span>
+            <!-- Viewport Debug -->
+            <div class="divider my-2 text-xs text-base-content/50">Viewport Debug</div>
+            <div class="space-y-1">
+              <div class="text-xs">
+                <div class="text-base-content/70 mb-1">Pixels:</div>
+                <div id="viewport-corners-pixel" class="font-bold font-mono text-cyan-400 text-xs">TL:(0,0) BR:(0,0)</div>
               </div>
-              <div class="flex flex-col items-center text-xs">
-                <span class="text-base-content/70 mb-1">Top-Right</span>
-                <span id="viewport-tr-pixel" class="font-bold font-mono status-camera">0, 0</span>
+              <div class="text-xs">
+                <div class="text-base-content/70 mb-1">Pixeloids:</div>
+                <div id="viewport-corners-pixeloids" class="font-bold font-mono text-blue-400 text-xs">TL:(0,0) BR:(0,0)</div>
               </div>
-              <div class="flex flex-col items-center text-xs">
-                <span class="text-base-content/70 mb-1">Bottom-Left</span>
-                <span id="viewport-bl-pixel" class="font-bold font-mono status-camera">0, 0</span>
+              <div class="text-xs">
+                <div class="text-base-content/70 mb-1">Vertices:</div>
+                <div id="viewport-corners-vertices" class="font-bold font-mono text-green-400 text-xs">TL:(0,0) BR:(0,0)</div>
               </div>
-              <div class="flex flex-col items-center text-xs">
-                <span class="text-base-content/70 mb-1">Bottom-Right</span>
-                <span id="viewport-br-pixel" class="font-bold font-mono status-camera">0, 0</span>
+              <div class="text-xs">
+                <div class="text-base-content/70 mb-1">Viewport Offset:</div>
+                <div id="viewport-offset" class="font-bold font-mono text-purple-400 text-xs">Offset:(0,0)</div>
               </div>
             </div>
+            
           </div>
         </div>
 

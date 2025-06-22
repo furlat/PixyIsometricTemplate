@@ -1,15 +1,29 @@
 // Centralized type definitions for the entire application
 
-export interface PixeloidCoordinate {
+// ================================
+// COORDINATE TYPE SAFETY (branded types prevent mixing)
+// ================================
+
+export interface ScreenCoordinate {
+  readonly __brand: 'screen'
   x: number
   y: number
 }
 
-// Static Mesh Architecture Types - for transform coherence
-export interface MeshVertexCoordinate {
+export interface VertexCoordinate {
+  readonly __brand: 'vertex'
   x: number
   y: number
 }
+
+export interface PixeloidCoordinate {
+  readonly __brand: 'pixeloid'
+  x: number
+  y: number
+}
+
+// Legacy alias for backward compatibility during migration
+export interface MeshVertexCoordinate extends VertexCoordinate {}
 
 export interface MeshResolution {
   level: number // 1, 2, 4, 8, 16, 32, 64, 128
@@ -39,6 +53,12 @@ export interface PixeloidVertexMapping {
     minVertexY: number
     maxVertexY: number
   }
+  // Explicit viewport offset tracking for perfect vertex-to-pixel alignment
+  viewportOffset: PixeloidCoordinate  // Where vertex (0,0) maps to in current pixeloid viewport
+  vertexBounds: {                     // Current viewport corners in vertex coordinates
+    topLeft: MeshVertexCoordinate
+    bottomRight: MeshVertexCoordinate
+  }
 }
 
 export interface StaticMeshState {
@@ -46,8 +66,8 @@ export interface StaticMeshState {
   activeMesh: StaticMeshData | null
   // Cached mesh levels for different resolutions
   meshCache: Map<number, StaticMeshData> // level -> mesh data
-  // Current coordinate mapping between mesh vertices and pixeloids
-  coordinateMapping: PixeloidVertexMapping | null
+  // Coordinate mappings indexed by pixeloid scale for efficient zoom switching
+  coordinateMappings: Map<number, PixeloidVertexMapping> // pixeloidScale -> mapping
   // Mesh configuration
   config: {
     oversizePercent: number // Always 20%
@@ -58,6 +78,7 @@ export interface StaticMeshState {
   stats: {
     activeMeshLevel: number
     totalCachedMeshes: number
+    totalCachedMappings: number
     lastMeshSwitch: number
     coordinateMappingUpdates: number
   }
@@ -68,6 +89,29 @@ export interface ViewportCorners {
   topRight: PixeloidCoordinate
   bottomLeft: PixeloidCoordinate
   bottomRight: PixeloidCoordinate
+}
+
+// ================================
+// COMPREHENSIVE VIEWPORT BOUNDS
+// ================================
+
+export interface ViewportBounds {
+  screen: {
+    width: number
+    height: number
+    center: ScreenCoordinate
+  }
+  world: {
+    top_left: PixeloidCoordinate
+    bottom_right: PixeloidCoordinate
+    center: PixeloidCoordinate
+  }
+  vertex: {
+    top_left: VertexCoordinate
+    bottom_right: VertexCoordinate
+    width: number
+    height: number
+  }
 }
 
 export interface CameraState {
@@ -96,22 +140,47 @@ export interface GameState {
   currentScene: string
   windowWidth: number
   windowHeight: number
-  mousePosition: {
-    x: number
-    y: number
+  
+  // ================================
+  // CLEAN COORDINATE STATE
+  // ================================
+  
+  camera: {
+    // World position (where we're looking in pixeloid space)
+    world_position: PixeloidCoordinate     // Camera center in world coordinates
+    
+    // Screen position (derived but stored for efficiency)
+    screen_center: { x: number, y: number }  // Camera center in screen coordinates
+    
+    // Scale
+    pixeloid_scale: number                 // Zoom level (screen pixels per pixeloid)
+    
+    // Derived viewport bounds (stored for efficiency, no recomputation)
+    viewport_bounds: ViewportBounds
   }
-  // Mouse position in pixeloid coordinates
-  mousePixeloidPosition: {
-    x: number
-    y: number
+  
+  mesh: {
+    // The key conversion variable: pixeloid = vertex + offset
+    vertex_to_pixeloid_offset: PixeloidCoordinate
+    
+    // Current mesh info (stored for efficiency)
+    active_resolution: number             // Current mesh resolution level
+    vertex_bounds: {                      // Current mesh size
+      width: number
+      height: number
+    }
+    
+    // Derived info (stored to avoid recomputation)
+    screen_to_vertex_scale: number        // Always equals pixeloid_scale
   }
-  // Mouse position in mesh vertex coordinates (for debugging)
-  mouseVertexPosition: {
-    x: number
-    y: number
+  
+  // Mouse positions (all coordinate systems, stored for efficiency)
+  mouse: {
+    screen_position: { x: number, y: number }
+    vertex_position: { x: number, y: number }
+    pixeloid_position: PixeloidCoordinate
   }
-  // Camera and canvas state
-  camera: CameraState
+  
   input: InputState
   // Geometry system state (Phase 1)
   geometry: GeometryState
