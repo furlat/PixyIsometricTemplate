@@ -1,7 +1,7 @@
 import { Container } from 'pixi.js'
 import { InfiniteCanvas } from './InfiniteCanvas'
 import { BackgroundGridRenderer } from './BackgroundGridRenderer'
-import { MeshGeometryRenderer } from './MeshGeometryRenderer'
+import { GeometryRenderer } from './GeometryRenderer'
 import { SelectionHighlightRenderer } from './SelectionHighlightRenderer'
 import { MouseHighlightRenderer } from './MouseHighlightRenderer'
 import { PixeloidMeshRenderer } from './PixeloidMeshRenderer'
@@ -32,8 +32,8 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
   // Background grid renderer using extracted logic
   private backgroundGridRenderer: BackgroundGridRenderer
   
-  // Mesh-based geometry renderer for user-drawn shapes (GPU-accelerated)
-  private geometryRenderer: MeshGeometryRenderer
+  // Graphics-based geometry renderer for user-drawn shapes (simple and reliable)
+  private geometryRenderer: GeometryRenderer
   
   // Selection highlight renderer for reactive selection visualization
   private selectionHighlightRenderer: SelectionHighlightRenderer
@@ -59,6 +59,7 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
   private lastPixeloidScale = 0
   private renderBufferPadding = 200 // Large buffer to avoid re-renders on movement
   private isBackgroundRendering = false
+  private lastMaskLayerVisible = false // Track mask layer state to clean up filter
 
   constructor(private app?: any) {
     super()
@@ -78,8 +79,8 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
     // Initialize background grid renderer
     this.backgroundGridRenderer = new BackgroundGridRenderer()
 
-    // Initialize mesh-based geometry renderer
-    this.geometryRenderer = new MeshGeometryRenderer()
+    // Initialize graphics-based geometry renderer
+    this.geometryRenderer = new GeometryRenderer()
     
     // Initialize selection highlight renderer (reactive)
     this.selectionHighlightRenderer = new SelectionHighlightRenderer()
@@ -87,8 +88,8 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
     // Initialize mouse highlight renderer (lightweight)
     this.mouseHighlightRenderer = new MouseHighlightRenderer()
     
-    // Initialize pixeloid mesh renderer
-    this.pixeloidMeshRenderer = new PixeloidMeshRenderer()
+    // Initialize pixeloid mesh renderer with app instance
+    this.pixeloidMeshRenderer = new PixeloidMeshRenderer(this.app)
     
     // Initialize simple bounding box renderer for comparison
     this.boundingBoxRenderer = new BoundingBoxRenderer()
@@ -241,16 +242,14 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
   }
   
   /**
-   * Render mask layer - both pixeloid mesh and bbox for comparison
+   * Render mask layer - GPU-accelerated pixeloid occupancy detection
    */
   private renderMaskLayer(corners: ViewportCorners, pixeloidScale: number): void {
-    if (gameStore.geometry.layerVisibility.mask) {
-      // Render pixeloid mesh (new implementation)
-      this.pixeloidMeshRenderer.render(corners, pixeloidScale, undefined)
-      this.maskLayer.visible = true
-    } else {
-      this.maskLayer.visible = false
-    }
+    // Always call renderer - it has internal state tracking to avoid redundant operations
+    this.pixeloidMeshRenderer.render(corners, pixeloidScale, this.cameraTransform)
+    
+    // Set layer visibility based on store state
+    this.maskLayer.visible = gameStore.geometry.layerVisibility.mask
   }
   
   /**

@@ -53,7 +53,7 @@ export const gameStore = proxy<GameState>({
       },
       settings: {
         defaultColor: 0x0066cc,
-        defaultStrokeWidth: 2,
+        defaultStrokeWidth: 1,
         defaultFillColor: 0x99ccff,
         fillEnabled: false,
         fillAlpha: 0.5,
