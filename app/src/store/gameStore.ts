@@ -131,6 +131,7 @@ export const gameStore = proxy<GameState>({
       selection: true,   // Selection highlights
       raycast: true,     // Raycast lines and debug visuals
       bbox: false,       // Bounding box overlay for comparison (off by default)
+      bboxTest: false,   // Bbox texture test layer (perfect geometry mirror)
       mouse: true        // Mouse visualization
     },
     filterEffects: {
@@ -601,7 +602,7 @@ export const updateGameStore = {
     }
   },
 
-  setLayerVisibility: (layer: 'background' | 'geometry' | 'selection' | 'raycast' | 'bbox' | 'mouse', visible: boolean) => {
+  setLayerVisibility: (layer: 'background' | 'geometry' | 'selection' | 'raycast' | 'bbox' | 'bboxTest' | 'mouse', visible: boolean) => {
     gameStore.geometry.layerVisibility[layer] = visible
   },
 

@@ -45,6 +45,9 @@ export class Game {
         resizeTo: window, // Auto-resize to window
       });
 
+      // Initialize renderers that require the PIXI renderer
+      this.infiniteCanvas.initializeRenderers();
+
       // Add infinite canvas to stage
       this.app.stage.addChild(this.infiniteCanvas.getContainer());
 

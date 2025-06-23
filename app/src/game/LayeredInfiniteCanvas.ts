@@ -3,6 +3,8 @@ import { InfiniteCanvas } from './InfiniteCanvas'
 import { BackgroundGridRenderer } from './BackgroundGridRenderer'
 import { GeometryRenderer } from './GeometryRenderer'
 import { SelectionFilterRenderer } from './SelectionFilterRenderer'
+import { PixelateFilterRenderer } from './PixelateFilterRenderer'
+import { BboxTextureTestRenderer } from './BboxTextureTestRenderer'
 import { MouseHighlightShader } from './MouseHighlightShader'
 import { BoundingBoxRenderer } from './BoundingBoxRenderer'
 import { TextureRegistry } from './TextureRegistry'
@@ -25,6 +27,8 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
   private backgroundLayer: Container
   private geometryLayer: Container
   private selectionLayer: Container  // NEW: Separate layer for selection highlighting
+  private pixelateLayer: Container   // NEW: Separate layer for pixelate effects
+  private bboxTestLayer: Container   // NEW: Test layer for bbox texture sprites
   private raycastLayer: Container
   private bboxLayer: Container      // NEW: Separate layer for bbox overlay
   private mouseLayer: Container     // NEW: Separate layer for mouse visualization
@@ -37,6 +41,12 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
   
   // Selection filter renderer for GPU-accelerated selection highlighting
   private selectionFilterRenderer: SelectionFilterRenderer
+  
+  // Pixelate filter renderer for GPU-accelerated pixeloid-perfect effects
+  private pixelateFilterRenderer: PixelateFilterRenderer
+  
+  // Bbox texture test renderer for perfect overlap testing
+  private bboxTextureTestRenderer: BboxTextureTestRenderer
   
   // Mouse visualization renderer (lightweight, updates every frame)
   private mouseHighlightShader: MouseHighlightShader
@@ -70,6 +80,8 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
     this.backgroundLayer = new Container({ isRenderGroup: true })
     this.geometryLayer = new Container({ isRenderGroup: true })
     this.selectionLayer = new Container({ isRenderGroup: true }) // Selection layer on top of geometry
+    this.pixelateLayer = new Container({ isRenderGroup: true })  // Pixelate layer for GPU-accelerated effects
+    this.bboxTestLayer = new Container({ isRenderGroup: true })  // Test layer for bbox texture sprites
     this.raycastLayer = new Container({ isRenderGroup: true })
     this.bboxLayer = new Container({ isRenderGroup: true })     // Bbox layer for comparison overlay
     this.mouseLayer = new Container({ isRenderGroup: true })    // Mouse layer on top
@@ -82,6 +94,12 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
     
     // Initialize selection filter renderer (GPU-accelerated)
     this.selectionFilterRenderer = new SelectionFilterRenderer()
+    
+    // Initialize pixelate filter renderer (will be initialized after app.init())
+    this.pixelateFilterRenderer = new PixelateFilterRenderer()
+    
+    // Initialize bbox texture test renderer (for testing perfect overlap)
+    this.bboxTextureTestRenderer = new BboxTextureTestRenderer()
     
     // Initialize mouse highlight renderer (lightweight)
     this.mouseHighlightShader = new MouseHighlightShader()
@@ -116,11 +134,19 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
     this.cameraTransform.addChild(this.backgroundLayer)    // Grid and background elements
     this.cameraTransform.addChild(this.geometryLayer)      // Geometric shapes and objects
     this.cameraTransform.addChild(this.selectionLayer)     // Selection highlights on top of geometry
+    this.cameraTransform.addChild(this.pixelateLayer)      // Pixelate effects (independent from selection)
+    this.cameraTransform.addChild(this.bboxTestLayer)      // TEST: Bbox texture sprites (for perfect overlap testing)
     this.cameraTransform.addChild(this.raycastLayer)       // Raycast lines and debug visuals
     this.cameraTransform.addChild(this.bboxLayer)          // Bbox layer for comparison overlay
     
     // Selection layer gets the selection filter renderer container
     this.selectionLayer.addChild(this.selectionFilterRenderer.getContainer())
+    
+    // Pixelate layer gets the pixelate filter renderer container
+    this.pixelateLayer.addChild(this.pixelateFilterRenderer.getContainer())
+    
+    // Bbox test layer gets the bbox texture test renderer container
+    this.bboxTestLayer.addChild(this.bboxTextureTestRenderer.getContainer())
     
     // Bbox layer gets the simple bounding box renderer
     this.bboxLayer.addChild(this.boundingBoxRenderer.getGraphics())
@@ -139,6 +165,19 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
     this.staticMeshManager.initialize(initialPixeloidScale)
     
     console.log(`LayeredInfiniteCanvas: Initialized static mesh system with scale ${initialPixeloidScale}`)
+  }
+
+  /**
+   * Initialize renderers that require the PIXI renderer (call after app.init())
+   */
+  public initializeRenderers(): void {
+    if (this.app?.renderer) {
+      this.pixelateFilterRenderer.init(this.app.renderer, this.geometryRenderer)
+      this.bboxTextureTestRenderer.init(this.app.renderer, this.geometryRenderer)
+      console.log('LayeredInfiniteCanvas: Initialized pixelate and bbox test renderers with dependencies')
+    } else {
+      console.warn('LayeredInfiniteCanvas: App renderer not available for renderer initialization')
+    }
   }
 
   /**
@@ -174,6 +213,12 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
     
     // Render selection highlights (reactive, always updates based on store state)
     this.renderSelectionLayer(paddedCorners, pixeloidScale)
+    
+    // Render pixelate effects (independent, GPU-accelerated)
+    this.renderPixelateLayer(paddedCorners, pixeloidScale)
+    
+    // Render bbox texture test layer (perfect overlap testing)
+    this.renderBboxTestLayer(paddedCorners, pixeloidScale)
     
     // Render bbox layer (comparison overlay)
     this.renderBboxLayer(paddedCorners, pixeloidScale)
@@ -251,6 +296,31 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
       this.selectionLayer.visible = true
     } else {
       this.selectionLayer.visible = false
+    }
+  }
+  
+  /**
+   * Render pixelate layer - GPU-accelerated pixeloid-perfect effects (independent from selection)
+   */
+  private renderPixelateLayer(corners: ViewportCorners, pixeloidScale: number): void {
+    if (gameStore.geometry.filterEffects.pixelate) {
+      this.pixelateFilterRenderer.render(corners, pixeloidScale)
+      this.pixelateLayer.visible = true
+    } else {
+      this.pixelateLayer.visible = false
+    }
+  }
+
+  /**
+   * Render bbox texture test layer - TEST: bbox-exact sprites for perfect overlap verification
+   */
+  private renderBboxTestLayer(corners: ViewportCorners, pixeloidScale: number): void {
+    // Use store state for toggleable control from UI
+    if (gameStore.geometry.layerVisibility.bboxTest) {
+      this.bboxTextureTestRenderer.render(corners, pixeloidScale)
+      this.bboxTestLayer.visible = true
+    } else {
+      this.bboxTestLayer.visible = false
     }
   }
   
@@ -461,12 +531,16 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
     this.backgroundGridRenderer.destroy()
     this.geometryRenderer.destroy()
     this.selectionFilterRenderer.destroy()
+    this.pixelateFilterRenderer.destroy()
+    this.bboxTextureTestRenderer.destroy()
     this.boundingBoxRenderer.destroy()
 
     // Destroy layer containers
     this.backgroundLayer.destroy()
     this.geometryLayer.destroy()
     this.selectionLayer.destroy()
+    this.pixelateLayer.destroy()
+    this.bboxTestLayer.destroy()
     this.raycastLayer.destroy()
     this.bboxLayer.destroy()
 
