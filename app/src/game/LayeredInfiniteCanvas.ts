@@ -163,7 +163,6 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
    */
   public initializeRenderers(): void {
     if (this.app?.renderer) {
-      this.pixelateFilterRenderer.init(this.app.renderer, this.geometryRenderer)
       console.log('LayeredInfiniteCanvas: Initialized pixelate and bbox test renderers with dependencies')
     } else {
       console.warn('LayeredInfiniteCanvas: App renderer not available for renderer initialization')

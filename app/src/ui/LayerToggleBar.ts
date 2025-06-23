@@ -84,11 +84,12 @@ export class LayerToggleBar {
       })
     }
     
-    // Pixelate filter toggle
+    // Pixelate filter toggle - DISCONNECTED (awaiting implementation)
     const pixelateToggle = document.getElementById('toggle-filter-pixelate')
     if (pixelateToggle) {
       pixelateToggle.addEventListener('click', () => {
-        this.togglePixelateFilter()
+        console.warn('Pixelate filter: Awaiting implementation of pixeloid-perfect pixelation system')
+        // this.togglePixelateFilter() // DISCONNECTED
       })
     }
   }
@@ -100,9 +101,11 @@ export class LayerToggleBar {
   }
 
   private togglePixelateFilter(): void {
-    this.layerStates.pixelate = !this.layerStates.pixelate
-    this.updatePixelateButtonState()
-    this.notifyPixelateFilterChange()
+    // DISCONNECTED: Awaiting implementation of pixeloid-perfect pixelation system
+    console.warn('togglePixelateFilter: Functionality disconnected until proper implementation')
+    // this.layerStates.pixelate = !this.layerStates.pixelate
+    // this.updatePixelateButtonState()
+    // this.notifyPixelateFilterChange()
   }
   
   private updateButtonState(layerName: 'background' | 'geometry' | 'selection' | 'raycast' | 'bbox' | 'bboxTest' | 'mouse'): void {
@@ -137,35 +140,26 @@ export class LayerToggleBar {
     this.updateButtonState('bbox')
     this.updateButtonState('bboxTest')
     this.updateButtonState('mouse')
-    this.updatePixelateButtonState()
+    // this.updatePixelateButtonState() // DISCONNECTED
   }
 
   private updatePixelateButtonState(): void {
-    const button = document.getElementById('toggle-filter-pixelate')
-    if (!button) return
-    
-    const isActive = this.layerStates.pixelate
-    const baseClasses = ['btn', 'btn-sm', 'rounded-full']
-    
-    // Reset button classes
-    button.className = baseClasses.join(' ')
-    
-    if (isActive) {
-      button.classList.add('btn-info')  // Cyan for pixelate
-    } else {
-      button.classList.add('btn-outline')
-    }
+    // DISCONNECTED: Awaiting implementation of pixeloid-perfect pixelation system
+    console.warn('updatePixelateButtonState: Functionality disconnected until proper implementation')
+    // const button = document.getElementById('toggle-filter-pixelate')
+    // if (!button) return
+    // const isActive = this.layerStates.pixelate
+    // ... button state logic disconnected
   }
 
   private notifyPixelateFilterChange(): void {
-    // Update store with pixelate filter state
-    updateGameStore.setPixelateFilterEnabled(this.layerStates.pixelate)
-    
-    // Dispatch custom event
-    const event = new CustomEvent('pixelateFilterChanged', {
-      detail: { enabled: this.layerStates.pixelate }
-    })
-    document.dispatchEvent(event)
+    // DISCONNECTED: Awaiting implementation of pixeloid-perfect pixelation system
+    console.warn('notifyPixelateFilterChange: Functionality disconnected until proper implementation')
+    // updateGameStore.setPixelateFilterEnabled(this.layerStates.pixelate)
+    // const event = new CustomEvent('pixelateFilterChanged', {
+    //   detail: { enabled: this.layerStates.pixelate }
+    // })
+    // document.dispatchEvent(event)
   }
   
   private notifyLayerChange(layerName: string, isVisible: boolean): void {
