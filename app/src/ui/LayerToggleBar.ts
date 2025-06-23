@@ -10,7 +10,8 @@ export class LayerToggleBar {
     raycast: true,     // Raycast lines and debug visuals
     mask: false,       // Pixeloid mask layer for collision/spatial analysis (off by default)
     bbox: false,       // Bounding box overlay for comparison (off by default)
-    mouse: true        // Mouse visualization
+    mouse: true,       // Mouse visualization
+    outline: true      // Selection outline filter enabled
   }
   
   constructor() {
@@ -82,12 +83,26 @@ export class LayerToggleBar {
         this.toggleLayer('mouse')
       })
     }
+    
+    // Outline filter toggle
+    const outlineToggle = document.getElementById('toggle-filter-outline')
+    if (outlineToggle) {
+      outlineToggle.addEventListener('click', () => {
+        this.toggleOutlineFilter()
+      })
+    }
   }
   
   private toggleLayer(layerName: 'background' | 'geometry' | 'selection' | 'raycast' | 'mask' | 'bbox' | 'mouse'): void {
     this.layerStates[layerName] = !this.layerStates[layerName]
     this.updateButtonState(layerName)
     this.notifyLayerChange(layerName, this.layerStates[layerName])
+  }
+
+  private toggleOutlineFilter(): void {
+    this.layerStates.outline = !this.layerStates.outline
+    this.updateOutlineButtonState()
+    this.notifyOutlineFilterChange()
   }
   
   private updateButtonState(layerName: 'background' | 'geometry' | 'selection' | 'raycast' | 'mask' | 'bbox' | 'mouse'): void {
@@ -122,6 +137,35 @@ export class LayerToggleBar {
     this.updateButtonState('mask')
     this.updateButtonState('bbox')
     this.updateButtonState('mouse')
+    this.updateOutlineButtonState()
+  }
+
+  private updateOutlineButtonState(): void {
+    const button = document.getElementById('toggle-filter-outline')
+    if (!button) return
+    
+    const isActive = this.layerStates.outline
+    const baseClasses = ['btn', 'btn-sm', 'rounded-full']
+    
+    // Reset button classes
+    button.className = baseClasses.join(' ')
+    
+    if (isActive) {
+      button.classList.add('btn-warning')  // Orange for outline
+    } else {
+      button.classList.add('btn-outline')
+    }
+  }
+
+  private notifyOutlineFilterChange(): void {
+    // Update store with outline filter state
+    updateGameStore.setOutlineFilterEnabled(this.layerStates.outline)
+    
+    // Dispatch custom event
+    const event = new CustomEvent('outlineFilterChanged', {
+      detail: { enabled: this.layerStates.outline }
+    })
+    document.dispatchEvent(event)
   }
   
   private notifyLayerChange(layerName: string, isVisible: boolean): void {

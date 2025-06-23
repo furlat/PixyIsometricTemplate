@@ -1,4 +1,5 @@
 import { Graphics, Container } from 'pixi.js'
+import { OutlineFilter } from 'pixi-filters'
 import { gameStore } from '../store/gameStore'
 import { GeometryHelper } from './GeometryHelper'
 import { CoordinateHelper } from './CoordinateHelper'
@@ -19,12 +20,35 @@ import type {
  */
 export class GeometryRenderer {
   private mainContainer: Container = new Container()
-  private objectContainers: Map<string, Graphics> = new Map()
+  
+  // Filter containers as render groups for GPU optimization
+  private normalContainer: Container = new Container({ isRenderGroup: true })
+  private selectedContainer: Container = new Container({ isRenderGroup: true })
+  
+  // Individual object containers and graphics tracking
+  private objectContainers: Map<string, Container> = new Map()
+  private objectGraphics: Map<string, Graphics> = new Map()
   private previewGraphics: Graphics = new Graphics()
   
+  // Filter instance (reuse for performance)
+  private outlineFilter: OutlineFilter
+  
   constructor() {
-    // Setup main container structure
+    // Setup container hierarchy
+    this.mainContainer.addChild(this.normalContainer)
+    this.mainContainer.addChild(this.selectedContainer)
     this.mainContainer.addChild(this.previewGraphics)
+    
+    // Create and apply outline filter
+    this.outlineFilter = new OutlineFilter({
+      thickness: 3,
+      color: 0xff4444,  // Bright red for visibility
+      quality: 0.1      // Performance optimization
+    })
+    this.selectedContainer.filters = [this.outlineFilter]
+    
+    // Subscribe to filter and selection changes
+    this.subscribeToFilterChanges()
   }
 
   /**
@@ -50,11 +74,12 @@ export class GeometryRenderer {
     const currentObjectIds = new Set(visibleObjects.map(obj => obj.id))
 
     // Remove objects that are no longer visible or deleted
-    for (const [objectId, graphics] of this.objectContainers) {
+    for (const [objectId, container] of this.objectContainers) {
       if (!currentObjectIds.has(objectId)) {
-        this.mainContainer.removeChild(graphics)
-        graphics.destroy()
+        container.removeFromParent()
+        container.destroy()
         this.objectContainers.delete(objectId)
+        this.objectGraphics.delete(objectId)
         console.log(`GeometryRenderer: Removed object ${objectId} (no longer visible)`)
       }
     }
@@ -74,96 +99,131 @@ export class GeometryRenderer {
    * Update or create a single geometric object with coordinate conversion
    */
   private updateGeometricObjectWithCoordinateConversion(obj: GeometricObject, pixeloidScale: number): void {
-    let graphics = this.objectContainers.get(obj.id)
+    let objectContainer = this.objectContainers.get(obj.id)
+    let graphics = this.objectGraphics.get(obj.id)
     
-    if (!graphics) {
-      // Create new graphics for this object
+    if (!objectContainer) {
+      // Create new container + graphics for this object
+      objectContainer = new Container()
       graphics = new Graphics()
-      this.objectContainers.set(obj.id, graphics)
-      this.mainContainer.addChild(graphics)
+      objectContainer.addChild(graphics)
+      
+      this.objectContainers.set(obj.id, objectContainer)
+      this.objectGraphics.set(obj.id, graphics)
     }
 
-    // Clear and re-render the object
-    graphics.clear()
+    // Clear and re-render the graphics
+    graphics!.clear()
     
     // ✅ COORDINATE CONVERSION: Convert object from pixeloid to vertex coordinates
     const convertedObject = this.convertObjectToVertexCoordinates(obj)
     
     // Position graphics at (0,0) and draw object at vertex coordinates
-    graphics.position.set(0, 0)
-    this.renderGeometricObjectToGraphics(convertedObject, pixeloidScale, graphics)
+    graphics!.position.set(0, 0)
+    this.renderGeometricObjectToGraphics(convertedObject, pixeloidScale, graphics!)
+    
+    // Assign to appropriate filter container based on selection
+    this.assignObjectToFilterContainer(obj.id, objectContainer)
   }
 
   /**
-   * Convert object from pixeloid coordinates to vertex coordinates using existing utilities
+   * Assign object container to appropriate filter group based on selection state
+   */
+  private assignObjectToFilterContainer(objectId: string, objectContainer: Container): void {
+    const isSelected = gameStore.geometry.selection.selectedObjectId === objectId
+    
+    // Remove from current parent
+    objectContainer.removeFromParent()
+    
+    // Assign to appropriate container
+    if (isSelected) {
+      this.selectedContainer.addChild(objectContainer)  // Gets outline filter
+    } else {
+      this.normalContainer.addChild(objectContainer)    // No filter
+    }
+  }
+
+  /**
+   * Subscribe to filter and selection changes for reactive updates
+   */
+  private subscribeToFilterChanges(): void {
+    // React to filter effects changes
+    subscribe(gameStore.geometry.filterEffects, () => {
+      this.updateOutlineFilterState()
+    })
+    
+    // React to selection changes (for object reassignment)
+    subscribe(gameStore.geometry.selection, () => {
+      this.updateSelectionFilterAssignment()
+    })
+  }
+
+  /**
+   * Update outline filter state based on store settings
+   */
+  private updateOutlineFilterState(): void {
+    const outlineEnabled = gameStore.geometry.filterEffects.outline
+    
+    if (outlineEnabled) {
+      this.selectedContainer.filters = [this.outlineFilter]
+    } else {
+      this.selectedContainer.filters = null  // Remove filter
+    }
+  }
+
+  /**
+   * Update filter assignment when selection changes
+   */
+  private updateSelectionFilterAssignment(): void {
+    // Reassign all objects to correct containers when selection changes
+    for (const [objectId, container] of this.objectContainers) {
+      this.assignObjectToFilterContainer(objectId, container)
+    }
+  }
+
+  /**
+   * Convert object from pixeloid coordinates to vertex coordinates using EXACT conversion (no rounding)
+   * This prevents geometry anchoring drift during zoom operations
    */
   private convertObjectToVertexCoordinates(obj: GeometricObject): GeometricObject {
+    const offset = gameStore.mesh.vertex_to_pixeloid_offset
+    
     if ('anchorX' in obj && 'anchorY' in obj) {
-      // Diamond object - use existing coordinate utility
-      const vertexCoord = CoordinateHelper.pixeloidToMeshVertex({
-        __brand: 'pixeloid',
-        x: obj.anchorX,
-        y: obj.anchorY
-      })
+      // Diamond object - use exact coordinate conversion
       return {
         ...obj,
-        anchorX: vertexCoord.x,
-        anchorY: vertexCoord.y
+        anchorX: obj.anchorX - offset.x,  // EXACT conversion, no rounding
+        anchorY: obj.anchorY - offset.y
       }
     } else if ('x' in obj && 'width' in obj && 'height' in obj) {
-      // Rectangle object - use existing coordinate utility
-      const vertexCoord = CoordinateHelper.pixeloidToMeshVertex({
-        __brand: 'pixeloid',
-        x: obj.x,
-        y: obj.y
-      })
+      // Rectangle object - use exact coordinate conversion
       return {
         ...obj,
-        x: vertexCoord.x,
-        y: vertexCoord.y
+        x: obj.x - offset.x,  // EXACT conversion, no rounding
+        y: obj.y - offset.y
       }
     } else if ('centerX' in obj && 'centerY' in obj) {
-      // Circle object - use existing coordinate utility
-      const vertexCoord = CoordinateHelper.pixeloidToMeshVertex({
-        __brand: 'pixeloid',
-        x: obj.centerX,
-        y: obj.centerY
-      })
+      // Circle object - use exact coordinate conversion
       return {
         ...obj,
-        centerX: vertexCoord.x,
-        centerY: vertexCoord.y
+        centerX: obj.centerX - offset.x,  // EXACT conversion, no rounding
+        centerY: obj.centerY - offset.y
       }
     } else if ('startX' in obj && 'endX' in obj) {
-      // Line object - convert both points using existing coordinate utility
-      const startVertexCoord = CoordinateHelper.pixeloidToMeshVertex({
-        __brand: 'pixeloid',
-        x: obj.startX,
-        y: obj.startY
-      })
-      const endVertexCoord = CoordinateHelper.pixeloidToMeshVertex({
-        __brand: 'pixeloid',
-        x: obj.endX,
-        y: obj.endY
-      })
+      // Line object - convert both points using exact conversion
       return {
         ...obj,
-        startX: startVertexCoord.x,
-        startY: startVertexCoord.y,
-        endX: endVertexCoord.x,
-        endY: endVertexCoord.y
+        startX: obj.startX - offset.x,  // EXACT conversion, no rounding
+        startY: obj.startY - offset.y,
+        endX: obj.endX - offset.x,
+        endY: obj.endY - offset.y
       }
     } else if ('x' in obj && 'y' in obj) {
-      // Point object - use existing coordinate utility
-      const vertexCoord = CoordinateHelper.pixeloidToMeshVertex({
-        __brand: 'pixeloid',
-        x: obj.x,
-        y: obj.y
-      })
+      // Point object - use exact coordinate conversion
       return {
         ...obj,
-        x: vertexCoord.x,
-        y: vertexCoord.y
+        x: obj.x - offset.x,  // EXACT conversion, no rounding
+        y: obj.y - offset.y
       }
     }
     
@@ -390,112 +450,11 @@ export class GeometryRenderer {
   }
 
   /**
-   * Render preview for active drawing operations
+   * Legacy preview method - DEPRECATED - now uses renderPreviewWithCoordinateConversion
    */
   private renderPreview(): void {
-    this.previewGraphics.clear()
-    
-    const activeDrawing = gameStore.geometry.drawing.activeDrawing
-    
-    if (!activeDrawing.isDrawing || !activeDrawing.startPoint || !activeDrawing.currentPoint) {
-      return
-    }
-
-    const startPoint = activeDrawing.startPoint
-    const currentPoint = activeDrawing.currentPoint
-    const previewAlpha = 0.6
-
-    if (activeDrawing.type === 'rectangle') {
-      // Calculate preview rectangle properties
-      const minX = Math.min(startPoint.x, currentPoint.x)
-      const minY = Math.min(startPoint.y, currentPoint.y)
-      const maxX = Math.max(startPoint.x, currentPoint.x)
-      const maxY = Math.max(startPoint.y, currentPoint.y)
-      
-      const width = maxX - minX
-      const height = maxY - minY
-      
-      // Only render preview if it has some size
-      if (width >= 1 && height >= 1) {
-        this.previewGraphics.rect(minX, minY, width, height)
-        
-        // Apply fill if enabled
-        if (gameStore.geometry.drawing.settings.fillEnabled) {
-          this.previewGraphics.fill({
-            color: gameStore.geometry.drawing.settings.defaultFillColor,
-            alpha: previewAlpha * gameStore.geometry.drawing.settings.fillAlpha
-          })
-        }
-        
-        this.previewGraphics.stroke({
-          width: gameStore.geometry.drawing.settings.defaultStrokeWidth,
-          color: gameStore.geometry.drawing.settings.defaultColor,
-          alpha: previewAlpha * gameStore.geometry.drawing.settings.strokeAlpha
-        })
-      }
-    } else if (activeDrawing.type === 'line') {
-      // Calculate distance for minimum line length
-      const distance = Math.sqrt(Math.pow(currentPoint.x - startPoint.x, 2) + Math.pow(currentPoint.y - startPoint.y, 2))
-      
-      if (distance >= 1) {
-        this.previewGraphics.moveTo(startPoint.x, startPoint.y)
-        this.previewGraphics.lineTo(currentPoint.x, currentPoint.y)
-        this.previewGraphics.stroke({
-          width: gameStore.geometry.drawing.settings.defaultStrokeWidth,
-          color: gameStore.geometry.drawing.settings.defaultColor,
-          alpha: previewAlpha * gameStore.geometry.drawing.settings.strokeAlpha
-        })
-      }
-    } else if (activeDrawing.type === 'circle') {
-      // Calculate radius
-      const radius = Math.sqrt(Math.pow(currentPoint.x - startPoint.x, 2) + Math.pow(currentPoint.y - startPoint.y, 2))
-      
-      if (radius >= 1) {
-        this.previewGraphics.circle(startPoint.x, startPoint.y, radius)
-        
-        // Apply fill if enabled
-        if (gameStore.geometry.drawing.settings.fillEnabled) {
-          this.previewGraphics.fill({
-            color: gameStore.geometry.drawing.settings.defaultFillColor,
-            alpha: previewAlpha * gameStore.geometry.drawing.settings.fillAlpha
-          })
-        }
-        
-        this.previewGraphics.stroke({
-          width: gameStore.geometry.drawing.settings.defaultStrokeWidth,
-          color: gameStore.geometry.drawing.settings.defaultColor,
-          alpha: previewAlpha * gameStore.geometry.drawing.settings.strokeAlpha
-        })
-      }
-    } else if (activeDrawing.type === 'diamond') {
-      // Use centralized geometry calculations for preview
-      const preview = GeometryHelper.calculateDiamondPreview(startPoint, currentPoint)
-      
-      if (preview.width >= 2) {
-        const vertices = preview.vertices
-        
-        // Draw diamond preview using calculated vertices
-        this.previewGraphics.moveTo(vertices.west.x, vertices.west.y)    // West
-        this.previewGraphics.lineTo(vertices.north.x, vertices.north.y)  // North
-        this.previewGraphics.lineTo(vertices.east.x, vertices.east.y)    // East
-        this.previewGraphics.lineTo(vertices.south.x, vertices.south.y)  // South
-        this.previewGraphics.lineTo(vertices.west.x, vertices.west.y)    // Back to West
-        
-        // Apply fill if enabled
-        if (gameStore.geometry.drawing.settings.fillEnabled) {
-          this.previewGraphics.fill({
-            color: gameStore.geometry.drawing.settings.defaultFillColor,
-            alpha: previewAlpha * gameStore.geometry.drawing.settings.fillAlpha
-          })
-        }
-        
-        this.previewGraphics.stroke({
-          width: gameStore.geometry.drawing.settings.defaultStrokeWidth,
-          color: gameStore.geometry.drawing.settings.defaultColor,
-          alpha: previewAlpha * gameStore.geometry.drawing.settings.strokeAlpha
-        })
-      }
-    }
+    // This method is deprecated - preview rendering now handled by renderPreviewWithCoordinateConversion
+    this.renderPreviewWithCoordinateConversion()
   }
 
   /**
@@ -510,144 +469,129 @@ export class GeometryRenderer {
    * This provides access to individual object Graphics for post-render texture capture
    */
   public getObjectContainers(): Map<string, Graphics> {
-    return new Map(this.objectContainers) // Return copy to prevent external modification
+    return new Map(this.objectGraphics) // Return copy to prevent external modification
   }
 
 
   /**
-   * Render preview for active drawing operations with coordinate conversion
+   * Render preview for active drawing operations - NEW: uses unified preview system
    */
   private renderPreviewWithCoordinateConversion(): void {
     this.previewGraphics.clear()
     
-    const activeDrawing = gameStore.geometry.drawing.activeDrawing
+    const preview = gameStore.geometry.drawing.preview
     
-    if (!activeDrawing.isDrawing || !activeDrawing.startPoint || !activeDrawing.currentPoint) {
+    if (!preview) {
       return
     }
 
-    // ✅ COORDINATE CONVERSION: Convert preview coordinates using existing utilities
-    const startPoint = CoordinateHelper.pixeloidToMeshVertex({
-      __brand: 'pixeloid',
-      x: activeDrawing.startPoint.x,
-      y: activeDrawing.startPoint.y
-    })
-    const currentPoint = CoordinateHelper.pixeloidToMeshVertex({
-      __brand: 'pixeloid',
-      x: activeDrawing.currentPoint.x,
-      y: activeDrawing.currentPoint.y
-    })
+    // ✅ COORDINATE CONVERSION: Convert preview vertices using EXACT conversion
+    const offset = gameStore.mesh.vertex_to_pixeloid_offset
+    const renderVertices = preview.vertices.map(vertex => ({
+      x: vertex.x - offset.x,  // EXACT conversion, no rounding
+      y: vertex.y - offset.y
+    }))
 
     const previewAlpha = 0.6
 
-    if (activeDrawing.type === 'rectangle') {
-      // Calculate preview rectangle properties
-      const minX = Math.min(startPoint.x, currentPoint.x)
-      const minY = Math.min(startPoint.y, currentPoint.y)
-      const maxX = Math.max(startPoint.x, currentPoint.x)
-      const maxY = Math.max(startPoint.y, currentPoint.y)
-      
-      const width = maxX - minX
-      const height = maxY - minY
-      
-      // Only render preview if it has some size
-      if (width >= 1 && height >= 1) {
-        this.previewGraphics.rect(minX, minY, width, height)
-        
-        // Apply fill if enabled
-        if (gameStore.geometry.drawing.settings.fillEnabled) {
+    // Render based on geometry type using converted vertices (same logic as new renderActiveDrawing)
+    switch (preview.type) {
+      case 'point':
+        if (renderVertices[0]) {
+          this.previewGraphics.circle(renderVertices[0].x, renderVertices[0].y, 2)
           this.previewGraphics.fill({
-            color: gameStore.geometry.drawing.settings.defaultFillColor,
-            alpha: previewAlpha * gameStore.geometry.drawing.settings.fillAlpha
+            color: preview.style.color,
+            alpha: previewAlpha * preview.style.strokeAlpha
           })
         }
+        break
         
-        this.previewGraphics.stroke({
-          width: gameStore.geometry.drawing.settings.defaultStrokeWidth,
-          color: gameStore.geometry.drawing.settings.defaultColor,
-          alpha: previewAlpha * gameStore.geometry.drawing.settings.strokeAlpha
-        })
-      }
-    } else if (activeDrawing.type === 'line') {
-      // Calculate distance for minimum line length
-      const distance = Math.sqrt(Math.pow(currentPoint.x - startPoint.x, 2) + Math.pow(currentPoint.y - startPoint.y, 2))
-      
-      if (distance >= 1) {
-        this.previewGraphics.moveTo(startPoint.x, startPoint.y)
-        this.previewGraphics.lineTo(currentPoint.x, currentPoint.y)
-        this.previewGraphics.stroke({
-          width: gameStore.geometry.drawing.settings.defaultStrokeWidth,
-          color: gameStore.geometry.drawing.settings.defaultColor,
-          alpha: previewAlpha * gameStore.geometry.drawing.settings.strokeAlpha
-        })
-      }
-    } else if (activeDrawing.type === 'circle') {
-      // Calculate radius
-      const radius = Math.sqrt(Math.pow(currentPoint.x - startPoint.x, 2) + Math.pow(currentPoint.y - startPoint.y, 2))
-      
-      if (radius >= 1) {
-        this.previewGraphics.circle(startPoint.x, startPoint.y, radius)
-        
-        // Apply fill if enabled
-        if (gameStore.geometry.drawing.settings.fillEnabled) {
-          this.previewGraphics.fill({
-            color: gameStore.geometry.drawing.settings.defaultFillColor,
-            alpha: previewAlpha * gameStore.geometry.drawing.settings.fillAlpha
+      case 'line':
+        if (renderVertices[0] && renderVertices[1]) {
+          this.previewGraphics.moveTo(renderVertices[0].x, renderVertices[0].y)
+          this.previewGraphics.lineTo(renderVertices[1].x, renderVertices[1].y)
+          this.previewGraphics.stroke({
+            width: preview.style.strokeWidth,
+            color: preview.style.color,
+            alpha: previewAlpha * preview.style.strokeAlpha
           })
         }
+        break
         
-        this.previewGraphics.stroke({
-          width: gameStore.geometry.drawing.settings.defaultStrokeWidth,
-          color: gameStore.geometry.drawing.settings.defaultColor,
-          alpha: previewAlpha * gameStore.geometry.drawing.settings.strokeAlpha
-        })
-      }
-    } else if (activeDrawing.type === 'diamond') {
-      // Convert vertex coordinates back to pixeloid for GeometryHelper
-      const startPixeloid = CoordinateHelper.meshVertexToPixeloid({
-        x: startPoint.x,
-        y: startPoint.y
-      })
-      const currentPixeloid = CoordinateHelper.meshVertexToPixeloid({
-        x: currentPoint.x,
-        y: currentPoint.y
-      })
-      
-      // Use centralized geometry calculations for preview
-      const preview = GeometryHelper.calculateDiamondPreview(startPixeloid, currentPixeloid)
-      
-      if (preview.width >= 2) {
-        const vertices = preview.vertices
-        
-        // Convert vertices to vertex coordinates for rendering using coordinate utilities
-        const convertedVertices = {
-          west: CoordinateHelper.pixeloidToMeshVertex(vertices.west),
-          north: CoordinateHelper.pixeloidToMeshVertex(vertices.north),
-          east: CoordinateHelper.pixeloidToMeshVertex(vertices.east),
-          south: CoordinateHelper.pixeloidToMeshVertex(vertices.south)
+      case 'circle':
+        if (renderVertices.length >= 3) {
+          const [west, east, center] = renderVertices
+          const radius = Math.abs(east.x - west.x) / 2
+          if (radius > 0) {
+            this.previewGraphics.circle(center.x, center.y, radius)
+            
+            // Apply fill if enabled
+            if (preview.style.fillColor !== undefined) {
+              this.previewGraphics.fill({
+                color: preview.style.fillColor,
+                alpha: previewAlpha * (preview.style.fillAlpha ?? 0.5)
+              })
+            }
+            
+            this.previewGraphics.stroke({
+              width: preview.style.strokeWidth,
+              color: preview.style.color,
+              alpha: previewAlpha * preview.style.strokeAlpha
+            })
+          }
         }
+        break
         
-        // Draw diamond preview using converted vertices
-        this.previewGraphics.moveTo(convertedVertices.west.x, convertedVertices.west.y)    // West
-        this.previewGraphics.lineTo(convertedVertices.north.x, convertedVertices.north.y)  // North
-        this.previewGraphics.lineTo(convertedVertices.east.x, convertedVertices.east.y)    // East
-        this.previewGraphics.lineTo(convertedVertices.south.x, convertedVertices.south.y)  // South
-        this.previewGraphics.lineTo(convertedVertices.west.x, convertedVertices.west.y)    // Back to West
+      case 'rectangle':
+        if (renderVertices.length >= 4) {
+          const [topLeft, topRight, bottomRight, bottomLeft] = renderVertices
+          const width = topRight.x - topLeft.x
+          const height = bottomLeft.y - topLeft.y
+          
+          if (width >= 1 && height >= 1) {
+            this.previewGraphics.rect(topLeft.x, topLeft.y, width, height)
+            
+            // Apply fill if enabled
+            if (preview.style.fillColor !== undefined) {
+              this.previewGraphics.fill({
+                color: preview.style.fillColor,
+                alpha: previewAlpha * (preview.style.fillAlpha ?? 0.5)
+              })
+            }
+            
+            this.previewGraphics.stroke({
+              width: preview.style.strokeWidth,
+              color: preview.style.color,
+              alpha: previewAlpha * preview.style.strokeAlpha
+            })
+          }
+        }
+        break
         
-        // Apply fill if enabled
-        if (gameStore.geometry.drawing.settings.fillEnabled) {
-          this.previewGraphics.fill({
-            color: gameStore.geometry.drawing.settings.defaultFillColor,
-            alpha: previewAlpha * gameStore.geometry.drawing.settings.fillAlpha
+      case 'diamond':
+        if (renderVertices.length >= 4) {
+          const [west, north, east, south] = renderVertices
+          this.previewGraphics.moveTo(west.x, west.y)
+          this.previewGraphics.lineTo(north.x, north.y)
+          this.previewGraphics.lineTo(east.x, east.y)
+          this.previewGraphics.lineTo(south.x, south.y)
+          this.previewGraphics.lineTo(west.x, west.y) // Close path
+          
+          // Apply fill if enabled
+          if (preview.style.fillColor !== undefined) {
+            this.previewGraphics.fill({
+              color: preview.style.fillColor,
+              alpha: previewAlpha * (preview.style.fillAlpha ?? 0.5)
+            })
+          }
+          
+          this.previewGraphics.stroke({
+            width: preview.style.strokeWidth,
+            color: preview.style.color,
+            alpha: previewAlpha * preview.style.strokeAlpha
           })
         }
-        
-        this.previewGraphics.stroke({
-          width: gameStore.geometry.drawing.settings.defaultStrokeWidth,
-          color: gameStore.geometry.drawing.settings.defaultColor,
-          alpha: previewAlpha * gameStore.geometry.drawing.settings.strokeAlpha
-        })
-      }
+        break
     }
   }
 

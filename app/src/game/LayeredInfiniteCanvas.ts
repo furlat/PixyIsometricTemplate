@@ -259,17 +259,13 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
   }
   
   /**
-   * Render selection layer - only if selection layer is visible
+   * Render selection layer - now handled by GeometryRenderer filters
    */
   private renderSelectionLayer(corners: ViewportCorners, pixeloidScale: number): void {
-    if (gameStore.geometry.layerVisibility.selection) {
-      // Selection highlighting is rendered reactively based on current store state
-      this.selectionHighlightRenderer.render(corners, pixeloidScale)
-      this.selectionLayer.visible = true
-    } else {
-      // Hide selection layer if not visible
-      this.selectionLayer.visible = false
-    }
+    // DISABLED: Old graphics-based selection highlighting replaced with filter approach
+    // Selection highlighting now handled by GeometryRenderer filters in selectedContainer
+    // Keep layer for future non-filter selection effects
+    this.selectionLayer.visible = false
   }
   
   /**
@@ -284,11 +280,15 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
   }
   
   /**
-   * Render bbox layer - separate from mask layer for independent control
+   * Render bbox layer - separate from mask layer for independent control with proper coordinate system
    */
   private renderBboxLayer(corners: ViewportCorners, pixeloidScale: number): void {
     if (gameStore.geometry.layerVisibility.bbox) {
       this.boundingBoxRenderer.render(corners, pixeloidScale)
+      
+      // Position bbox layer at (0,0) like geometry layer (no transform offset)
+      // This ensures bbox uses same coordinate system as GeometryRenderer
+      this.bboxLayer.position.set(0, 0)
       this.bboxLayer.visible = true
     } else {
       this.bboxLayer.visible = false
@@ -506,6 +506,31 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
 
     // Call parent destroy
     super.destroy()
+  }
+
+  /**
+   * Get bbox data for external access (filters, shaders, analysis)
+   * Provides object bounds data while maintaining filter isolation
+   */
+  public getBboxData(): Map<string, { bounds: any, visible: boolean }> {
+    const bboxData = new Map()
+    
+    if (gameStore.geometry.layerVisibility.bbox) {
+      const enabledObjects = gameStore.geometry.objects.filter(obj =>
+        gameStore.geometry.mask.enabledObjects.has(obj.id) &&
+        obj.isVisible &&
+        obj.metadata
+      )
+      
+      for (const obj of enabledObjects) {
+        bboxData.set(obj.id, {
+          bounds: obj.metadata.bounds,
+          visible: true
+        })
+      }
+    }
+    
+    return bboxData
   }
 
   /**

@@ -1,8 +1,9 @@
 import { updateGameStore, gameStore, createPixeloidCoordinate } from '../store/gameStore'
 import { GeometryHelper } from './GeometryHelper'
+import { GeometryVertexCalculator } from './GeometryVertexCalculator'
 import { CoordinateHelper } from './CoordinateHelper'
 import type { InfiniteCanvas } from './InfiniteCanvas'
-import type { GeometricRectangle, GeometricPoint, GeometricLine, GeometricCircle, GeometricDiamond } from '../types'
+import type { GeometricRectangle, GeometricPoint, GeometricLine, GeometricCircle, GeometricDiamond, PixeloidCoordinate } from '../types'
 
 export class InputManager {
   private canvas: HTMLCanvasElement | null = null
@@ -219,7 +220,7 @@ export class InputManager {
   }
 
   /**
-   * Handle geometry drawing on mouse down with vertex alignment
+   * Handle geometry drawing on mouse down - NEW: preserve exact user input
    */
   private handleGeometryMouseDown(pixeloidPos: { x: number, y: number }): void {
     const mode = gameStore.geometry.drawing.mode
@@ -230,149 +231,213 @@ export class InputManager {
       return
     }
     
-    // Apply vertex alignment for transform coherence
-    const alignedPos = CoordinateHelper.getVertexAlignedPixeloid(createPixeloidCoordinate(pixeloidPos.x, pixeloidPos.y))
+    // EXACT user input preservation - NO MODIFICATION
+    const firstPixeloidPos = createPixeloidCoordinate(pixeloidPos.x, pixeloidPos.y)
     
-    // Use consistent top-left pixeloid anchoring for ALL shapes (including diamonds)
-    const anchorPoints = GeometryHelper.calculatePixeloidAnchorPoints(alignedPos.x, alignedPos.y)
-    const topLeftPos = anchorPoints.topLeft
+    // Get anchor configuration for this geometry type
+    const anchorConfig = GeometryVertexCalculator.getDefaultAnchorConfig(mode)
     
-    if (mode === 'rectangle') {
-      gameStore.geometry.drawing.activeDrawing.type = 'rectangle'
-      gameStore.geometry.drawing.activeDrawing.startPoint = topLeftPos
-      gameStore.geometry.drawing.activeDrawing.isDrawing = true
-    } else if (mode === 'point') {
-      // Points: create immediately at top-left
-      this.createPoint(topLeftPos)
-    } else if (mode === 'line') {
-      gameStore.geometry.drawing.activeDrawing.type = 'line'
-      gameStore.geometry.drawing.activeDrawing.startPoint = topLeftPos
-      gameStore.geometry.drawing.activeDrawing.isDrawing = true
-    } else if (mode === 'circle') {
-      gameStore.geometry.drawing.activeDrawing.type = 'circle'
-      gameStore.geometry.drawing.activeDrawing.startPoint = topLeftPos
-      gameStore.geometry.drawing.activeDrawing.isDrawing = true
-    } else if (mode === 'diamond') {
-      // Diamonds: start point will become either west or east vertex based on drag direction
-      gameStore.geometry.drawing.activeDrawing.type = 'diamond'
-      gameStore.geometry.drawing.activeDrawing.startPoint = topLeftPos
+    if (mode === 'point') {
+      // Points: create immediately using new vertex calculation
+      this.createPointWithVertices(firstPixeloidPos, anchorConfig)
+    } else {
+      // Multi-step shapes: store exact input for drag completion
+      gameStore.geometry.drawing.activeDrawing.type = mode
+      gameStore.geometry.drawing.activeDrawing.firstPixeloidPos = firstPixeloidPos
+      gameStore.geometry.drawing.activeDrawing.anchorConfig = anchorConfig
       gameStore.geometry.drawing.activeDrawing.isDrawing = true
     }
   }
 
   /**
-   * Handle geometry drawing on mouse up
+   * Handle geometry drawing on mouse up - NEW: use vertex calculation
    */
   private handleGeometryMouseUp(pixeloidPos: { x: number, y: number }): void {
     const activeDrawing = gameStore.geometry.drawing.activeDrawing
     
-    if (activeDrawing.isDrawing && activeDrawing.startPoint) {
-      const startPoint = activeDrawing.startPoint
+    if (activeDrawing.isDrawing && activeDrawing.firstPixeloidPos && activeDrawing.anchorConfig && activeDrawing.type) {
+      // EXACT user input preservation - NO MODIFICATION
+      const secondPixeloidPos = createPixeloidCoordinate(pixeloidPos.x, pixeloidPos.y)
       
-      if (activeDrawing.type === 'diamond') {
-        // Diamonds: use top-left anchoring for current position, then calculate directional vertices
-        const anchorPoints = GeometryHelper.calculatePixeloidAnchorPoints(pixeloidPos.x, pixeloidPos.y)
-        const currentPoint = anchorPoints.topLeft
-        this.createDiamond(startPoint, currentPoint)
-      } else {
-        // All other shapes: use consistent top-left pixeloid anchoring
-        const anchorPoints = GeometryHelper.calculatePixeloidAnchorPoints(pixeloidPos.x, pixeloidPos.y)
-        const endPoint = anchorPoints.topLeft
-        
-        if (activeDrawing.type === 'rectangle') {
-          this.createRectangle(startPoint, endPoint)
-        } else if (activeDrawing.type === 'line') {
-          this.createLine(startPoint, endPoint)
-        } else if (activeDrawing.type === 'circle') {
-          this.createCircle(startPoint, endPoint)
-        }
-      }
+      // Use vertex calculation for all geometry types
+      this.createGeometryWithVertices(
+        activeDrawing.firstPixeloidPos,
+        secondPixeloidPos,
+        activeDrawing.type,
+        activeDrawing.anchorConfig
+      )
       
       // Clear active drawing
-      gameStore.geometry.drawing.activeDrawing.type = null
-      gameStore.geometry.drawing.activeDrawing.startPoint = null
-      gameStore.geometry.drawing.activeDrawing.currentPoint = null
-      gameStore.geometry.drawing.activeDrawing.isDrawing = false
+      this.clearActiveDrawing()
     }
   }
 
   /**
-   * Create a point immediately (no dragging needed)
+   * Create a point immediately using new vertex calculation
    */
-  private createPoint(pixeloidPos: { x: number, y: number }): void {
-    updateGameStore.createPoint(pixeloidPos.x, pixeloidPos.y)
+  private createPointWithVertices(pixeloidPos: PixeloidCoordinate, anchorConfig: any): void {
+    // Calculate vertices and create through store
+    const vertices = GeometryVertexCalculator.calculateGeometryVertices(
+      pixeloidPos,
+      pixeloidPos, // Same position for point
+      'point',
+      anchorConfig
+    )
+    
+    // Extract legacy properties for compatibility
+    const properties = GeometryVertexCalculator.extractGeometryProperties(vertices, 'point')
+    updateGameStore.createPoint(properties.x, properties.y)
   }
 
   /**
-   * Handle geometry drawing during mouse move (for preview)
+   * Create any geometry type using vertex calculation
+   */
+  private createGeometryWithVertices(
+    firstPos: PixeloidCoordinate,
+    secondPos: PixeloidCoordinate,
+    geometryType: 'point' | 'line' | 'circle' | 'rectangle' | 'diamond',
+    anchorConfig: any
+  ): void {
+    // Calculate vertices using new system
+    const vertices = GeometryVertexCalculator.calculateGeometryVertices(
+      firstPos,
+      secondPos,
+      geometryType,
+      anchorConfig
+    )
+    
+    // Extract legacy properties for compatibility with existing store methods
+    const properties = GeometryVertexCalculator.extractGeometryProperties(vertices, geometryType)
+    
+    // Create using existing store methods (will be updated later)
+    switch (geometryType) {
+      case 'line':
+        updateGameStore.createLine(properties.startX, properties.startY, properties.endX, properties.endY)
+        break
+      case 'circle':
+        updateGameStore.createCircle(properties.centerX, properties.centerY, properties.radius)
+        break
+      case 'rectangle':
+        updateGameStore.createRectangle(properties.x, properties.y, properties.width, properties.height)
+        break
+      case 'diamond':
+        updateGameStore.createDiamond(properties.anchorX, properties.anchorY, properties.width, properties.height)
+        break
+    }
+  }
+
+  /**
+   * Clear active drawing state
+   */
+  private clearActiveDrawing(): void {
+    gameStore.geometry.drawing.activeDrawing.type = null
+    gameStore.geometry.drawing.activeDrawing.firstPixeloidPos = null
+    gameStore.geometry.drawing.activeDrawing.currentPixeloidPos = null
+    gameStore.geometry.drawing.activeDrawing.anchorConfig = null
+    gameStore.geometry.drawing.activeDrawing.isDrawing = false
+    gameStore.geometry.drawing.preview = null
+  }
+
+  /**
+   * Handle geometry drawing during mouse move - NEW: unified preview/creation logic
    */
   private handleGeometryMouseMove(pixeloidPos: { x: number, y: number }): void {
     const activeDrawing = gameStore.geometry.drawing.activeDrawing
     
-    if (activeDrawing.isDrawing && activeDrawing.startPoint) {
-      // Use consistent top-left pixeloid anchoring for ALL shapes during preview
-      const anchorPoints = GeometryHelper.calculatePixeloidAnchorPoints(pixeloidPos.x, pixeloidPos.y)
-      const currentPoint = anchorPoints.topLeft
+    if (activeDrawing.isDrawing && activeDrawing.firstPixeloidPos && activeDrawing.anchorConfig && activeDrawing.type) {
+      // EXACT user input preservation - NO MODIFICATION
+      const currentPixeloidPos = createPixeloidCoordinate(pixeloidPos.x, pixeloidPos.y)
       
-      // Update current point for preview
-      gameStore.geometry.drawing.activeDrawing.currentPoint = currentPoint
+      // Update current position for tracking
+      gameStore.geometry.drawing.activeDrawing.currentPixeloidPos = currentPixeloidPos
+      
+      // Use SAME vertex calculation as final creation for preview
+      const previewVertices = GeometryVertexCalculator.calculateGeometryVertices(
+        activeDrawing.firstPixeloidPos,
+        currentPixeloidPos,
+        activeDrawing.type,
+        activeDrawing.anchorConfig
+      )
+      
+      // Create preview state using new architecture
+      gameStore.geometry.drawing.preview = {
+        vertices: previewVertices,
+        type: activeDrawing.type,
+        style: {
+          color: gameStore.geometry.drawing.settings.defaultColor,
+          strokeWidth: gameStore.geometry.drawing.settings.defaultStrokeWidth,
+          strokeAlpha: gameStore.geometry.drawing.settings.strokeAlpha,
+          ...(gameStore.geometry.drawing.settings.fillEnabled && {
+            fillColor: gameStore.geometry.drawing.settings.defaultFillColor,
+            fillAlpha: gameStore.geometry.drawing.settings.fillAlpha
+          })
+        },
+        isPreview: true
+      }
     }
   }
 
 
   /**
-   * Create a rectangle from start and end points
+   * Create a rectangle from start and end points using unified anchoring
    */
   private createRectangle(startPoint: { x: number, y: number }, endPoint: { x: number, y: number }): void {
-    // Calculate rectangle properties
-    const minX = Math.min(startPoint.x, endPoint.x)
-    const minY = Math.min(startPoint.y, endPoint.y)
-    const maxX = Math.max(startPoint.x, endPoint.x)
-    const maxY = Math.max(startPoint.y, endPoint.y)
+    // Calculate rectangle size
+    const width = Math.abs(endPoint.x - startPoint.x)
+    const height = Math.abs(endPoint.y - startPoint.y)
     
     // Only create rectangle if it has some size (minimum 1 pixeloid)
-    if (Math.abs(maxX - minX) >= 1 && Math.abs(maxY - minY) >= 1) {
-      updateGameStore.createRectangle(minX, minY, maxX - minX, maxY - minY)
+    if (width >= 1 && height >= 1) {
+      updateGameStore.createRectangleWithAnchor(
+        createPixeloidCoordinate(startPoint.x, startPoint.y),
+        createPixeloidCoordinate(endPoint.x, endPoint.y)
+      )
     }
   }
 
   /**
-   * Create a line from start and end points
+   * Create a line from start and end points using unified anchoring
    */
   private createLine(startPoint: { x: number, y: number }, endPoint: { x: number, y: number }): void {
     // Only create line if it has some length (minimum 1 pixeloid distance)
     const distance = Math.sqrt(Math.pow(endPoint.x - startPoint.x, 2) + Math.pow(endPoint.y - startPoint.y, 2))
     if (distance >= 1) {
-      updateGameStore.createLine(startPoint.x, startPoint.y, endPoint.x, endPoint.y)
+      updateGameStore.createLineWithAnchor(
+        createPixeloidCoordinate(startPoint.x, startPoint.y),
+        createPixeloidCoordinate(endPoint.x, endPoint.y)
+      )
     }
   }
 
   /**
-   * Create a circle from center and edge points
+   * Create a circle using unified anchoring (ISOMETRIC: radius from width)
    */
-  private createCircle(centerPoint: { x: number, y: number }, edgePoint: { x: number, y: number }): void {
-    // Calculate radius
-    const radius = Math.sqrt(Math.pow(edgePoint.x - centerPoint.x, 2) + Math.pow(edgePoint.y - centerPoint.y, 2))
+  private createCircle(startPoint: { x: number, y: number }, dragPoint: { x: number, y: number }): void {
+    // Calculate width for isometric circle
+    const width = Math.abs(dragPoint.x - startPoint.x)
     
-    // Only create circle if it has some size (minimum 1 pixeloid radius)
-    if (radius >= 1) {
-      updateGameStore.createCircle(centerPoint.x, centerPoint.y, Math.round(radius))
+    // Only create circle if it has some size (minimum 1 pixeloid width)
+    if (width >= 1) {
+      updateGameStore.createCircleWithAnchor(
+        createPixeloidCoordinate(startPoint.x, startPoint.y),
+        createPixeloidCoordinate(dragPoint.x, dragPoint.y)
+      )
     }
   }
 
   /**
-   * Create an isometric diamond from anchor point and width
+   * Create an isometric diamond using unified anchoring (ISOMETRIC: height from width)
    */
-  private createDiamond(anchorPoint: { x: number, y: number }, dragPoint: { x: number, y: number }): void {
-    // Use centralized geometry calculations
-    const properties = GeometryHelper.calculateDiamondProperties(
-      createPixeloidCoordinate(anchorPoint.x, anchorPoint.y),
-      createPixeloidCoordinate(dragPoint.x, dragPoint.y)
-    )
+  private createDiamond(startPoint: { x: number, y: number }, dragPoint: { x: number, y: number }): void {
+    // Calculate width for isometric diamond
+    const width = Math.abs(dragPoint.x - startPoint.x)
     
     // Only create diamond if it has some size (any width > 0)
-    if (properties.width > 0) {
-      updateGameStore.createDiamond(properties.anchorX, properties.anchorY, properties.width, properties.height)
+    if (width > 0) {
+      updateGameStore.createDiamondWithAnchor(
+        createPixeloidCoordinate(startPoint.x, startPoint.y),
+        createPixeloidCoordinate(dragPoint.x, dragPoint.y)
+      )
     }
   }
 

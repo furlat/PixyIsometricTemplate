@@ -182,15 +182,19 @@ export class InfiniteCanvas {
     const newMouseVertexY = this.zoomTargetScreen.y / newScale
     
     // Calculate new offset to keep same pixeloid under mouse
-    const newOffsetX = targetPixeloidX - newMouseVertexX
-    const newOffsetY = targetPixeloidY - newMouseVertexY
+    const rawOffsetX = targetPixeloidX - newMouseVertexX
+    const rawOffsetY = targetPixeloidY - newMouseVertexY
     
-    // ✅ FIXED: Update offset (NOT camera) to maintain static mesh
+    // ✅ FIX: Round to integers for pixeloid-perfect alignment (eliminates geometry drift)
+    const newOffsetX = Math.round(rawOffsetX)  // DISCRETE INTEGER alignment
+    const newOffsetY = Math.round(rawOffsetY)  // DISCRETE INTEGER alignment
+    
+    // Update offset with integer values for perfect pixeloid grid alignment
     updateGameStore.setVertexToPixeloidOffset(
       createPixeloidCoordinate(newOffsetX, newOffsetY)
     )
     
-    console.log(`InfiniteCanvas: Mouse-centered zoom - offset adjusted to (${newOffsetX.toFixed(2)}, ${newOffsetY.toFixed(2)})`)
+    console.log(`InfiniteCanvas: Mouse-centered zoom - offset adjusted to INTEGER (${newOffsetX}, ${newOffsetY}) [raw: (${rawOffsetX.toFixed(2)}, ${rawOffsetY.toFixed(2)})]`)
   }
 
   /**

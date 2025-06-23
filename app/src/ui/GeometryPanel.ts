@@ -96,22 +96,22 @@ export class GeometryPanel {
       // Note: opacity is already set in HTML via Tailwind class
     }
     
-    // Default stroke width input
+    // Default stroke width input - FIXED: Allow stroke width below 0.5
     const defaultStrokeWidthElement = this.elements.get('geometry-default-stroke-width')
     if (defaultStrokeWidthElement) {
       defaultStrokeWidthElement.addEventListener('input', (event) => {
         const target = event.target as HTMLInputElement
-        const newValue = Math.max(0.5, parseFloat(target.value) || 0.5)
+        const newValue = Math.max(0.1, parseFloat(target.value) || 0.1) // Allow down to 0.1
         updateGameStore.setDrawingSettings({ defaultStrokeWidth: newValue })
       })
       
-      // Ensure minimum value
+      // Ensure minimum value (now 0.1 instead of 0.5)
       defaultStrokeWidthElement.addEventListener('blur', (event) => {
         const target = event.target as HTMLInputElement
-        const value = parseFloat(target.value) || 0.5
-        if (value < 0.5) {
-          target.value = '0.5'
-          updateGameStore.setDrawingSettings({ defaultStrokeWidth: 0.5 })
+        const value = parseFloat(target.value) || 0.1
+        if (value < 0.1) {
+          target.value = '0.1'
+          updateGameStore.setDrawingSettings({ defaultStrokeWidth: 0.1 })
         }
       })
     }

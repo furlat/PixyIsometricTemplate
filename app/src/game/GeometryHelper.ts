@@ -12,9 +12,35 @@ import type {
   GeometricObject,
   PixeloidCoordinate,
   GeometricMetadata,
+  AnchorSnapPoint,
 } from '../types'
 
 export class GeometryHelper {
+
+  /**
+   * UNIFIED PIXELOID ANCHORING SYSTEM
+   * Snap to consistent anchor points within pixeloid for all geometry types
+   */
+  static snapToPixeloidAnchor(
+    clickPosition: PixeloidCoordinate,
+    snapPoint: AnchorSnapPoint
+  ): PixeloidCoordinate {
+    const gridX = Math.floor(clickPosition.x)
+    const gridY = Math.floor(clickPosition.y)
+    
+    switch (snapPoint) {
+      case 'top-left':     return { __brand: 'pixeloid', x: gridX,       y: gridY }
+      case 'top-mid':      return { __brand: 'pixeloid', x: gridX + 0.5, y: gridY }
+      case 'top-right':    return { __brand: 'pixeloid', x: gridX + 1,   y: gridY }
+      case 'left-mid':     return { __brand: 'pixeloid', x: gridX,       y: gridY + 0.5 }
+      case 'center':       return { __brand: 'pixeloid', x: gridX + 0.5, y: gridY + 0.5 }
+      case 'right-mid':    return { __brand: 'pixeloid', x: gridX + 1,   y: gridY + 0.5 }
+      case 'bottom-left':  return { __brand: 'pixeloid', x: gridX,       y: gridY + 1 }
+      case 'bottom-mid':   return { __brand: 'pixeloid', x: gridX + 0.5, y: gridY + 1 }
+      case 'bottom-right': return { __brand: 'pixeloid', x: gridX + 1,   y: gridY + 1 }
+    }
+  }
+
   /**
    * Calculate diamond vertices from diamond properties
    * anchorX = west vertex X position, anchorY = center Y position (east/west level)
@@ -34,13 +60,15 @@ export class GeometryHelper {
     // - West/East vertices: snap to pixeloid centers (top-left anchor)
     // - North/South vertices: do NOT snap, use exact calculated positions
     return {
-      west: { x: anchorX, y: anchorY },
+      west: { __brand: 'pixeloid', x: anchorX, y: anchorY },
       north: {
+        __brand: 'pixeloid',
         x: centerX,
         y: anchorY - height  // No snapping for north/south
       },
-      east: { x: anchorX + width, y: anchorY },
+      east: { __brand: 'pixeloid', x: anchorX + width, y: anchorY },
       south: {
+        __brand: 'pixeloid',
         x: centerX,
         y: anchorY + height  // No snapping for north/south
       }
@@ -143,6 +171,7 @@ export class GeometryHelper {
    */
   static snapPointToPixeloidCenter(point: PixeloidCoordinate): PixeloidCoordinate {
     return {
+      __brand: 'pixeloid',
       x: this.snapToPixeloidCenter(point.x),
       y: this.snapToPixeloidCenter(point.y)
     }
@@ -180,19 +209,19 @@ export class GeometryHelper {
     
     return {
       // Four corners of the pixeloid square (integer coordinates)
-      topLeft: { x: gridX, y: gridY },
-      topRight: { x: gridX + 1, y: gridY },
-      bottomLeft: { x: gridX, y: gridY + 1 },
-      bottomRight: { x: gridX + 1, y: gridY + 1 },
+      topLeft: { __brand: 'pixeloid', x: gridX, y: gridY },
+      topRight: { __brand: 'pixeloid', x: gridX + 1, y: gridY },
+      bottomLeft: { __brand: 'pixeloid', x: gridX, y: gridY + 1 },
+      bottomRight: { __brand: 'pixeloid', x: gridX + 1, y: gridY + 1 },
       
       // Midpoints of each edge (half-integer on one axis)
-      topMid: { x: gridX + 0.5, y: gridY },           // Top edge center
-      rightMid: { x: gridX + 1, y: gridY + 0.5 },     // Right edge center
-      bottomMid: { x: gridX + 0.5, y: gridY + 1 },    // Bottom edge center
-      leftMid: { x: gridX, y: gridY + 0.5 },          // Left edge center
+      topMid: { __brand: 'pixeloid', x: gridX + 0.5, y: gridY },           // Top edge center
+      rightMid: { __brand: 'pixeloid', x: gridX + 1, y: gridY + 0.5 },     // Right edge center
+      bottomMid: { __brand: 'pixeloid', x: gridX + 0.5, y: gridY + 1 },    // Bottom edge center
+      leftMid: { __brand: 'pixeloid', x: gridX, y: gridY + 0.5 },          // Left edge center
       
       // Center of the pixeloid (half-integer on both axes)
-      center: { x: gridX + 0.5, y: gridY + 0.5 }      // Pixeloid center
+      center: { __brand: 'pixeloid', x: gridX + 0.5, y: gridY + 0.5 }      // Pixeloid center
     }
   }
 
@@ -255,7 +284,7 @@ export class GeometryHelper {
    */
   static calculatePointMetadata(point: { x: number; y: number }): GeometricMetadata {
     return {
-      center: { x: point.x, y: point.y },
+      center: { __brand: 'pixeloid', x: point.x, y: point.y },
       bounds: {
         minX: point.x,
         maxX: point.x,
@@ -273,7 +302,7 @@ export class GeometryHelper {
     const centerY = (line.startY + line.endY) / 2
     
     return {
-      center: { x: centerX, y: centerY },
+      center: { __brand: 'pixeloid', x: centerX, y: centerY },
       bounds: {
         minX: Math.min(line.startX, line.endX),
         maxX: Math.max(line.startX, line.endX),
@@ -288,7 +317,7 @@ export class GeometryHelper {
    */
   static calculateCircleMetadata(circle: { centerX: number; centerY: number; radius: number }): GeometricMetadata {
     return {
-      center: { x: circle.centerX, y: circle.centerY },
+      center: { __brand: 'pixeloid', x: circle.centerX, y: circle.centerY },
       bounds: {
         minX: circle.centerX - circle.radius,
         maxX: circle.centerX + circle.radius,
@@ -306,7 +335,7 @@ export class GeometryHelper {
     const centerY = rectangle.y + rectangle.height / 2
     
     return {
-      center: { x: centerX, y: centerY },
+      center: { __brand: 'pixeloid', x: centerX, y: centerY },
       bounds: {
         minX: rectangle.x,
         maxX: rectangle.x + rectangle.width,
@@ -324,7 +353,7 @@ export class GeometryHelper {
     const centerY = diamond.anchorY
     
     return {
-      center: { x: centerX, y: centerY },
+      center: { __brand: 'pixeloid', x: centerX, y: centerY },
       bounds: {
         minX: diamond.anchorX,
         maxX: diamond.anchorX + diamond.width,
@@ -349,17 +378,17 @@ export class GeometryHelper {
   ): boolean {
     // Fast mode: only check center point
     if (samplingMode === 'fast') {
-      const centerPoint = { x: pixeloidX + 0.5, y: pixeloidY + 0.5 }
+      const centerPoint = { __brand: 'pixeloid', x: pixeloidX + 0.5, y: pixeloidY + 0.5 } as PixeloidCoordinate
       return this.isPointInsideObject(centerPoint, obj)
     }
 
     // Precise mode: 5-point sampling within the pixeloid
     const samples = [
-      { x: pixeloidX + 0.25, y: pixeloidY + 0.25 }, // Top-left
-      { x: pixeloidX + 0.75, y: pixeloidY + 0.25 }, // Top-right
-      { x: pixeloidX + 0.25, y: pixeloidY + 0.75 }, // Bottom-left
-      { x: pixeloidX + 0.75, y: pixeloidY + 0.75 }, // Bottom-right
-      { x: pixeloidX + 0.5, y: pixeloidY + 0.5 }     // Center
+      { __brand: 'pixeloid', x: pixeloidX + 0.25, y: pixeloidY + 0.25 } as PixeloidCoordinate, // Top-left
+      { __brand: 'pixeloid', x: pixeloidX + 0.75, y: pixeloidY + 0.25 } as PixeloidCoordinate, // Top-right
+      { __brand: 'pixeloid', x: pixeloidX + 0.25, y: pixeloidY + 0.75 } as PixeloidCoordinate, // Bottom-left
+      { __brand: 'pixeloid', x: pixeloidX + 0.75, y: pixeloidY + 0.75 } as PixeloidCoordinate, // Bottom-right
+      { __brand: 'pixeloid', x: pixeloidX + 0.5, y: pixeloidY + 0.5 } as PixeloidCoordinate     // Center
     ]
     
     // If any sample point is inside the object, the pixeloid intersects

@@ -87,10 +87,12 @@ export const gameStore = proxy<GameState>({
       mode: 'none',
       activeDrawing: {
         type: null,
-        startPoint: null,
-        currentPoint: null,
+        firstPixeloidPos: null,
+        currentPixeloidPos: null,
+        anchorConfig: null,
         isDrawing: false
       },
+      preview: null,
       settings: {
         defaultColor: 0x0066cc,
         defaultStrokeWidth: 1,
@@ -109,6 +111,17 @@ export const gameStore = proxy<GameState>({
         stepColor: 0xffaa66
       }
     },
+    // Unified anchor configuration for pixeloid snapping
+    anchorConfig: {
+      defaults: {
+        point: 'top-left',     // All geometry types default to top-left for consistency
+        line: 'top-left',
+        circle: 'top-left',    // Changed from center to top-left for consistency
+        rectangle: 'top-left', // Already correct
+        diamond: 'top-left'    // Changed from west-vertex to top-left for consistency
+      },
+      enablePreComputedAnchors: true  // Enable zoom-stable anchoring
+    },
     layerVisibility: {
       background: true,  // Grid and background elements
       geometry: true,    // Geometric shapes and objects
@@ -117,6 +130,9 @@ export const gameStore = proxy<GameState>({
       mask: false,       // Pixeloid mask layer for collision/spatial analysis (off by default)
       bbox: false,       // Bounding box overlay for comparison (off by default)
       mouse: true        // Mouse visualization
+    },
+    filterEffects: {
+      outline: true  // Selection outline enabled by default
     },
     selection: {
       selectedObjectId: null,
@@ -385,9 +401,11 @@ export const updateGameStore = {
     gameStore.geometry.drawing.mode = mode
     // Clear active drawing when switching modes
     gameStore.geometry.drawing.activeDrawing.type = null
-    gameStore.geometry.drawing.activeDrawing.startPoint = null
-    gameStore.geometry.drawing.activeDrawing.currentPoint = null
+    gameStore.geometry.drawing.activeDrawing.firstPixeloidPos = null
+    gameStore.geometry.drawing.activeDrawing.currentPixeloidPos = null
+    gameStore.geometry.drawing.activeDrawing.anchorConfig = null
     gameStore.geometry.drawing.activeDrawing.isDrawing = false
+    gameStore.geometry.drawing.preview = null
   },
 
   addGeometricObject: (object: GeometricObject) => {
@@ -798,6 +816,11 @@ export const updateGameStore = {
     }
   },
 
+  setOutlineFilterEnabled: (enabled: boolean) => {
+    gameStore.geometry.filterEffects.outline = enabled
+    console.log(`Store: Outline filter ${enabled ? 'enabled' : 'disabled'}`)
+  },
+
   // Texture Registry actions (WRITE-ONLY from rendering perspective)
   setObjectTexture: (objectId: string, textureData: ObjectTextureData) => {
     gameStore.textureRegistry.objectTextures[objectId] = textureData
@@ -949,6 +972,163 @@ export const updateGameStore = {
 
   getCoordinateMappingForScale: (pixeloidScale: number): PixeloidVertexMapping | null => {
     return gameStore.staticMesh.coordinateMappings.get(pixeloidScale) || null
+  },
+
+  // ================================
+  // UNIFIED ANCHORING SYSTEM
+  // ================================
+
+  getAnchorConfig: (geometryType: 'point' | 'line' | 'circle' | 'rectangle' | 'diamond') => {
+    return gameStore.geometry.anchorConfig.defaults[geometryType]
+  },
+
+  setAnchorConfig: (geometryType: 'point' | 'line' | 'circle' | 'rectangle' | 'diamond', snapPoint: any) => {
+    gameStore.geometry.anchorConfig.defaults[geometryType] = snapPoint
+  },
+
+  // Factory methods with unified anchoring
+  createPointWithAnchor: (clickPos: PixeloidCoordinate) => {
+    const snapPoint = updateGameStore.getAnchorConfig('point')
+    const anchoredPos = GeometryHelper.snapToPixeloidAnchor(clickPos, snapPoint)
+    
+    const point: GeometricPoint = {
+      id: updateGameStore.generateUniqueId('point'),
+      x: anchoredPos.x,
+      y: anchoredPos.y,
+      color: gameStore.geometry.drawing.settings.defaultColor,
+      strokeAlpha: gameStore.geometry.drawing.settings.strokeAlpha,
+      isVisible: true,
+      createdAt: Date.now(),
+      metadata: GeometryHelper.calculatePointMetadata({ x: anchoredPos.x, y: anchoredPos.y })
+    }
+    gameStore.geometry.objects.push(point)
+    gameStore.geometry.mask.enabledObjects.add(point.id)
+    return point
+  },
+
+  createLineWithAnchor: (clickPos: PixeloidCoordinate, dragPos: PixeloidCoordinate) => {
+    const snapPoint = updateGameStore.getAnchorConfig('line')
+    const anchoredStart = GeometryHelper.snapToPixeloidAnchor(clickPos, snapPoint)
+    
+    const line: GeometricLine = {
+      id: updateGameStore.generateUniqueId('line'),
+      startX: anchoredStart.x,
+      startY: anchoredStart.y,
+      endX: dragPos.x,  // End point can be anywhere
+      endY: dragPos.y,
+      color: gameStore.geometry.drawing.settings.defaultColor,
+      strokeWidth: gameStore.geometry.drawing.settings.defaultStrokeWidth,
+      strokeAlpha: gameStore.geometry.drawing.settings.strokeAlpha,
+      isVisible: true,
+      createdAt: Date.now(),
+      metadata: GeometryHelper.calculateLineMetadata({
+        startX: anchoredStart.x, startY: anchoredStart.y,
+        endX: dragPos.x, endY: dragPos.y
+      })
+    }
+    gameStore.geometry.objects.push(line)
+    gameStore.geometry.mask.enabledObjects.add(line.id)
+    return line
+  },
+
+  createCircleWithAnchor: (clickPos: PixeloidCoordinate, dragPos: PixeloidCoordinate) => {
+    const snapPoint = updateGameStore.getAnchorConfig('circle')
+    const anchoredStart = GeometryHelper.snapToPixeloidAnchor(clickPos, snapPoint)
+    
+    // ISOMETRIC CONSTRAINT: Circle radius derived from width only
+    const width = Math.abs(dragPos.x - anchoredStart.x)
+    const radius = width / 2
+    
+    const circle: GeometricCircle = {
+      id: updateGameStore.generateUniqueId('circle'),
+      centerX: anchoredStart.x + radius,  // Calculate center from anchor
+      centerY: anchoredStart.y + radius,
+      radius,
+      color: gameStore.geometry.drawing.settings.defaultColor,
+      strokeWidth: gameStore.geometry.drawing.settings.defaultStrokeWidth,
+      strokeAlpha: gameStore.geometry.drawing.settings.strokeAlpha,
+      ...(gameStore.geometry.drawing.settings.fillEnabled && {
+        fillColor: gameStore.geometry.drawing.settings.defaultFillColor,
+        fillAlpha: gameStore.geometry.drawing.settings.fillAlpha
+      }),
+      isVisible: true,
+      createdAt: Date.now(),
+      metadata: GeometryHelper.calculateCircleMetadata({
+        centerX: anchoredStart.x + radius,
+        centerY: anchoredStart.y + radius,
+        radius
+      })
+    }
+    gameStore.geometry.objects.push(circle)
+    gameStore.geometry.mask.enabledObjects.add(circle.id)
+    return circle
+  },
+
+  createRectangleWithAnchor: (clickPos: PixeloidCoordinate, dragPos: PixeloidCoordinate) => {
+    const snapPoint = updateGameStore.getAnchorConfig('rectangle')
+    const anchoredStart = GeometryHelper.snapToPixeloidAnchor(clickPos, snapPoint)
+    
+    const width = Math.abs(dragPos.x - anchoredStart.x)
+    const height = Math.abs(dragPos.y - anchoredStart.y)
+    
+    const rectangle: GeometricRectangle = {
+      id: updateGameStore.generateUniqueId('rect'),
+      x: anchoredStart.x,  // Top-left corner
+      y: anchoredStart.y,
+      width,
+      height,
+      color: gameStore.geometry.drawing.settings.defaultColor,
+      strokeWidth: gameStore.geometry.drawing.settings.defaultStrokeWidth,
+      strokeAlpha: gameStore.geometry.drawing.settings.strokeAlpha,
+      ...(gameStore.geometry.drawing.settings.fillEnabled && {
+        fillColor: gameStore.geometry.drawing.settings.defaultFillColor,
+        fillAlpha: gameStore.geometry.drawing.settings.fillAlpha
+      }),
+      isVisible: true,
+      createdAt: Date.now(),
+      metadata: GeometryHelper.calculateRectangleMetadata({
+        x: anchoredStart.x, y: anchoredStart.y, width, height
+      })
+    }
+    gameStore.geometry.objects.push(rectangle)
+    gameStore.geometry.mask.enabledObjects.add(rectangle.id)
+    return rectangle
+  },
+
+  createDiamondWithAnchor: (clickPos: PixeloidCoordinate, dragPos: PixeloidCoordinate) => {
+    const snapPoint = updateGameStore.getAnchorConfig('diamond')
+    const anchoredStart = GeometryHelper.snapToPixeloidAnchor(clickPos, snapPoint)
+    
+    // ISOMETRIC CONSTRAINT: Diamond height derived from width
+    const width = Math.abs(dragPos.x - anchoredStart.x)
+    const height = width / 4  // Fixed ratio for isometric diamonds
+    
+    // Calculate west vertex from top-left anchor
+    const westX = anchoredStart.x
+    const westY = anchoredStart.y + height  // Center Y
+    
+    const diamond: GeometricDiamond = {
+      id: updateGameStore.generateUniqueId('diamond'),
+      anchorX: westX,
+      anchorY: westY,
+      width,
+      height,
+      color: gameStore.geometry.drawing.settings.defaultColor,
+      strokeWidth: gameStore.geometry.drawing.settings.defaultStrokeWidth,
+      strokeAlpha: gameStore.geometry.drawing.settings.strokeAlpha,
+      ...(gameStore.geometry.drawing.settings.fillEnabled && {
+        fillColor: gameStore.geometry.drawing.settings.defaultFillColor,
+        fillAlpha: gameStore.geometry.drawing.settings.fillAlpha
+      }),
+      isVisible: true,
+      createdAt: Date.now(),
+      metadata: GeometryHelper.calculateDiamondMetadata({
+        anchorX: westX, anchorY: westY, width, height
+      })
+    }
+    gameStore.geometry.objects.push(diamond)
+    gameStore.geometry.mask.enabledObjects.add(diamond.id)
+    return diamond
   }
 }
 

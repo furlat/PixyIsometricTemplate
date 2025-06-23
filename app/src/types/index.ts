@@ -294,19 +294,103 @@ export interface GeometricDiamond {
   metadata: GeometricMetadata
 }
 
+// ================================
+// NEW STABLE GEOMETRY ARCHITECTURE
+// ================================
+
+// Pixeloid vertex (stored coordinates - resolution independent)
+export interface PixeloidVertex {
+  readonly __brand: 'pixeloid'
+  x: number
+  y: number
+}
+
+// Mesh vertex (rendering coordinates - derived from pixeloid)
+export interface MeshVertex {
+  readonly __brand: 'vertex'
+  x: number
+  y: number
+}
+
+// Anchor point within pixeloid square
+export type PixeloidAnchorPoint =
+  | 'top-left' | 'top-mid' | 'top-right'
+  | 'left-mid' | 'center' | 'right-mid'
+  | 'bottom-left' | 'bottom-mid' | 'bottom-right'
+
+// Anchor configuration for object creation
+export interface AnchorConfig {
+  firstPointAnchor: PixeloidAnchorPoint
+  secondPointAnchor?: PixeloidAnchorPoint
+}
+
+// Geometry style properties (separated from coordinates)
+export interface GeometryStyle {
+  color: number
+  strokeWidth: number
+  strokeAlpha: number
+  fillColor?: number
+  fillAlpha?: number
+}
+
+// NEW: Stable geometric object with pre-computed vertices
+export interface GeometricObjectStable {
+  // Identity
+  id: string
+  type: 'point' | 'line' | 'circle' | 'rectangle' | 'diamond'
+  isVisible: boolean
+  createdAt: number
+  
+  // THE KEY: Pre-computed vertices in pixeloid space (NEVER recomputed)
+  pixeloidVertices: PixeloidVertex[]
+  
+  // Anchor configuration used at creation
+  anchorConfig: AnchorConfig
+  
+  // Style properties (no coordinates here!)
+  style: GeometryStyle
+  
+  // Metadata for UI/selection (derived from vertices)
+  metadata: GeometricMetadata
+}
+
+// Preview state for drawing
+export interface DrawingPreview {
+  // Pre-computed vertices in pixeloid space (same as final objects)
+  vertices: PixeloidVertex[]
+  
+  // Geometry type for rendering
+  type: 'point' | 'line' | 'circle' | 'rectangle' | 'diamond'
+  
+  // Style properties for preview rendering
+  style: GeometryStyle
+  
+  // Indicates this is temporary preview data
+  isPreview: true
+}
+
+// Legacy types (for backward compatibility during migration)
 export type GeometricObject = GeometricPoint | GeometricLine | GeometricCircle | GeometricRectangle | GeometricDiamond
+
+// Anchor point configuration for unified pixeloid anchoring (DEPRECATED - use PixeloidAnchorPoint)
+export type AnchorSnapPoint = PixeloidAnchorPoint
 
 export interface GeometryDrawingState {
   // Current drawing mode
   mode: 'none' | 'point' | 'line' | 'circle' | 'rectangle' | 'diamond'
-  // Active drawing operation (for multi-step operations like line drawing)
+  // Active drawing operation (NEW: stores exact user input)
   activeDrawing: {
-    type: GeometricObject['id'] | null
-    startPoint: PixeloidCoordinate | null
-    currentPoint: PixeloidCoordinate | null
+    type: 'point' | 'line' | 'circle' | 'rectangle' | 'diamond' | null
+    // EXACT user input coordinates (never modified)
+    firstPixeloidPos: PixeloidCoordinate | null
+    currentPixeloidPos: PixeloidCoordinate | null
+    // Anchor configuration for this drawing operation
+    anchorConfig: AnchorConfig | null
     isDrawing: boolean
   }
-  // Drawing settings
+  // Current preview state (using new architecture)
+  preview: DrawingPreview | null
+  // Drawing settings (now matches GeometryStyle)
   settings: {
     defaultColor: number
     defaultStrokeWidth: number
@@ -345,6 +429,19 @@ export interface GeometryState {
   drawing: GeometryDrawingState
   // Raycast visualization state
   raycast: RaycastState
+  // Anchor configuration for unified pixeloid snapping
+  anchorConfig: {
+    // Default anchor points for each geometry type
+    defaults: {
+      point: AnchorSnapPoint
+      line: AnchorSnapPoint
+      circle: AnchorSnapPoint
+      rectangle: AnchorSnapPoint
+      diamond: AnchorSnapPoint
+    }
+    // Enable/disable pre-computed anchors (for zoom stability)
+    enablePreComputedAnchors: boolean
+  }
   // Layer visibility
   layerVisibility: {
     background: boolean  // Grid and background elements (backgroundLayer)
@@ -354,6 +451,10 @@ export interface GeometryState {
     mask: boolean        // Pixeloid mask layer for collision/spatial analysis (maskLayer)
     bbox: boolean        // Bounding box overlay for comparison (bboxLayer)
     mouse: boolean       // Mouse visualization (mouseLayer)
+  }
+  // Filter effects state
+  filterEffects: {
+    outline: boolean     // Selection outline filter enabled
   }
   // Selection state
   selection: {
