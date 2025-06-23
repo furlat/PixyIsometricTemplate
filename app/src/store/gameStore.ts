@@ -547,7 +547,7 @@ export const updateGameStore = {
     const index = gameStore.geometry.objects.findIndex(obj => obj.id === id)
     if (index !== -1) {
       gameStore.geometry.objects.splice(index, 1)
-      // Remove texture when object is deleted
+      // Remove textures when object is deleted
       updateGameStore.removeObjectTexture(id)
     }
   },
@@ -584,9 +584,10 @@ export const updateGameStore = {
           'startX' in updates || 'startY' in updates || 'endX' in updates || 'endY' in updates ||
           'anchorX' in updates || 'anchorY' in updates) {
         
-        // Remove cached texture to force regeneration
+        // Remove cached textures to force regeneration
         updateGameStore.removeObjectTexture(id)
-        console.log(`Store: Invalidated texture cache for object ${id} due to property changes`)
+        updateGameStore.removeRenderingTexture(id)
+        console.log(`Store: Invalidated texture caches for object ${id} due to property changes`)
       }
     }
   },
@@ -824,6 +825,7 @@ export const updateGameStore = {
   hasObjectTexture: (objectId: string): boolean => {
     return gameStore.textureRegistry.objectTextures[objectId] !== undefined
   },
+
 
   // Mesh Registry actions (for pixeloid mesh system)
   setMeshData: (objectId: string, meshData: PixeloidMeshData) => {

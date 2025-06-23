@@ -4,7 +4,6 @@ import { BackgroundGridRenderer } from './BackgroundGridRenderer'
 import { GeometryRenderer } from './GeometryRenderer'
 import { SelectionFilterRenderer } from './SelectionFilterRenderer'
 import { PixelateFilterRenderer } from './PixelateFilterRenderer'
-import { BboxTextureTestRenderer } from './BboxTextureTestRenderer'
 import { MouseHighlightShader } from './MouseHighlightShader'
 import { BoundingBoxRenderer } from './BoundingBoxRenderer'
 import { TextureRegistry } from './TextureRegistry'
@@ -44,9 +43,6 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
   
   // Pixelate filter renderer for GPU-accelerated pixeloid-perfect effects
   private pixelateFilterRenderer: PixelateFilterRenderer
-  
-  // Bbox texture test renderer for perfect overlap testing
-  private bboxTextureTestRenderer: BboxTextureTestRenderer
   
   // Mouse visualization renderer (lightweight, updates every frame)
   private mouseHighlightShader: MouseHighlightShader
@@ -98,9 +94,6 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
     // Initialize pixelate filter renderer (will be initialized after app.init())
     this.pixelateFilterRenderer = new PixelateFilterRenderer()
     
-    // Initialize bbox texture test renderer (for testing perfect overlap)
-    this.bboxTextureTestRenderer = new BboxTextureTestRenderer()
-    
     // Initialize mouse highlight renderer (lightweight)
     this.mouseHighlightShader = new MouseHighlightShader()
     
@@ -145,8 +138,6 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
     // Pixelate layer gets the pixelate filter renderer container
     this.pixelateLayer.addChild(this.pixelateFilterRenderer.getContainer())
     
-    // Bbox test layer gets the bbox texture test renderer container
-    this.bboxTestLayer.addChild(this.bboxTextureTestRenderer.getContainer())
     
     // Bbox layer gets the simple bounding box renderer
     this.bboxLayer.addChild(this.boundingBoxRenderer.getGraphics())
@@ -173,7 +164,6 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
   public initializeRenderers(): void {
     if (this.app?.renderer) {
       this.pixelateFilterRenderer.init(this.app.renderer, this.geometryRenderer)
-      this.bboxTextureTestRenderer.init(this.app.renderer, this.geometryRenderer)
       console.log('LayeredInfiniteCanvas: Initialized pixelate and bbox test renderers with dependencies')
     } else {
       console.warn('LayeredInfiniteCanvas: App renderer not available for renderer initialization')
@@ -217,8 +207,6 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
     // Render pixelate effects (independent, GPU-accelerated)
     this.renderPixelateLayer(paddedCorners, pixeloidScale)
     
-    // Render bbox texture test layer (perfect overlap testing)
-    this.renderBboxTestLayer(paddedCorners, pixeloidScale)
     
     // Render bbox layer (comparison overlay)
     this.renderBboxLayer(paddedCorners, pixeloidScale)
@@ -311,18 +299,6 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
     }
   }
 
-  /**
-   * Render bbox texture test layer - TEST: bbox-exact sprites for perfect overlap verification
-   */
-  private renderBboxTestLayer(corners: ViewportCorners, pixeloidScale: number): void {
-    // Use store state for toggleable control from UI
-    if (gameStore.geometry.layerVisibility.bboxTest) {
-      this.bboxTextureTestRenderer.render(corners, pixeloidScale)
-      this.bboxTestLayer.visible = true
-    } else {
-      this.bboxTestLayer.visible = false
-    }
-  }
   
   /**
    * Render bbox layer - separate from mask layer for independent control with proper coordinate system
@@ -532,7 +508,6 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
     this.geometryRenderer.destroy()
     this.selectionFilterRenderer.destroy()
     this.pixelateFilterRenderer.destroy()
-    this.bboxTextureTestRenderer.destroy()
     this.boundingBoxRenderer.destroy()
 
     // Destroy layer containers

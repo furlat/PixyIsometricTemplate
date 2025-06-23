@@ -1,5 +1,5 @@
-import { Graphics, Container } from 'pixi.js'
-import { gameStore } from '../store/gameStore'
+import { Graphics, Container, Renderer, Rectangle } from 'pixi.js'
+import { gameStore, updateGameStore } from '../store/gameStore'
 import { GeometryHelper } from './GeometryHelper'
 import { subscribe } from 'valtio'
 import type {
@@ -28,6 +28,7 @@ export class GeometryRenderer {
   private objectGraphics: Map<string, Graphics> = new Map()
   private previewGraphics: Graphics = new Graphics()
   
+  
   constructor() {
     // Setup container hierarchy
     this.mainContainer.addChild(this.normalContainer)
@@ -41,6 +42,7 @@ export class GeometryRenderer {
     // Subscribe to selection changes only
     this.subscribeToSelection()
   }
+
 
   /**
    * Simple render system - always renders when called by LayeredInfiniteCanvas
@@ -577,6 +579,7 @@ export class GeometryRenderer {
         break
     }
   }
+
 
   /**
    * Clean up resources

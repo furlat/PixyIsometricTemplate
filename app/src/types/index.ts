@@ -508,6 +508,7 @@ export interface TextureRegistryState {
   }
 }
 
+
 // Mesh-related types for pixeloid mesh rendering
 export interface PixeloidMeshData {
   objectId: string

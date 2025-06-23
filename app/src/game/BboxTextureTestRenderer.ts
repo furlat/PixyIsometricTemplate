@@ -1,5 +1,5 @@
 import { Graphics, Container, Sprite, Texture, Renderer } from 'pixi.js'
-import { gameStore } from '../store/gameStore'
+import { gameStore, updateGameStore } from '../store/gameStore'
 import { GeometryHelper } from './GeometryHelper'
 import { GeometryRenderer } from './GeometryRenderer'
 import type { ViewportCorners, GeometricObject, GeometricRectangle, GeometricCircle, GeometricLine, GeometricPoint, GeometricDiamond } from '../types'
@@ -11,13 +11,13 @@ import type { ViewportCorners, GeometricObject, GeometricRectangle, GeometricCir
 export class BboxTextureTestRenderer {
   private container: Container = new Container()
   private bboxSprites: Map<string, Sprite> = new Map()
-  private objectTextures: Map<string, Texture> = new Map()
   private renderer!: Renderer
   private geometryRenderer!: GeometryRenderer
   private initialized = false
 
   constructor() {
     // No filters needed - pure geometry mirror
+    // No local texture management - using store
   }
 
   /**
@@ -60,7 +60,7 @@ export class BboxTextureTestRenderer {
   }
 
   /**
-   * Create sprite that exactly matches bounding box dimensions
+   * Create simple colored rectangle that exactly matches bounding box dimensions
    */
   private createBboxTextureSprite(obj: GeometricObject): Sprite | null {
     if (!obj.metadata) {
@@ -68,62 +68,32 @@ export class BboxTextureTestRenderer {
       return null
     }
 
-    // 1. Get exact bbox dimensions
+    // Get exact bbox dimensions
     const bounds = obj.metadata.bounds
     const width = bounds.maxX - bounds.minX
     const height = bounds.maxY - bounds.minY
 
-    // 2. Capture texture from geometry
-    let texture = this.objectTextures.get(obj.id)
-    if (!texture) {
-      const capturedTexture = this.captureGeometryTexture(obj)
-      if (!capturedTexture) {
-        console.warn(`BboxTextureTestRenderer: Failed to capture texture for object ${obj.id}`)
-        return null
-      }
-      texture = capturedTexture
-      this.objectTextures.set(obj.id, texture)
-    }
+    // Create simple colored rectangle graphics
+    const graphics = new Graphics()
+    graphics.rect(0, 0, width, height)
+    graphics.fill({ color: 0xff0000, alpha: 0.3 }) // Semi-transparent red for testing
 
-    // 3. Create sprite with captured texture
+    // Create texture from graphics
+    const texture = this.renderer.generateTexture(graphics)
     const sprite = new Sprite(texture)
 
-    // 4. Set sprite to EXACT bbox dimensions (this is the key!)
-    sprite.width = width
-    sprite.height = height
-
-    // 5. Position sprite at bbox origin (exact overlap)
-    sprite.position.set(bounds.minX, bounds.minY)
-
-    // 6. NO FILTERS - pure geometry mirror for perfect overlap testing
+    // Use vertex coordinates (same as GeometryRenderer)
+    const offset = gameStore.mesh.vertex_to_pixeloid_offset
+    const vertexX = bounds.minX - offset.x
+    const vertexY = bounds.minY - offset.y
+    sprite.position.set(vertexX, vertexY)
 
     // Store for cleanup
     this.bboxSprites.set(obj.id, sprite)
 
-    console.log(`BboxTextureTestRenderer: Created bbox sprite for ${obj.id} at (${bounds.minX}, ${bounds.minY}) size ${width}x${height}`)
+    console.log(`BboxTextureTestRenderer: Created bbox sprite for ${obj.id} at vertex (${vertexX}, ${vertexY}) size ${width}x${height}`)
     return sprite
   }
-
-  /**
-   * Capture geometry texture (same method as PixelateFilterRenderer)
-   */
-  private captureGeometryTexture(obj: GeometricObject): Texture | null {
-    const graphics = this.geometryRenderer.getObjectGraphics(obj.id)
-    if (!graphics) {
-      console.warn(`BboxTextureTestRenderer: No graphics found for object ${obj.id}`)
-      return null
-    }
-
-    try {
-      const texture = this.renderer.generateTexture(graphics)
-      console.log(`BboxTextureTestRenderer: Captured texture for object ${obj.id}`)
-      return texture
-    } catch (error) {
-      console.error(`BboxTextureTestRenderer: Failed to generate texture for object ${obj.id}:`, error)
-      return null
-    }
-  }
-
 
   /**
    * Clean up old sprites
@@ -192,13 +162,7 @@ export class BboxTextureTestRenderer {
    * Clean up resources
    */
   public destroy(): void {
-    // Clean up textures
-    for (const texture of this.objectTextures.values()) {
-      texture.destroy()
-    }
-    this.objectTextures.clear()
-
-    // Clean up sprites
+    // Clean up sprites (textures are managed by store)
     this.clearOldSprites()
 
     // Destroy container
