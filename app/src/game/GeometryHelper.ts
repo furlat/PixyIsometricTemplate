@@ -346,7 +346,7 @@ export class GeometryHelper {
   }
 
   /**
-   * Calculate metadata for a geometric diamond
+   * Calculate metadata for a geometric diamond with PIXELOID-PERFECT BOUNDS
    */
   static calculateDiamondMetadata(diamond: { anchorX: number; anchorY: number; width: number; height: number }): GeometricMetadata {
     const centerX = diamond.anchorX + diamond.width / 2
@@ -357,8 +357,8 @@ export class GeometryHelper {
       bounds: {
         minX: diamond.anchorX,
         maxX: diamond.anchorX + diamond.width,
-        minY: diamond.anchorY - diamond.height,
-        maxY: diamond.anchorY + diamond.height
+        minY: Math.floor(diamond.anchorY - diamond.height), // ✅ Round DOWN - include full pixeloid containing north vertex
+        maxY: Math.ceil(diamond.anchorY + diamond.height)   // ✅ Round UP - include full pixeloid containing south vertex
       }
     }
   }

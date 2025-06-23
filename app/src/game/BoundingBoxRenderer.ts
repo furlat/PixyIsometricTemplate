@@ -115,16 +115,18 @@ export class BoundingBoxRenderer {
   }
 
   /**
-   * Render bounding box rectangle using converted coordinates for perfect alignment
+   * Render bounding box rectangle using centralized metadata bounds (NO MORE DUPLICATION)
    */
   private renderBoundingBoxRectangle(convertedObj: GeometricObject, pixeloidScale: number): void {
     if (!convertedObj.metadata) return
 
-    // Calculate bounds from converted object coordinates
-    const bounds = this.calculateConvertedBounds(convertedObj)
+    // ✅ USE CENTRALIZED METADATA BOUNDS (single source of truth)
+    // Apply coordinate conversion to metadata bounds, don't recalculate them
+    const offset = gameStore.mesh.vertex_to_pixeloid_offset
+    const bounds = convertedObj.metadata.bounds
     
-    const x = bounds.minX
-    const y = bounds.minY
+    const x = bounds.minX - offset.x
+    const y = bounds.minY - offset.y
     const width = bounds.maxX - bounds.minX
     const height = bounds.maxY - bounds.minY
 
@@ -144,64 +146,10 @@ export class BoundingBoxRenderer {
       })
   }
 
-  /**
-   * Calculate bounds from converted coordinates for accurate bbox rendering
-   */
-  private calculateConvertedBounds(obj: GeometricObject): { minX: number, maxX: number, minY: number, maxY: number } {
-    if ('centerX' in obj && 'centerY' in obj) {
-      // Circle
-      const circle = obj as any
-      return {
-        minX: circle.centerX - circle.radius,
-        maxX: circle.centerX + circle.radius,
-        minY: circle.centerY - circle.radius,
-        maxY: circle.centerY + circle.radius
-      }
-    } else if ('x' in obj && 'width' in obj) {
-      // Rectangle
-      const rect = obj as any
-      return {
-        minX: rect.x,
-        maxX: rect.x + rect.width,
-        minY: rect.y,
-        maxY: rect.y + rect.height
-      }
-    } else if ('startX' in obj && 'endX' in obj) {
-      // Line
-      const line = obj as any
-      return {
-        minX: Math.min(line.startX, line.endX),
-        maxX: Math.max(line.startX, line.endX),
-        minY: Math.min(line.startY, line.endY),
-        maxY: Math.max(line.startY, line.endY)
-      }
-    } else if ('anchorX' in obj && 'anchorY' in obj) {
-      // Diamond
-      const diamond = obj as any
-      const halfWidth = diamond.width / 2
-      const halfHeight = diamond.height / 2
-      return {
-        minX: diamond.anchorX - halfWidth,
-        maxX: diamond.anchorX + halfWidth,
-        minY: diamond.anchorY - halfHeight,
-        maxY: diamond.anchorY + halfHeight
-      }
-    } else if ('x' in obj && 'y' in obj) {
-      // Point (small bounds for visibility)
-      const point = obj as any
-      const pointSize = 2 // Minimum visible size
-      return {
-        minX: point.x - pointSize,
-        maxX: point.x + pointSize,
-        minY: point.y - pointSize,
-        maxY: point.y + pointSize
-      }
-    }
-    
-    // Fallback to metadata bounds if available (all object types should have been covered above)
-    const fallbackBounds = (obj as any).metadata?.bounds
-    return fallbackBounds || { minX: 0, maxX: 0, minY: 0, maxY: 0 }
-  }
+  // ✅ REMOVED: calculateConvertedBounds() method
+  // This was the source of dangerous computation duplication
+  // Diamond calculations were WRONG (assumed anchorX = centerX)
+  // Now we always use obj.metadata.bounds (centralized, correct calculation from GeometryHelper)
 
   /**
    * Get the graphics object for rendering
