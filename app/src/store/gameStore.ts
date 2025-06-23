@@ -111,15 +111,18 @@ export const gameStore = proxy<GameState>({
         stepColor: 0xffaa66
       }
     },
-    // Unified anchor configuration for pixeloid snapping
-    anchorConfig: {
+    // Enhanced anchor configuration for UI control
+    anchoring: {
+      // Global defaults for new geometry creation
       defaults: {
-        point: 'top-left',     // All geometry types default to top-left for consistency
-        line: 'top-left',
-        circle: 'top-left',    // Changed from center to top-left for consistency
-        rectangle: 'top-left', // Already correct
-        diamond: 'top-left'    // Changed from west-vertex to top-left for consistency
+        point: 'center',       // Points at pixeloid centers
+        line: 'top-left',      // Lines use top-left anchoring
+        circle: 'top-left',    // Circles use top-left anchoring
+        rectangle: 'top-left', // Rectangles use top-left anchoring
+        diamond: 'top-left'    // Diamonds use top-left anchoring
       },
+      // Per-object anchor overrides (objectId -> anchorConfig)
+      objectOverrides: new Map(),
       enablePreComputedAnchors: true  // Enable zoom-stable anchoring
     },
     layerVisibility: {
@@ -735,8 +738,8 @@ export const updateGameStore = {
       newObject.metadata = GeometryHelper.calculatePointMetadata(newObject as any)
     }
 
-    // Add to objects array
-    gameStore.geometry.objects.push(newObject)
+    // Use proper method that handles mask layer and other setup
+    updateGameStore.addGeometricObject(newObject)
     
     // Select the new object
     updateGameStore.setSelectedObject(newObject.id)
@@ -978,12 +981,37 @@ export const updateGameStore = {
   // UNIFIED ANCHORING SYSTEM
   // ================================
 
+  // Enhanced anchor configuration actions
+  getDefaultAnchor: (geometryType: 'point' | 'line' | 'circle' | 'rectangle' | 'diamond') => {
+    return gameStore.geometry.anchoring.defaults[geometryType]
+  },
+
+  setDefaultAnchor: (geometryType: 'point' | 'line' | 'circle' | 'rectangle' | 'diamond', anchorPoint: any) => {
+    gameStore.geometry.anchoring.defaults[geometryType] = anchorPoint
+    console.log(`Store: Set default anchor for ${geometryType} to ${anchorPoint}`)
+  },
+
+  getObjectAnchor: (objectId: string): any => {
+    return gameStore.geometry.anchoring.objectOverrides.get(objectId) || null
+  },
+
+  setObjectAnchor: (objectId: string, anchorConfig: any) => {
+    gameStore.geometry.anchoring.objectOverrides.set(objectId, anchorConfig)
+    console.log(`Store: Set object anchor for ${objectId}:`, anchorConfig)
+  },
+
+  clearObjectAnchor: (objectId: string) => {
+    gameStore.geometry.anchoring.objectOverrides.delete(objectId)
+    console.log(`Store: Cleared object anchor for ${objectId}`)
+  },
+
+  // Legacy compatibility methods
   getAnchorConfig: (geometryType: 'point' | 'line' | 'circle' | 'rectangle' | 'diamond') => {
-    return gameStore.geometry.anchorConfig.defaults[geometryType]
+    return updateGameStore.getDefaultAnchor(geometryType)
   },
 
   setAnchorConfig: (geometryType: 'point' | 'line' | 'circle' | 'rectangle' | 'diamond', snapPoint: any) => {
-    gameStore.geometry.anchorConfig.defaults[geometryType] = snapPoint
+    updateGameStore.setDefaultAnchor(geometryType, snapPoint)
   },
 
   // Factory methods with unified anchoring

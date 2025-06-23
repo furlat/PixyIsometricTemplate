@@ -429,16 +429,18 @@ export interface GeometryState {
   drawing: GeometryDrawingState
   // Raycast visualization state
   raycast: RaycastState
-  // Anchor configuration for unified pixeloid snapping
-  anchorConfig: {
-    // Default anchor points for each geometry type
+  // Enhanced anchor configuration for UI control
+  anchoring: {
+    // Global defaults for new geometry creation
     defaults: {
-      point: AnchorSnapPoint
-      line: AnchorSnapPoint
-      circle: AnchorSnapPoint
-      rectangle: AnchorSnapPoint
-      diamond: AnchorSnapPoint
+      point: PixeloidAnchorPoint
+      line: PixeloidAnchorPoint
+      circle: PixeloidAnchorPoint
+      rectangle: PixeloidAnchorPoint
+      diamond: PixeloidAnchorPoint
     }
+    // Per-object anchor overrides (objectId -> anchorConfig)
+    objectOverrides: Map<string, AnchorConfig>
     // Enable/disable pre-computed anchors (for zoom stability)
     enablePreComputedAnchors: boolean
   }

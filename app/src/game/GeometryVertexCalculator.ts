@@ -16,6 +16,7 @@ import type {
   AnchorConfig,
   GeometryStyle
 } from '../types'
+import { gameStore } from '../store/gameStore'
 
 export class GeometryVertexCalculator {
   
@@ -132,53 +133,86 @@ export class GeometryVertexCalculator {
 
   /**
    * Calculate vertices for a diamond (4 cardinal vertices)
-   * ISOMETRIC CONSTRAINT: height derived from width
+   * PRECISE: Top-left anchoring ONLY for west/east vertices (horizontal extent)
+   * Height calculations remain precise and unaffected by anchoring
    */
   static calculateDiamondVertices(
     firstPos: PixeloidCoordinate,
     secondPos: PixeloidCoordinate,
     anchorConfig: AnchorConfig
   ): PixeloidVertex[] {
-    // First click determines one vertex (usually west)
-    const firstVertex = this.snapToPixeloidAnchor(firstPos, anchorConfig.firstPointAnchor)
+    // Anchor the west vertex using top-left anchoring
+    const westVertex = this.snapToPixeloidAnchor(firstPos, anchorConfig.firstPointAnchor)
     
-    // Calculate width from drag distance
-    const width = Math.abs(secondPos.x - firstPos.x)
+    // East vertex: X from mouse drag, Y LOCKED to same as west vertex
+    const eastX = anchorConfig.secondPointAnchor
+      ? this.snapToPixeloidAnchor(secondPos, anchorConfig.secondPointAnchor).x
+      : secondPos.x
+    const eastVertex: PixeloidVertex = {
+      __brand: 'pixeloid',
+      x: eastX,
+      y: westVertex.y  // Y-axis LOCKED to west vertex Y
+    }
     
-    // ISOMETRIC CONSTRAINT: height = width / 4
-    const height = width / 4
+    // Calculate precise width from anchored west/east vertices
+    const width = Math.abs(eastVertex.x - westVertex.x)
     
-    // Assume first vertex is west, calculate other cardinal points
-    const westVertex = firstVertex
-    const centerX = westVertex.x + width / 2
-    const centerY = westVertex.y
+    // INTEGER HEIGHT CALCULATION: height = int(width/2) for pixeloid-perfect alignment
+    const height = Math.floor(width / 2)  // Integer height for clean positioning
+    const halfHeight = height / 2         // Half-height for north/south offset
     
+    // Calculate diamond center (horizontally centered between west/east, vertically at west vertex level)
+    const centerX = (westVertex.x + eastVertex.x) / 2
+    const centerY = westVertex.y  // Use west vertex Y as baseline
+    
+    // Calculate integer-aligned north/south vertices
     return [
-      westVertex,                                                      // west
-      { __brand: 'pixeloid', x: centerX, y: centerY - height },       // north
-      { __brand: 'pixeloid', x: centerX + width / 2, y: centerY },    // east
-      { __brand: 'pixeloid', x: centerX, y: centerY + height }        // south
+      westVertex,                                                           // west (anchored)
+      { __brand: 'pixeloid', x: centerX, y: centerY - halfHeight },        // north (integer aligned)
+      eastVertex,                                                           // east (anchored)
+      { __brand: 'pixeloid', x: centerX, y: centerY + halfHeight }         // south (integer aligned)
     ]
   }
 
   /**
-   * Get default anchor configuration for each geometry type
+   * Get anchor configuration for geometry type with optional per-object override
+   * STORE-DRIVEN: Reads from store instead of hardcoded values
    */
-  static getDefaultAnchorConfig(geometryType: string): AnchorConfig {
+  static getAnchorConfig(geometryType: string, objectId?: string): AnchorConfig {
+    // Check for per-object override first
+    if (objectId) {
+      const objectOverride = gameStore.geometry.anchoring.objectOverrides.get(objectId)
+      if (objectOverride) {
+        return objectOverride
+      }
+    }
+    
+    // Fall back to global default from store
+    const defaultAnchor = gameStore.geometry.anchoring.defaults[geometryType as keyof typeof gameStore.geometry.anchoring.defaults]
+    
+    // Build AnchorConfig based on geometry type
     switch (geometryType) {
       case 'point':
-        return { firstPointAnchor: 'center' }
+        return { firstPointAnchor: defaultAnchor }
       case 'line':
-        return { firstPointAnchor: 'center' }
       case 'circle':
-        return { firstPointAnchor: 'center', secondPointAnchor: 'center' }
       case 'rectangle':
-        return { firstPointAnchor: 'top-left', secondPointAnchor: 'center' }
       case 'diamond':
-        return { firstPointAnchor: 'left-mid' } // West vertex
+        return {
+          firstPointAnchor: defaultAnchor,
+          secondPointAnchor: defaultAnchor
+        }
       default:
-        return { firstPointAnchor: 'center' }
+        return { firstPointAnchor: 'top-left', secondPointAnchor: 'top-left' }
     }
+  }
+
+  /**
+   * Legacy method for backward compatibility
+   * DEPRECATED: Use getAnchorConfig instead
+   */
+  static getDefaultAnchorConfig(geometryType: string): AnchorConfig {
+    return this.getAnchorConfig(geometryType)
   }
 
   /**

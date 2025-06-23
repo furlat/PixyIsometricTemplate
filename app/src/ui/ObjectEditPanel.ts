@@ -1,11 +1,13 @@
 import { subscribe } from 'valtio'
 import { gameStore, updateGameStore } from '../store/gameStore'
-import type { GeometricObject, GeometricDiamond, GeometricRectangle, GeometricCircle, GeometricLine, GeometricPoint } from '../types'
+import { GeometryVertexCalculator } from '../game/GeometryVertexCalculator'
+import type { GeometricObject, GeometricDiamond, GeometricRectangle, GeometricCircle, GeometricLine, GeometricPoint, PixeloidAnchorPoint, PixeloidCoordinate } from '../types'
 
 export class ObjectEditPanel {
   private elements: Map<string, HTMLElement> = new Map()
   private isVisible: boolean = false
   private originalObject: GeometricObject | null = null
+  private originalAnchorOverride: any = null // Save original anchor override state
   private panel: HTMLElement | null = null
   
   constructor() {
@@ -43,6 +45,9 @@ export class ObjectEditPanel {
     
     // Store original object for restoration on cancel
     this.originalObject = { ...selectedObject }
+    
+    // Store original anchor override state for restoration on cancel
+    this.originalAnchorOverride = updateGameStore.getObjectAnchor(selectedObjectId)
     
     // Generate form based on object type
     this.generateForm(selectedObject)
@@ -107,6 +112,9 @@ export class ObjectEditPanel {
   
   private generateObjectProperties(obj: GeometricObject): string {
     let html = ''
+    
+    // Anchor Configuration
+    html += this.generateAnchorControls(obj)
     
     // Common properties
     html += `
@@ -311,6 +319,65 @@ export class ObjectEditPanel {
     
     return html
   }
+
+  /**
+   * Generate anchor configuration controls for per-object anchoring
+   */
+  private generateAnchorControls(obj: GeometricObject): string {
+    const objectType = this.getObjectType(obj).toLowerCase()
+    
+    // Get current anchor override or default
+    const currentOverride = updateGameStore.getObjectAnchor(obj.id)
+    const defaultAnchor = updateGameStore.getDefaultAnchor(objectType as any)
+    const currentAnchor = currentOverride ? currentOverride.firstPointAnchor : defaultAnchor
+    
+    const anchorOptions = [
+      { value: 'top-left', label: 'Top Left' },
+      { value: 'top-mid', label: 'Top Center' },
+      { value: 'top-right', label: 'Top Right' },
+      { value: 'left-mid', label: 'Left Center' },
+      { value: 'center', label: 'Center' },
+      { value: 'right-mid', label: 'Right Center' },
+      { value: 'bottom-left', label: 'Bottom Left' },
+      { value: 'bottom-mid', label: 'Bottom Center' },
+      { value: 'bottom-right', label: 'Bottom Right' }
+    ]
+
+    let html = `
+      <div class="bg-warning/10 border border-warning/20 rounded-lg p-3 mb-3">
+        <h4 class="font-bold text-sm text-warning mb-2 flex items-center gap-2">
+          <span>⚓</span>
+          Object Anchoring
+        </h4>
+        <div class="space-y-2">
+          <div>
+            <label class="label">
+              <span class="label-text">Anchor Point:</span>
+            </label>
+            <select id="edit-anchor-point" class="select select-bordered select-sm w-full">
+    `
+    
+    // Add anchor options
+    anchorOptions.forEach(option => {
+      const selected = option.value === currentAnchor ? 'selected' : ''
+      html += `<option value="${option.value}" ${selected}>${option.label}</option>`
+    })
+    
+    html += `
+            </select>
+          </div>
+          <div class="flex gap-2">
+            <button id="edit-reset-anchor" class="btn btn-sm btn-outline flex-1">Reset to Default</button>
+            <span class="text-xs text-base-content/70 flex items-center">
+              Default: ${anchorOptions.find(opt => opt.value === defaultAnchor)?.label || defaultAnchor}
+            </span>
+          </div>
+        </div>
+      </div>
+    `
+    
+    return html
+  }
   
   private numberToHex(num: number): string {
     return `#${num.toString(16).padStart(6, '0')}`
@@ -372,6 +439,31 @@ export class ObjectEditPanel {
           const updates: any = { fillColor: undefined, fillAlpha: undefined }
           updateGameStore.updateGeometricObject(selectedObjectId, updates)
           // Regenerate the form to show the enable fill button
+          this.loadSelectedObject()
+        }
+      })
+    }
+
+    // Handle anchor point changes
+    const anchorSelect = this.panel.querySelector('#edit-anchor-point') as HTMLSelectElement
+    if (anchorSelect) {
+      anchorSelect.addEventListener('change', () => {
+        const selectedObjectId = gameStore.geometry.selection.selectedObjectId
+        if (selectedObjectId) {
+          this.handleAnchorChange(selectedObjectId, anchorSelect.value as PixeloidAnchorPoint)
+        }
+      })
+    }
+
+    // Handle reset anchor button
+    const resetAnchorButton = this.panel.querySelector('#edit-reset-anchor') as HTMLButtonElement
+    if (resetAnchorButton) {
+      resetAnchorButton.addEventListener('click', () => {
+        const selectedObjectId = gameStore.geometry.selection.selectedObjectId
+        if (selectedObjectId) {
+          updateGameStore.clearObjectAnchor(selectedObjectId)
+          console.log(`ObjectEditPanel: Reset object anchor for ${selectedObjectId} to default`)
+          // Regenerate the form to show the updated anchor
           this.loadSelectedObject()
         }
       })
@@ -582,9 +674,113 @@ export class ObjectEditPanel {
   private applyChanges(): void {
     // Changes are already applied via live preview
     this.originalObject = null
-    this.closePanel()
+    this.originalAnchorOverride = null // Clear original state since changes are accepted
+    updateGameStore.setEditPanelOpen(false)
   }
   
+  /**
+   * Handle anchor point changes using existing vertex calculation system
+   */
+  private handleAnchorChange(objectId: string, newAnchor: PixeloidAnchorPoint): void {
+    const selectedObject = gameStore.geometry.objects.find(obj => obj.id === objectId)
+    if (!selectedObject) {
+      console.warn(`ObjectEditPanel: Object ${objectId} not found for anchor change`)
+      return
+    }
+
+    const objectType = this.getObjectType(selectedObject).toLowerCase()
+    console.log(`ObjectEditPanel: Changing anchor for ${objectId} to ${newAnchor}`)
+
+    // Step 1: Extract geometry defining points from current coordinates
+    const geometryPoints = this.extractGeometryPoints(selectedObject)
+
+    // Step 2: Create new anchor config
+    const newAnchorConfig = {
+      firstPointAnchor: newAnchor,
+      secondPointAnchor: newAnchor
+    }
+
+    // Step 3: Recalculate vertices using existing vertex calculation system
+    const newVertices = GeometryVertexCalculator.calculateGeometryVertices(
+      geometryPoints.firstPos,
+      geometryPoints.secondPos,
+      objectType as 'point' | 'line' | 'circle' | 'rectangle' | 'diamond',
+      newAnchorConfig
+    )
+
+    // Step 4: Extract properties using existing system
+    const newProperties = GeometryVertexCalculator.extractGeometryProperties(
+      newVertices,
+      objectType
+    )
+
+    // Step 5: Update object coordinates AND anchor override
+    updateGameStore.updateGeometricObject(objectId, newProperties)
+    updateGameStore.setObjectAnchor(objectId, newAnchorConfig)
+    
+    console.log(`ObjectEditPanel: Anchor changed using vertex recalculation:`, newProperties)
+  }
+
+  /**
+   * Extract geometry defining points from current object coordinates
+   */
+  private extractGeometryPoints(obj: GeometricObject): {
+    firstPos: PixeloidCoordinate,
+    secondPos: PixeloidCoordinate
+  } {
+    
+    if ('x' in obj && 'width' in obj && 'height' in obj) {
+      // Rectangle: use top-left + bottom-right
+      const rect = obj as GeometricRectangle
+      return {
+        firstPos: { __brand: 'pixeloid', x: rect.x, y: rect.y },
+        secondPos: { __brand: 'pixeloid', x: rect.x + rect.width, y: rect.y + rect.height }
+      }
+    }
+    
+    if ('centerX' in obj && 'centerY' in obj && 'radius' in obj) {
+      // Circle: use west + east points
+      const circle = obj as GeometricCircle
+      return {
+        firstPos: { __brand: 'pixeloid', x: circle.centerX - circle.radius, y: circle.centerY },
+        secondPos: { __brand: 'pixeloid', x: circle.centerX + circle.radius, y: circle.centerY }
+      }
+    }
+    
+    if ('anchorX' in obj && 'anchorY' in obj) {
+      // Diamond: use west + east vertices
+      const diamond = obj as GeometricDiamond
+      return {
+        firstPos: { __brand: 'pixeloid', x: diamond.anchorX, y: diamond.anchorY },
+        secondPos: { __brand: 'pixeloid', x: diamond.anchorX + diamond.width, y: diamond.anchorY }
+      }
+    }
+    
+    if ('startX' in obj && 'endX' in obj) {
+      // Line: use start + end
+      const line = obj as GeometricLine
+      return {
+        firstPos: { __brand: 'pixeloid', x: line.startX, y: line.startY },
+        secondPos: { __brand: 'pixeloid', x: line.endX, y: line.endY }
+      }
+    }
+    
+    if ('x' in obj && 'y' in obj && !('width' in obj)) {
+      // Point: same position for both
+      const point = obj as GeometricPoint
+      return {
+        firstPos: { __brand: 'pixeloid', x: point.x, y: point.y },
+        secondPos: { __brand: 'pixeloid', x: point.x, y: point.y }
+      }
+    }
+    
+    // Fallback
+    return {
+      firstPos: { __brand: 'pixeloid', x: 0, y: 0 },
+      secondPos: { __brand: 'pixeloid', x: 0, y: 0 }
+    }
+  }
+
   private closePanel(): void {
     // Restore original object if cancelled
     if (this.originalObject) {
@@ -594,10 +790,20 @@ export class ObjectEditPanel {
         if (objectIndex !== -1) {
           gameStore.geometry.objects[objectIndex] = this.originalObject
         }
+        
+        // Restore original anchor override state
+        if (this.originalAnchorOverride) {
+          updateGameStore.setObjectAnchor(selectedObjectId, this.originalAnchorOverride)
+        } else {
+          updateGameStore.clearObjectAnchor(selectedObjectId)
+        }
+        
+        console.log(`ObjectEditPanel: Restored object and anchor override state on cancel`)
       }
     }
     
     this.originalObject = null
+    this.originalAnchorOverride = null
     updateGameStore.setEditPanelOpen(false)
   }
   

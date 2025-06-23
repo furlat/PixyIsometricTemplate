@@ -6,6 +6,11 @@ export class Workspace {
   private panel: HTMLElement | null = null
   private _isVisible: boolean = false
   
+  // Double-click detection (copied from proven StoreExplorer implementation)
+  private lastClickTime = 0
+  private lastClickedObjectId: string | null = null
+  private readonly DOUBLE_CLICK_THRESHOLD = 300 // ms
+  
   constructor() {
     this.panel = document.getElementById('workspace-panel')
     this.setupReactivity()
@@ -66,12 +71,24 @@ export class Workspace {
     const obj = gameStore.geometry.objects.find(o => o.id === objectId)
     if (!obj) return
     
+    event.preventDefault()
+    
+    // Use proven StoreExplorer double-click detection method
+    const currentTime = Date.now()
+    const isDoubleClick = (
+      currentTime - this.lastClickTime < this.DOUBLE_CLICK_THRESHOLD &&
+      this.lastClickedObjectId === objectId
+    )
+    
+    this.lastClickTime = currentTime
+    this.lastClickedObjectId = objectId
+    
     // Select the object
     updateGameStore.setSelectedObject(objectId)
     
-    // Center camera on double-click
-    if (event.detail === 2) {
-      updateGameStore.centerCameraOnObject(objectId)
+    // Handle double-click navigation (use proven viewport method)
+    if (isDoubleClick) {
+      updateGameStore.centerViewportOnObject(objectId)
     }
   }
   

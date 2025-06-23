@@ -234,8 +234,8 @@ export class InputManager {
     // EXACT user input preservation - NO MODIFICATION
     const firstPixeloidPos = createPixeloidCoordinate(pixeloidPos.x, pixeloidPos.y)
     
-    // Get anchor configuration for this geometry type
-    const anchorConfig = GeometryVertexCalculator.getDefaultAnchorConfig(mode)
+    // Get anchor configuration from store (supports per-object overrides)
+    const anchorConfig = GeometryVertexCalculator.getAnchorConfig(mode)
     
     if (mode === 'point') {
       // Points: create immediately using new vertex calculation

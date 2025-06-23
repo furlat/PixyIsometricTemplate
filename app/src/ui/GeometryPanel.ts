@@ -27,7 +27,13 @@ export class GeometryPanel {
       'geometry-fill-enabled',
       'geometry-fill-alpha',
       'geometry-stroke-alpha',
-      'geometry-default-texture'
+      'geometry-default-texture',
+      // Anchor control elements
+      'anchor-point',
+      'anchor-line',
+      'anchor-circle',
+      'anchor-rectangle',
+      'anchor-diamond'
     ]
     
     elementIds.forEach(id => {
@@ -148,6 +154,9 @@ export class GeometryPanel {
       })
     }
     
+    // Anchor control dropdowns
+    this.setupAnchorControls()
+    
     // Clear all button
     const clearButton = document.getElementById('geometry-clear-all')
     if (clearButton) {
@@ -241,6 +250,9 @@ export class GeometryPanel {
     
     // Update mode button states
     this.updateModeButtons()
+    
+    // Update anchor control values
+    this.updateAnchorValues()
   }
   
   private updateModeButtons(): void {
@@ -307,6 +319,66 @@ export class GeometryPanel {
     colorInput.addEventListener('blur', () => {
       if (document.body.contains(colorInput)) {
         document.body.removeChild(colorInput)
+      }
+    })
+  }
+
+  /**
+   * Setup anchor control dropdowns for each geometry type
+   */
+  private setupAnchorControls(): void {
+    const geometryTypes = ['point', 'line', 'circle', 'rectangle', 'diamond']
+    const anchorOptions = [
+      { value: 'top-left', label: 'Top Left' },
+      { value: 'top-mid', label: 'Top Center' },
+      { value: 'top-right', label: 'Top Right' },
+      { value: 'left-mid', label: 'Left Center' },
+      { value: 'center', label: 'Center' },
+      { value: 'right-mid', label: 'Right Center' },
+      { value: 'bottom-left', label: 'Bottom Left' },
+      { value: 'bottom-mid', label: 'Bottom Center' },
+      { value: 'bottom-right', label: 'Bottom Right' }
+    ]
+
+    geometryTypes.forEach(type => {
+      const selectElement = this.elements.get(`anchor-${type}`) as HTMLSelectElement
+      if (selectElement) {
+        // Clear existing options
+        selectElement.innerHTML = ''
+        
+        // Add anchor options
+        anchorOptions.forEach(option => {
+          const optionElement = document.createElement('option')
+          optionElement.value = option.value
+          optionElement.textContent = option.label
+          selectElement.appendChild(optionElement)
+        })
+        
+        // Set current value from store
+        const currentAnchor = updateGameStore.getDefaultAnchor(type as any)
+        selectElement.value = currentAnchor
+        
+        // Add change event listener
+        selectElement.addEventListener('change', () => {
+          const newAnchor = selectElement.value
+          updateGameStore.setDefaultAnchor(type as any, newAnchor)
+          console.log(`GeometryPanel: Set default anchor for ${type} to ${newAnchor}`)
+        })
+      }
+    })
+  }
+
+  /**
+   * Update anchor dropdown values from store
+   */
+  private updateAnchorValues(): void {
+    const geometryTypes = ['point', 'line', 'circle', 'rectangle', 'diamond']
+    
+    geometryTypes.forEach(type => {
+      const selectElement = this.elements.get(`anchor-${type}`) as HTMLSelectElement
+      if (selectElement) {
+        const currentAnchor = updateGameStore.getDefaultAnchor(type as any)
+        selectElement.value = currentAnchor
       }
     })
   }
