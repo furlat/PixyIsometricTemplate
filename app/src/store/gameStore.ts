@@ -130,12 +130,11 @@ export const gameStore = proxy<GameState>({
       geometry: true,    // Geometric shapes and objects
       selection: true,   // Selection highlights
       raycast: true,     // Raycast lines and debug visuals
-      mask: false,       // Pixeloid mask layer for collision/spatial analysis (off by default)
       bbox: false,       // Bounding box overlay for comparison (off by default)
       mouse: true        // Mouse visualization
     },
     filterEffects: {
-      outline: true  // Selection outline enabled by default
+      pixelate: false  // Pixeloid-perfect pixelation disabled by default
     },
     selection: {
       selectedObjectId: null,
@@ -146,18 +145,6 @@ export const gameStore = proxy<GameState>({
     },
     favorites: {
       favoriteObjectIds: []
-    },
-    // Mask layer state for GPU-based spatial analysis
-    mask: {
-      enabledObjects: new Set<string>(), // Objects contributing to mask
-      mode: 'boundingBox' as 'boundingBox' | 'precise', // boundingBox = use metadata bounds, precise = use shape geometry
-      visualSettings: {
-        fillColor: 0x000000,     // Black mask
-        fillAlpha: 0.3,          // Semi-transparent overlay
-        strokeColor: 0xff0000,   // Red outline for debugging
-        strokeAlpha: 0.5,        // Semi-transparent outline
-        strokeWidth: 0.1         // Thin outline
-      }
     }
   },
   // Texture registry for StoreExplorer previews (ISOLATED from main rendering)
@@ -416,8 +403,6 @@ export const updateGameStore = {
     const ensuredObject = updateGameStore.ensureUniqueId(object)
     gameStore.geometry.objects.push(ensuredObject)
     
-    // Auto-enable new objects in mask layer for immediate visibility
-    gameStore.geometry.mask.enabledObjects.add(ensuredObject.id)
   },
 
   // Ensure unique ID for objects (handles copying and duplicate prevention)
@@ -471,8 +456,6 @@ export const updateGameStore = {
       metadata: GeometryHelper.calculatePointMetadata({ x, y })
     }
     gameStore.geometry.objects.push(point)
-    // Auto-enable in mask layer
-    gameStore.geometry.mask.enabledObjects.add(point.id)
     return point
   },
 
@@ -491,8 +474,6 @@ export const updateGameStore = {
       metadata: GeometryHelper.calculateLineMetadata({ startX, startY, endX, endY })
     }
     gameStore.geometry.objects.push(line)
-    // Auto-enable in mask layer
-    gameStore.geometry.mask.enabledObjects.add(line.id)
     return line
   },
 
@@ -514,8 +495,6 @@ export const updateGameStore = {
       metadata: GeometryHelper.calculateCircleMetadata({ centerX, centerY, radius })
     }
     gameStore.geometry.objects.push(circle)
-    // Auto-enable in mask layer
-    gameStore.geometry.mask.enabledObjects.add(circle.id)
     return circle
   },
 
@@ -538,8 +517,6 @@ export const updateGameStore = {
       metadata: GeometryHelper.calculateRectangleMetadata({ x, y, width, height })
     }
     gameStore.geometry.objects.push(rectangle)
-    // Auto-enable in mask layer
-    gameStore.geometry.mask.enabledObjects.add(rectangle.id)
     return rectangle
   },
 
@@ -562,8 +539,6 @@ export const updateGameStore = {
       metadata: GeometryHelper.calculateDiamondMetadata({ anchorX, anchorY, width, height })
     }
     gameStore.geometry.objects.push(diamond)
-    // Auto-enable in mask layer
-    gameStore.geometry.mask.enabledObjects.add(diamond.id)
     return diamond
   },
 
@@ -626,7 +601,7 @@ export const updateGameStore = {
     }
   },
 
-  setLayerVisibility: (layer: 'background' | 'geometry' | 'selection' | 'raycast' | 'mask' | 'bbox' | 'mouse', visible: boolean) => {
+  setLayerVisibility: (layer: 'background' | 'geometry' | 'selection' | 'raycast' | 'bbox' | 'mouse', visible: boolean) => {
     gameStore.geometry.layerVisibility[layer] = visible
   },
 
@@ -738,7 +713,7 @@ export const updateGameStore = {
       newObject.metadata = GeometryHelper.calculatePointMetadata(newObject as any)
     }
 
-    // Use proper method that handles mask layer and other setup
+    // Use proper method that handles object setup
     updateGameStore.addGeometricObject(newObject)
     
     // Select the new object
@@ -819,9 +794,9 @@ export const updateGameStore = {
     }
   },
 
-  setOutlineFilterEnabled: (enabled: boolean) => {
-    gameStore.geometry.filterEffects.outline = enabled
-    console.log(`Store: Outline filter ${enabled ? 'enabled' : 'disabled'}`)
+  setPixelateFilterEnabled: (enabled: boolean) => {
+    gameStore.geometry.filterEffects.pixelate = enabled
+    console.log(`Store: Pixeloid-perfect pixelate filter ${enabled ? 'enabled' : 'disabled'}`)
   },
 
   // Texture Registry actions (WRITE-ONLY from rendering perspective)
@@ -847,42 +822,6 @@ export const updateGameStore = {
 
   hasObjectTexture: (objectId: string): boolean => {
     return gameStore.textureRegistry.objectTextures[objectId] !== undefined
-  },
-
-  // Mask layer controls
-  enableObjectInMask: (objectId: string) => {
-    gameStore.geometry.mask.enabledObjects.add(objectId)
-  },
-
-  disableObjectInMask: (objectId: string) => {
-    gameStore.geometry.mask.enabledObjects.delete(objectId)
-  },
-
-  toggleObjectInMask: (objectId: string) => {
-    if (gameStore.geometry.mask.enabledObjects.has(objectId)) {
-      gameStore.geometry.mask.enabledObjects.delete(objectId)
-    } else {
-      gameStore.geometry.mask.enabledObjects.add(objectId)
-    }
-  },
-
-  enableAllObjectsInMask: () => {
-    gameStore.geometry.objects.forEach(obj => {
-      gameStore.geometry.mask.enabledObjects.add(obj.id)
-    })
-    console.log(`Store: Enabled ${gameStore.geometry.objects.length} objects in mask layer`)
-  },
-
-  disableAllObjectsInMask: () => {
-    gameStore.geometry.mask.enabledObjects.clear()
-  },
-
-  setMaskMode: (mode: 'boundingBox' | 'precise') => {
-    gameStore.geometry.mask.mode = mode
-  },
-
-  updateMaskVisualSettings: (settings: Partial<typeof gameStore.geometry.mask.visualSettings>) => {
-    Object.assign(gameStore.geometry.mask.visualSettings, settings)
   },
 
   // Mesh Registry actions (for pixeloid mesh system)
@@ -1030,7 +969,7 @@ export const updateGameStore = {
       metadata: GeometryHelper.calculatePointMetadata({ x: anchoredPos.x, y: anchoredPos.y })
     }
     gameStore.geometry.objects.push(point)
-    gameStore.geometry.mask.enabledObjects.add(point.id)
+    
     return point
   },
 
@@ -1055,7 +994,7 @@ export const updateGameStore = {
       })
     }
     gameStore.geometry.objects.push(line)
-    gameStore.geometry.mask.enabledObjects.add(line.id)
+    
     return line
   },
 
@@ -1088,7 +1027,7 @@ export const updateGameStore = {
       })
     }
     gameStore.geometry.objects.push(circle)
-    gameStore.geometry.mask.enabledObjects.add(circle.id)
+    
     return circle
   },
 
@@ -1119,7 +1058,7 @@ export const updateGameStore = {
       })
     }
     gameStore.geometry.objects.push(rectangle)
-    gameStore.geometry.mask.enabledObjects.add(rectangle.id)
+    
     return rectangle
   },
 
@@ -1155,7 +1094,7 @@ export const updateGameStore = {
       })
     }
     gameStore.geometry.objects.push(diamond)
-    gameStore.geometry.mask.enabledObjects.add(diamond.id)
+    
     return diamond
   }
 }

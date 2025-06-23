@@ -32,7 +32,6 @@ export class BoundingBoxRenderer {
 
     // Get objects that should show bounding boxes AND are in viewport
     const objectsToRender = gameStore.geometry.objects.filter(obj =>
-      gameStore.geometry.mask.enabledObjects.has(obj.id) &&
       obj.isVisible &&
       obj.metadata &&
       this.isObjectInViewport(obj, corners)

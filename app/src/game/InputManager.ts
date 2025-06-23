@@ -538,7 +538,7 @@ export class InputManager {
   }
 
   /**
-   * Handle object dragging during mouse move
+   * Handle object dragging during mouse move - FIXED: Use store updates for bbox mesh reactivity
    */
   private handleObjectDragging(pixeloidPos: { x: number, y: number }): void {
     if (!this.isDragging || !this.dragObjectId || !this.dragStartPosition || !this.dragObjectOriginalPosition) {
@@ -563,34 +563,46 @@ export class InputManager {
     const anchorPoints = GeometryHelper.calculatePixeloidAnchorPoints(rawNewX, rawNewY)
     const snappedPos = anchorPoints.topLeft
 
-    // Apply snapped position to object based on type
+    // ✅ FIXED: Use store updates instead of direct modification to trigger bbox mesh reactivity
     if ('anchorX' in obj && 'anchorY' in obj) {
-      const diamond = obj as GeometricDiamond
-      diamond.anchorX = snappedPos.x
-      diamond.anchorY = snappedPos.y
+      // Diamond object
+      updateGameStore.updateGeometricObject(this.dragObjectId, {
+        anchorX: snappedPos.x,
+        anchorY: snappedPos.y
+      })
     } else if ('centerX' in obj && 'centerY' in obj) {
-      const circle = obj as GeometricCircle
-      circle.centerX = snappedPos.x
-      circle.centerY = snappedPos.y
+      // Circle object
+      updateGameStore.updateGeometricObject(this.dragObjectId, {
+        centerX: snappedPos.x,
+        centerY: snappedPos.y
+      })
     } else if ('x' in obj && 'y' in obj && 'width' in obj && 'height' in obj) {
-      const rect = obj as GeometricRectangle
-      rect.x = snappedPos.x
-      rect.y = snappedPos.y
+      // Rectangle object
+      updateGameStore.updateGeometricObject(this.dragObjectId, {
+        x: snappedPos.x,
+        y: snappedPos.y
+      })
     } else if ('startX' in obj && 'startY' in obj && 'endX' in obj && 'endY' in obj) {
-      const line = obj as GeometricLine
+      // Line object - move both endpoints
       if (this.dragObjectOriginalEnd) {
         const deltaSnappedX = snappedPos.x - this.dragObjectOriginalPosition.x
         const deltaSnappedY = snappedPos.y - this.dragObjectOriginalPosition.y
-        line.startX = this.dragObjectOriginalPosition.x + deltaSnappedX
-        line.startY = this.dragObjectOriginalPosition.y + deltaSnappedY
-        line.endX = this.dragObjectOriginalEnd.x + deltaSnappedX
-        line.endY = this.dragObjectOriginalEnd.y + deltaSnappedY
+        updateGameStore.updateGeometricObject(this.dragObjectId, {
+          startX: this.dragObjectOriginalPosition.x + deltaSnappedX,
+          startY: this.dragObjectOriginalPosition.y + deltaSnappedY,
+          endX: this.dragObjectOriginalEnd.x + deltaSnappedX,
+          endY: this.dragObjectOriginalEnd.y + deltaSnappedY
+        })
       }
     } else if ('x' in obj && 'y' in obj) {
-      const point = obj as GeometricPoint
-      point.x = snappedPos.x
-      point.y = snappedPos.y
+      // Point object
+      updateGameStore.updateGeometricObject(this.dragObjectId, {
+        x: snappedPos.x,
+        y: snappedPos.y
+      })
     }
+    
+    console.log(`🎯 InputManager: Updated object ${this.dragObjectId} via store, triggering bbox mesh reactivity`)
   }
 
   /**

@@ -1,6 +1,6 @@
-import { Graphics, Container } from 'pixi.js'
-import { OutlineFilter } from 'pixi-filters'
-import { gameStore } from '../store/gameStore'
+import { Graphics, Container, Rectangle } from 'pixi.js'
+import { PixelateFilter } from 'pixi-filters'
+import { gameStore, updateGameStore } from '../store/gameStore'
 import { GeometryHelper } from './GeometryHelper'
 import { CoordinateHelper } from './CoordinateHelper'
 import { subscribe } from 'valtio'
@@ -11,7 +11,8 @@ import type {
   GeometricCircle,
   GeometricLine,
   GeometricPoint,
-  GeometricDiamond
+  GeometricDiamond,
+  BboxMeshReference
 } from '../types'
 
 /**
@@ -28,10 +29,11 @@ export class GeometryRenderer {
   // Individual object containers and graphics tracking
   private objectContainers: Map<string, Container> = new Map()
   private objectGraphics: Map<string, Graphics> = new Map()
+  private objectBboxMeshes: Map<string, Graphics> = new Map() // NEW: Track bbox meshes
   private previewGraphics: Graphics = new Graphics()
   
-  // Filter instance (reuse for performance)
-  private outlineFilter: OutlineFilter
+  // Filter instances (reuse for performance)
+  private pixelateFilter: PixelateFilter
   
   constructor() {
     // Setup container hierarchy
@@ -39,16 +41,22 @@ export class GeometryRenderer {
     this.mainContainer.addChild(this.selectedContainer)
     this.mainContainer.addChild(this.previewGraphics)
     
-    // Create and apply outline filter
-    this.outlineFilter = new OutlineFilter({
-      thickness: 3,
-      color: 0xff4444,  // Bright red for visibility
-      quality: 0.1      // Performance optimization
-    })
-    this.selectedContainer.filters = [this.outlineFilter]
+    // Create pixelate filter with pixeloid-perfect configuration
+    this.pixelateFilter = new PixelateFilter([gameStore.camera.pixeloid_scale, gameStore.camera.pixeloid_scale])
+    
+    // Performance optimizations for pixelate filter
+    this.pixelateFilter.padding = 0  // No extra padding needed for pixelation
+    this.pixelateFilter.resolution = 1  // Full resolution for pixeloid-perfect quality
+    
+    // Keep containers clean - no initial filters (handled per-object via bbox meshes)
+    this.selectedContainer.filters = null
+    this.normalContainer.filters = null
     
     // Subscribe to filter and selection changes
     this.subscribeToFilterChanges()
+    
+    // Subscribe to object changes for bbox mesh updates
+    this.subscribeToObjectChanges()
   }
 
   /**
@@ -76,6 +84,14 @@ export class GeometryRenderer {
     // Remove objects that are no longer visible or deleted
     for (const [objectId, container] of this.objectContainers) {
       if (!currentObjectIds.has(objectId)) {
+        // Clean up bbox mesh
+        const bboxMesh = this.objectBboxMeshes.get(objectId)
+        if (bboxMesh) {
+          bboxMesh.destroy()
+          this.objectBboxMeshes.delete(objectId)
+        }
+        
+        // Clean up container and graphics
         container.removeFromParent()
         container.destroy()
         this.objectContainers.delete(objectId)
@@ -102,6 +118,8 @@ export class GeometryRenderer {
     let objectContainer = this.objectContainers.get(obj.id)
     let graphics = this.objectGraphics.get(obj.id)
     
+    const isNewObject = !objectContainer
+    
     if (!objectContainer) {
       // Create new container + graphics for this object
       objectContainer = new Container()
@@ -122,6 +140,14 @@ export class GeometryRenderer {
     graphics!.position.set(0, 0)
     this.renderGeometricObjectToGraphics(convertedObject, pixeloidScale, graphics!)
     
+    // Create bbox mesh for new objects (will be handled by subscription for existing objects)
+    if (isNewObject) {
+      this.createBboxMeshForObject(obj)
+    }
+    
+    // Update bbox mesh position with coordinate conversion
+    this.updateBboxMeshPosition(obj.id, obj)
+    
     // Assign to appropriate filter container based on selection
     this.assignObjectToFilterContainer(obj.id, objectContainer)
   }
@@ -137,7 +163,7 @@ export class GeometryRenderer {
     
     // Assign to appropriate container
     if (isSelected) {
-      this.selectedContainer.addChild(objectContainer)  // Gets outline filter
+      this.selectedContainer.addChild(objectContainer)  // Selection handled by SelectionFilterRenderer
     } else {
       this.normalContainer.addChild(objectContainer)    // No filter
     }
@@ -147,9 +173,14 @@ export class GeometryRenderer {
    * Subscribe to filter and selection changes for reactive updates
    */
   private subscribeToFilterChanges(): void {
-    // React to filter effects changes
+    // React to filter effects changes (pixelate only now)
     subscribe(gameStore.geometry.filterEffects, () => {
-      this.updateOutlineFilterState()
+      this.updatePixelateFilterState()
+    })
+    
+    // React to pixeloid scale changes for perfect alignment
+    subscribe(gameStore.camera, () => {
+      this.updatePixelateFilterScale()
     })
     
     // React to selection changes (for object reassignment)
@@ -158,27 +189,202 @@ export class GeometryRenderer {
     })
   }
 
+
   /**
-   * Update outline filter state based on store settings
+   * Update pixelate filter state - OBJECT-LEVEL FILTERING: Uses bbox meshes, preserves container filters
    */
-  private updateOutlineFilterState(): void {
-    const outlineEnabled = gameStore.geometry.filterEffects.outline
+  private updatePixelateFilterState(): void {
+    const pixelateEnabled = gameStore.geometry.filterEffects.pixelate
     
-    if (outlineEnabled) {
-      this.selectedContainer.filters = [this.outlineFilter]
-    } else {
-      this.selectedContainer.filters = null  // Remove filter
+    console.log(`GeometryRenderer: Updating pixelate filter state - ${pixelateEnabled ? 'ENABLED' : 'DISABLED'}`)
+    
+    if (pixelateEnabled) {
+      // Set pixeloid-perfect filter size
+      this.updatePixelateFilterScale()
     }
+    
+    // ✅ OBJECT-LEVEL FILTERING: Update filters on all bbox meshes only
+    this.updateAllObjectFilters()
+    
+    // ✅ PRESERVE GLOBAL FILTERS: Don't touch container filters (selection handled by SelectionFilterRenderer)
+    // normalContainer.filters stays null (no global filters needed)
+    // selectedContainer.filters stays null (no filters in GeometryRenderer)
+    
+    console.log(`GeometryRenderer: Updated pixelate filters on ${this.objectBboxMeshes.size} bbox meshes`)
   }
+
+  /**
+   * Dynamic scale adjustment for perfect pixeloid alignment
+   */
+  private updatePixelateFilterScale(): void {
+    const pixeloidScale = gameStore.camera.pixeloid_scale
+    this.pixelateFilter.size = [pixeloidScale, pixeloidScale]
+    console.log(`PixelateFilter: Updated size to ${pixeloidScale}x${pixeloidScale} for perfect pixeloid alignment`)
+  }
+
 
   /**
    * Update filter assignment when selection changes
    */
   private updateSelectionFilterAssignment(): void {
+    // Update bbox mesh filters for all objects (selection handled by SelectionFilterRenderer)
+    this.updateAllObjectFilters()
+    
     // Reassign all objects to correct containers when selection changes
     for (const [objectId, container] of this.objectContainers) {
       this.assignObjectToFilterContainer(objectId, container)
     }
+  }
+
+  /**
+   * Subscribe to object changes for bbox mesh updates
+   */
+  private subscribeToObjectChanges(): void {
+    subscribe(gameStore.geometry.objects, () => {
+      // Check each object for bbox updates needed
+      for (const obj of gameStore.geometry.objects) {
+        if (this.needsBboxUpdate(obj)) {
+          this.updateBboxMeshForObject(obj)
+        }
+      }
+    })
+  }
+
+  /**
+   * Check if bbox mesh needs updating for an object
+   */
+  private needsBboxUpdate(obj: GeometricObject): boolean {
+    // Object needs bbox update if:
+    // 1. No bbox mesh exists, OR
+    // 2. Object metadata is newer than bbox mesh
+    if (!obj.bboxMesh) return true
+    
+    // Check if we have the mesh tracked locally
+    const localMesh = this.objectBboxMeshes.get(obj.id)
+    if (!localMesh) return true
+    
+    // Compare timestamps (metadata should have lastUpdated, but fallback to createdAt)
+    const metadataTime = (obj.metadata as any).lastUpdated || obj.createdAt
+    return metadataTime > obj.bboxMesh.lastUpdated
+  }
+
+  /**
+   * Create or update bbox mesh for an object
+   */
+  private updateBboxMeshForObject(obj: GeometricObject): void {
+    // Remove old bbox mesh if it exists
+    const oldMesh = this.objectBboxMeshes.get(obj.id)
+    if (oldMesh) {
+      oldMesh.destroy()
+      this.objectBboxMeshes.delete(obj.id)
+    }
+    
+    // Create new bbox mesh
+    this.createBboxMeshForObject(obj)
+  }
+
+  /**
+   * Create pixeloid-perfect bbox mesh for filtering
+   */
+  private createBboxMeshForObject(obj: GeometricObject): void {
+    if (!obj.metadata) {
+      console.warn(`GeometryRenderer: Cannot create bbox mesh for object ${obj.id} - missing metadata`)
+      return
+    }
+    
+    const bounds = obj.metadata.bounds
+    const width = bounds.maxX - bounds.minX
+    const height = bounds.maxY - bounds.minY
+    
+    // Create invisible bbox mesh at exact pixeloid bounds
+    const bboxMesh = new Graphics()
+    bboxMesh.rect(bounds.minX, bounds.minY, width, height)
+    bboxMesh.fill({ color: 0x000000, alpha: 0 }) // Invisible
+    
+    // Apply filters to bbox mesh instead of graphics
+    const filters = this.getFiltersForObject(obj.id)
+    if (filters && filters.length > 0) {
+      bboxMesh.filters = filters
+    }
+    
+    // Store bbox mesh reference
+    const meshId = `bbox_${obj.id}_${Date.now()}`
+    this.objectBboxMeshes.set(obj.id, bboxMesh)
+    
+    // Add bbox mesh to object container
+    const objectContainer = this.objectContainers.get(obj.id)
+    if (objectContainer) {
+      objectContainer.addChild(bboxMesh)
+    }
+    
+    // Update store with bbox mesh reference
+    const bboxRef: BboxMeshReference = {
+      meshId: meshId,
+      bounds: {
+        minX: bounds.minX,
+        maxX: bounds.maxX,
+        minY: bounds.minY,
+        maxY: bounds.maxY
+      },
+      lastUpdated: Date.now()
+    }
+    
+    updateGameStore.updateGeometricObject(obj.id, {
+      bboxMesh: bboxRef
+    })
+    
+    console.log(`GeometryRenderer: Created bbox mesh for object ${obj.id} at bounds:`, bounds)
+  }
+
+  /**
+   * Get appropriate filters for bbox mesh (pixelate only - outline handled at container level)
+   */
+  private getFiltersForObject(objectId: string): any[] | null {
+    const pixelateEnabled = gameStore.geometry.filterEffects.pixelate
+    
+    const filters: any[] = []
+    
+    // Only add pixelate filter to bbox meshes (outline handled by selectedContainer)
+    if (pixelateEnabled) {
+      filters.push(this.pixelateFilter)
+    }
+    
+    return filters.length > 0 ? filters : null
+  }
+
+  /**
+   * Update filters on all existing object bbox meshes
+   */
+  private updateAllObjectFilters(): void {
+    for (const [objectId, bboxMesh] of this.objectBboxMeshes) {
+      const filters = this.getFiltersForObject(objectId)
+      bboxMesh.filters = filters
+    }
+    console.log(`GeometryRenderer: Updated filters on ${this.objectBboxMeshes.size} bbox meshes`)
+  }
+
+  /**
+   * Update bbox mesh position to match coordinate conversion
+   */
+  private updateBboxMeshPosition(objectId: string, obj: GeometricObject): void {
+    const bboxMesh = this.objectBboxMeshes.get(objectId)
+    if (!bboxMesh || !obj.metadata) return
+    
+    // Apply same coordinate conversion as graphics
+    const offset = gameStore.mesh.vertex_to_pixeloid_offset
+    const convertedBounds = {
+      minX: obj.metadata.bounds.minX - offset.x,
+      minY: obj.metadata.bounds.minY - offset.y,
+      maxX: obj.metadata.bounds.maxX - offset.x,
+      maxY: obj.metadata.bounds.maxY - offset.y
+    }
+    
+    // Clear and redraw bbox mesh with converted coordinates
+    bboxMesh.clear()
+    bboxMesh.rect(convertedBounds.minX, convertedBounds.minY,
+                  convertedBounds.maxX - convertedBounds.minX,
+                  convertedBounds.maxY - convertedBounds.minY)
+    bboxMesh.fill({ color: 0x000000, alpha: 0 }) // Keep invisible
   }
 
   /**
@@ -604,6 +810,12 @@ export class GeometryRenderer {
       graphics.destroy()
     }
     this.objectContainers.clear()
+    
+    // Destroy all bbox meshes
+    for (const bboxMesh of this.objectBboxMeshes.values()) {
+      bboxMesh.destroy()
+    }
+    this.objectBboxMeshes.clear()
     
     // Destroy preview graphics
     this.previewGraphics.destroy()

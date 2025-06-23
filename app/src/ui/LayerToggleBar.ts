@@ -8,10 +8,9 @@ export class LayerToggleBar {
     geometry: true,    // Geometric shapes and objects
     selection: true,   // Selection highlights
     raycast: true,     // Raycast lines and debug visuals
-    mask: false,       // Pixeloid mask layer for collision/spatial analysis (off by default)
     bbox: false,       // Bounding box overlay for comparison (off by default)
     mouse: true,       // Mouse visualization
-    outline: true      // Selection outline filter enabled
+    pixelate: false    // Pixeloid-perfect pixelation filter disabled by default
   }
   
   constructor() {
@@ -60,14 +59,6 @@ export class LayerToggleBar {
       })
     }
     
-    // Mask layer toggle
-    const maskToggle = document.getElementById('toggle-layer-mask')
-    if (maskToggle) {
-      maskToggle.addEventListener('click', () => {
-        this.toggleLayer('mask')
-      })
-    }
-    
     // Bbox layer toggle
     const bboxToggle = document.getElementById('toggle-layer-bbox')
     if (bboxToggle) {
@@ -84,28 +75,28 @@ export class LayerToggleBar {
       })
     }
     
-    // Outline filter toggle
-    const outlineToggle = document.getElementById('toggle-filter-outline')
-    if (outlineToggle) {
-      outlineToggle.addEventListener('click', () => {
-        this.toggleOutlineFilter()
+    // Pixelate filter toggle
+    const pixelateToggle = document.getElementById('toggle-filter-pixelate')
+    if (pixelateToggle) {
+      pixelateToggle.addEventListener('click', () => {
+        this.togglePixelateFilter()
       })
     }
   }
   
-  private toggleLayer(layerName: 'background' | 'geometry' | 'selection' | 'raycast' | 'mask' | 'bbox' | 'mouse'): void {
+  private toggleLayer(layerName: 'background' | 'geometry' | 'selection' | 'raycast' | 'bbox' | 'mouse'): void {
     this.layerStates[layerName] = !this.layerStates[layerName]
     this.updateButtonState(layerName)
     this.notifyLayerChange(layerName, this.layerStates[layerName])
   }
 
-  private toggleOutlineFilter(): void {
-    this.layerStates.outline = !this.layerStates.outline
-    this.updateOutlineButtonState()
-    this.notifyOutlineFilterChange()
+  private togglePixelateFilter(): void {
+    this.layerStates.pixelate = !this.layerStates.pixelate
+    this.updatePixelateButtonState()
+    this.notifyPixelateFilterChange()
   }
   
-  private updateButtonState(layerName: 'background' | 'geometry' | 'selection' | 'raycast' | 'mask' | 'bbox' | 'mouse'): void {
+  private updateButtonState(layerName: 'background' | 'geometry' | 'selection' | 'raycast' | 'bbox' | 'mouse'): void {
     const buttonId = `toggle-layer-${layerName}`
     const button = document.getElementById(buttonId)
     if (!button) return
@@ -116,7 +107,6 @@ export class LayerToggleBar {
                        layerName === 'geometry' ? 'btn-secondary' :
                        layerName === 'selection' ? 'btn-primary' :
                        layerName === 'raycast' ? 'btn-warning' :
-                       layerName === 'mask' ? 'btn-info' :
                        layerName === 'bbox' ? 'btn-error' : 'btn-accent'
     
     // Reset button classes
@@ -134,36 +124,35 @@ export class LayerToggleBar {
     this.updateButtonState('geometry')
     this.updateButtonState('selection')
     this.updateButtonState('raycast')
-    this.updateButtonState('mask')
     this.updateButtonState('bbox')
     this.updateButtonState('mouse')
-    this.updateOutlineButtonState()
+    this.updatePixelateButtonState()
   }
 
-  private updateOutlineButtonState(): void {
-    const button = document.getElementById('toggle-filter-outline')
+  private updatePixelateButtonState(): void {
+    const button = document.getElementById('toggle-filter-pixelate')
     if (!button) return
     
-    const isActive = this.layerStates.outline
+    const isActive = this.layerStates.pixelate
     const baseClasses = ['btn', 'btn-sm', 'rounded-full']
     
     // Reset button classes
     button.className = baseClasses.join(' ')
     
     if (isActive) {
-      button.classList.add('btn-warning')  // Orange for outline
+      button.classList.add('btn-info')  // Cyan for pixelate
     } else {
       button.classList.add('btn-outline')
     }
   }
 
-  private notifyOutlineFilterChange(): void {
-    // Update store with outline filter state
-    updateGameStore.setOutlineFilterEnabled(this.layerStates.outline)
+  private notifyPixelateFilterChange(): void {
+    // Update store with pixelate filter state
+    updateGameStore.setPixelateFilterEnabled(this.layerStates.pixelate)
     
     // Dispatch custom event
-    const event = new CustomEvent('outlineFilterChanged', {
-      detail: { enabled: this.layerStates.outline }
+    const event = new CustomEvent('pixelateFilterChanged', {
+      detail: { enabled: this.layerStates.pixelate }
     })
     document.dispatchEvent(event)
   }
@@ -171,7 +160,7 @@ export class LayerToggleBar {
   private notifyLayerChange(layerName: string, isVisible: boolean): void {
     // Update the store with the layer visibility change
     if (layerName === 'background' || layerName === 'geometry' || layerName === 'selection' ||
-        layerName === 'raycast' || layerName === 'mask' || layerName === 'bbox' || layerName === 'mouse') {
+        layerName === 'raycast' || layerName === 'bbox' || layerName === 'mouse') {
       updateGameStore.setLayerVisibility(layerName as any, isVisible)
     }
     
@@ -189,11 +178,11 @@ export class LayerToggleBar {
     }
   }
   
-  public getLayerState(layerName: 'background' | 'geometry' | 'selection' | 'raycast' | 'mask' | 'bbox' | 'mouse'): boolean {
+  public getLayerState(layerName: 'background' | 'geometry' | 'selection' | 'raycast' | 'bbox' | 'mouse'): boolean {
     return this.layerStates[layerName]
   }
   
-  public setLayerState(layerName: 'background' | 'geometry' | 'selection' | 'raycast' | 'mask' | 'bbox' | 'mouse', isVisible: boolean): void {
+  public setLayerState(layerName: 'background' | 'geometry' | 'selection' | 'raycast' | 'bbox' | 'mouse', isVisible: boolean): void {
     this.layerStates[layerName] = isVisible
     this.updateButtonState(layerName)
     this.notifyLayerChange(layerName, isVisible)

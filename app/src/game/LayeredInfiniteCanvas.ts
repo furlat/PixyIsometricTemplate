@@ -2,9 +2,8 @@ import { Container } from 'pixi.js'
 import { InfiniteCanvas } from './InfiniteCanvas'
 import { BackgroundGridRenderer } from './BackgroundGridRenderer'
 import { GeometryRenderer } from './GeometryRenderer'
-import { SelectionHighlightRenderer } from './SelectionHighlightRenderer'
+import { SelectionFilterRenderer } from './SelectionFilterRenderer'
 import { MouseHighlightShader } from './MouseHighlightShader'
-import { PixeloidMeshRenderer } from './PixeloidMeshRenderer'
 import { BoundingBoxRenderer } from './BoundingBoxRenderer'
 import { TextureRegistry } from './TextureRegistry'
 import { StaticMeshManager } from './StaticMeshManager'
@@ -27,7 +26,6 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
   private geometryLayer: Container
   private selectionLayer: Container  // NEW: Separate layer for selection highlighting
   private raycastLayer: Container
-  private maskLayer: Container      // NEW: Mask layer for collision/spatial analysis
   private bboxLayer: Container      // NEW: Separate layer for bbox overlay
   private mouseLayer: Container     // NEW: Separate layer for mouse visualization
 
@@ -37,14 +35,12 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
   // Graphics-based geometry renderer for user-drawn shapes (simple and reliable)
   private geometryRenderer: GeometryRenderer
   
-  // Selection highlight renderer for reactive selection visualization
-  private selectionHighlightRenderer: SelectionHighlightRenderer
+  // Selection filter renderer for GPU-accelerated selection highlighting
+  private selectionFilterRenderer: SelectionFilterRenderer
   
   // Mouse visualization renderer (lightweight, updates every frame)
   private mouseHighlightShader: MouseHighlightShader
   
-  // Pixeloid mesh renderer for GPU-accelerated spatial analysis
-  private pixeloidMeshRenderer: PixeloidMeshRenderer
   
   // Simple bounding box renderer for comparison
   private boundingBoxRenderer: BoundingBoxRenderer
@@ -63,7 +59,6 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
   private lastPixeloidScale = 0
   private renderBufferPadding = 200 // Large buffer to avoid re-renders on movement
   private isBackgroundRendering = false
-  private lastMaskLayerVisible = false // Track mask layer state to clean up filter
 
   constructor(private app?: any) {
     super()
@@ -76,7 +71,6 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
     this.geometryLayer = new Container({ isRenderGroup: true })
     this.selectionLayer = new Container({ isRenderGroup: true }) // Selection layer on top of geometry
     this.raycastLayer = new Container({ isRenderGroup: true })
-    this.maskLayer = new Container({ isRenderGroup: true })     // Mask layer for spatial analysis
     this.bboxLayer = new Container({ isRenderGroup: true })     // Bbox layer for comparison overlay
     this.mouseLayer = new Container({ isRenderGroup: true })    // Mouse layer on top
 
@@ -86,14 +80,11 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
     // Initialize graphics-based geometry renderer
     this.geometryRenderer = new GeometryRenderer()
     
-    // Initialize selection highlight renderer (reactive)
-    this.selectionHighlightRenderer = new SelectionHighlightRenderer()
+    // Initialize selection filter renderer (GPU-accelerated)
+    this.selectionFilterRenderer = new SelectionFilterRenderer()
     
     // Initialize mouse highlight renderer (lightweight)
     this.mouseHighlightShader = new MouseHighlightShader()
-    
-    // Initialize pixeloid mesh renderer
-    this.pixeloidMeshRenderer = new PixeloidMeshRenderer()
     
     // Initialize simple bounding box renderer for comparison
     this.boundingBoxRenderer = new BoundingBoxRenderer()
@@ -126,14 +117,10 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
     this.cameraTransform.addChild(this.geometryLayer)      // Geometric shapes and objects
     this.cameraTransform.addChild(this.selectionLayer)     // Selection highlights on top of geometry
     this.cameraTransform.addChild(this.raycastLayer)       // Raycast lines and debug visuals
-    this.cameraTransform.addChild(this.maskLayer)          // Mask layer for spatial analysis
     this.cameraTransform.addChild(this.bboxLayer)          // Bbox layer for comparison overlay
     
-    // Selection layer gets the selection highlight renderer graphics
-    this.selectionLayer.addChild(this.selectionHighlightRenderer.getGraphics())
-    
-    // Mask layer gets the pixeloid mesh renderer
-    this.maskLayer.addChild(this.pixeloidMeshRenderer.getContainer())
+    // Selection layer gets the selection filter renderer container
+    this.selectionLayer.addChild(this.selectionFilterRenderer.getContainer())
     
     // Bbox layer gets the simple bounding box renderer
     this.bboxLayer.addChild(this.boundingBoxRenderer.getGraphics())
@@ -187,9 +174,6 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
     
     // Render selection highlights (reactive, always updates based on store state)
     this.renderSelectionLayer(paddedCorners, pixeloidScale)
-    
-    // Render mask layer (GPU-accelerated spatial analysis)
-    this.renderMaskLayer(paddedCorners, pixeloidScale)
     
     // Render bbox layer (comparison overlay)
     this.renderBboxLayer(paddedCorners, pixeloidScale)
@@ -259,24 +243,15 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
   }
   
   /**
-   * Render selection layer - now handled by GeometryRenderer filters
+   * Render selection layer - RE-ENABLED: Using working SelectionHighlightRenderer
    */
   private renderSelectionLayer(corners: ViewportCorners, pixeloidScale: number): void {
-    // DISABLED: Old graphics-based selection highlighting replaced with filter approach
-    // Selection highlighting now handled by GeometryRenderer filters in selectedContainer
-    // Keep layer for future non-filter selection effects
-    this.selectionLayer.visible = false
-  }
-  
-  /**
-   * Render mask layer - GPU-accelerated pixeloid occupancy detection
-   */
-  private renderMaskLayer(corners: ViewportCorners, pixeloidScale: number): void {
-    // Back to simple camera transform approach that was working
-    this.pixeloidMeshRenderer.render(pixeloidScale, this.cameraTransform)
-    
-    // Set layer visibility based on store state
-    this.maskLayer.visible = gameStore.geometry.layerVisibility.mask
+    if (gameStore.geometry.layerVisibility.selection) {
+      this.selectionFilterRenderer.render(corners, pixeloidScale)
+      this.selectionLayer.visible = true
+    } else {
+      this.selectionLayer.visible = false
+    }
   }
   
   /**
@@ -469,13 +444,6 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
   }
 
   /**
-   * Get the mask layer container for adding mask elements
-   */
-  public getMaskLayer(): Container {
-    return this.maskLayer
-  }
-
-  /**
    * Get the bbox layer container for adding bbox elements
    */
   public getBboxLayer(): Container {
@@ -492,8 +460,7 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
     // Destroy renderers
     this.backgroundGridRenderer.destroy()
     this.geometryRenderer.destroy()
-    this.selectionHighlightRenderer.destroy()
-    this.pixeloidMeshRenderer.destroy()
+    this.selectionFilterRenderer.destroy()
     this.boundingBoxRenderer.destroy()
 
     // Destroy layer containers
@@ -501,7 +468,6 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
     this.geometryLayer.destroy()
     this.selectionLayer.destroy()
     this.raycastLayer.destroy()
-    this.maskLayer.destroy()
     this.bboxLayer.destroy()
 
     // Call parent destroy
@@ -517,7 +483,6 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
     
     if (gameStore.geometry.layerVisibility.bbox) {
       const enabledObjects = gameStore.geometry.objects.filter(obj =>
-        gameStore.geometry.mask.enabledObjects.has(obj.id) &&
         obj.isVisible &&
         obj.metadata
       )

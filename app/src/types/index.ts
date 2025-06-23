@@ -219,6 +219,18 @@ export interface GeometricMetadata {
   }
 }
 
+// Bbox mesh reference for pixeloid-perfect filtering
+export interface BboxMeshReference {
+  meshId: string           // Unique identifier for the bbox mesh
+  bounds: {                // Pixeloid-perfect bounds
+    minX: number
+    maxX: number
+    minY: number
+    maxY: number
+  }
+  lastUpdated: number      // Timestamp for consistency tracking
+}
+
 export interface GeometricPoint {
   id: string
   x: number
@@ -228,6 +240,7 @@ export interface GeometricPoint {
   isVisible: boolean
   createdAt: number
   metadata: GeometricMetadata
+  bboxMesh?: BboxMeshReference
 }
 
 export interface GeometricLine {
@@ -242,6 +255,7 @@ export interface GeometricLine {
   isVisible: boolean
   createdAt: number
   metadata: GeometricMetadata
+  bboxMesh?: BboxMeshReference
 }
 
 export interface GeometricCircle {
@@ -257,6 +271,7 @@ export interface GeometricCircle {
   isVisible: boolean
   createdAt: number
   metadata: GeometricMetadata
+  bboxMesh?: BboxMeshReference
 }
 
 export interface GeometricRectangle {
@@ -273,6 +288,7 @@ export interface GeometricRectangle {
   isVisible: boolean
   createdAt: number
   metadata: GeometricMetadata
+  bboxMesh?: BboxMeshReference
 }
 
 export interface GeometricDiamond {
@@ -292,6 +308,7 @@ export interface GeometricDiamond {
   isVisible: boolean
   createdAt: number
   metadata: GeometricMetadata
+  bboxMesh?: BboxMeshReference
 }
 
 // ================================
@@ -450,13 +467,12 @@ export interface GeometryState {
     geometry: boolean    // Geometric shapes and objects (geometryLayer)
     selection: boolean   // Selection highlights (selectionLayer)
     raycast: boolean     // Raycast lines and debug visuals (raycastLayer)
-    mask: boolean        // Pixeloid mask layer for collision/spatial analysis (maskLayer)
     bbox: boolean        // Bounding box overlay for comparison (bboxLayer)
     mouse: boolean       // Mouse visualization (mouseLayer)
   }
   // Filter effects state
   filterEffects: {
-    outline: boolean     // Selection outline filter enabled
+    pixelate: boolean    // Pixeloid-perfect pixelation filter enabled
   }
   // Selection state
   selection: {
@@ -470,18 +486,6 @@ export interface GeometryState {
   // Favorites system
   favorites: {
     favoriteObjectIds: string[]
-  }
-  // Mask layer state for GPU-based spatial analysis
-  mask: {
-    enabledObjects: Set<string>    // Objects contributing to mask
-    mode: 'boundingBox' | 'precise'  // boundingBox = use metadata bounds, precise = use shape geometry
-    visualSettings: {
-      fillColor: number      // Mask fill color
-      fillAlpha: number      // Mask fill transparency
-      strokeColor: number    // Outline color for debugging
-      strokeAlpha: number    // Outline transparency
-      strokeWidth: number    // Outline thickness
-    }
   }
 }
 
