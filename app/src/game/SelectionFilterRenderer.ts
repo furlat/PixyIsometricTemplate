@@ -2,6 +2,7 @@ import { Graphics, Container } from 'pixi.js'
 import { OutlineFilter } from 'pixi-filters'
 import { gameStore } from '../store/gameStore'
 import { GeometryHelper } from './GeometryHelper'
+import { CoordinateCalculations } from './CoordinateCalculations'
 import type { ViewportCorners, GeometricObject, GeometricRectangle, GeometricCircle, GeometricLine, GeometricPoint, GeometricDiamond } from '../types'
 
 /**
@@ -70,13 +71,13 @@ export class SelectionFilterRenderer {
     
     // Render the object graphics (will be filtered by OutlineFilter)
     if ('anchorX' in convertedObject && 'anchorY' in convertedObject) {
-      this.renderDiamondToGraphics(convertedObject as GeometricDiamond, graphics)
+      this.renderDiamondToGraphics(convertedObject as GeometricDiamond, pixeloidScale, graphics)
     } else if ('width' in convertedObject && 'height' in convertedObject) {
-      this.renderRectangleToGraphics(convertedObject as GeometricRectangle, graphics)
+      this.renderRectangleToGraphics(convertedObject as GeometricRectangle, pixeloidScale, graphics)
     } else if ('radius' in convertedObject) {
-      this.renderCircleToGraphics(convertedObject as GeometricCircle, graphics)
+      this.renderCircleToGraphics(convertedObject as GeometricCircle, pixeloidScale, graphics)
     } else if ('startX' in convertedObject && 'endX' in convertedObject) {
-      this.renderLineToGraphics(convertedObject as GeometricLine, graphics)
+      this.renderLineToGraphics(convertedObject as GeometricLine, pixeloidScale, graphics)
     } else if ('x' in convertedObject && 'y' in convertedObject && !('width' in convertedObject)) {
       this.renderPointToGraphics(convertedObject as GeometricPoint, pixeloidScale, graphics)
     } else {
@@ -205,8 +206,18 @@ export class SelectionFilterRenderer {
   /**
    * Render rectangle shape to graphics (same logic as GeometryRenderer)
    */
-  private renderRectangleToGraphics(rect: GeometricRectangle, graphics: Graphics): void {
-    graphics.rect(rect.x, rect.y, rect.width, rect.height)
+  private renderRectangleToGraphics(rect: GeometricRectangle, pixeloidScale: number, graphics: Graphics): void {
+    // Convert vertex coordinates to screen coordinates
+    const topLeft = CoordinateCalculations.vertexToScreen(
+      { __brand: 'vertex' as const, x: rect.x, y: rect.y },
+      pixeloidScale
+    )
+    const x = topLeft.x
+    const y = topLeft.y
+    const width = rect.width * pixeloidScale
+    const height = rect.height * pixeloidScale
+
+    graphics.rect(x, y, width, height)
     
     if (rect.fillColor !== undefined) {
       graphics.fill({
@@ -216,7 +227,7 @@ export class SelectionFilterRenderer {
     }
 
     graphics.stroke({
-      width: rect.strokeWidth || gameStore.geometry.drawing.settings.defaultStrokeWidth,
+      width: (rect.strokeWidth || gameStore.geometry.drawing.settings.defaultStrokeWidth) * pixeloidScale,
       color: rect.color,
       alpha: rect.strokeAlpha
     })
@@ -225,8 +236,17 @@ export class SelectionFilterRenderer {
   /**
    * Render circle shape to graphics (same logic as GeometryRenderer)
    */
-  private renderCircleToGraphics(circle: GeometricCircle, graphics: Graphics): void {
-    graphics.circle(circle.centerX, circle.centerY, circle.radius)
+  private renderCircleToGraphics(circle: GeometricCircle, pixeloidScale: number, graphics: Graphics): void {
+    // Convert center vertex to screen coordinates
+    const center = CoordinateCalculations.vertexToScreen(
+      { __brand: 'vertex' as const, x: circle.centerX, y: circle.centerY },
+      pixeloidScale
+    )
+    const centerX = center.x
+    const centerY = center.y
+    const radius = circle.radius * pixeloidScale
+
+    graphics.circle(centerX, centerY, radius)
     
     if (circle.fillColor !== undefined) {
       graphics.fill({
@@ -236,7 +256,7 @@ export class SelectionFilterRenderer {
     }
 
     graphics.stroke({
-      width: circle.strokeWidth || gameStore.geometry.drawing.settings.defaultStrokeWidth,
+      width: (circle.strokeWidth || gameStore.geometry.drawing.settings.defaultStrokeWidth) * pixeloidScale,
       color: circle.color,
       alpha: circle.strokeAlpha
     })
@@ -245,12 +265,22 @@ export class SelectionFilterRenderer {
   /**
    * Render line shape to graphics (same logic as GeometryRenderer)
    */
-  private renderLineToGraphics(line: GeometricLine, graphics: Graphics): void {
-    graphics.moveTo(line.startX, line.startY)
-    graphics.lineTo(line.endX, line.endY)
+  private renderLineToGraphics(line: GeometricLine, pixeloidScale: number, graphics: Graphics): void {
+    // Convert both endpoints to screen coordinates
+    const start = CoordinateCalculations.vertexToScreen(
+      { __brand: 'vertex' as const, x: line.startX, y: line.startY },
+      pixeloidScale
+    )
+    const end = CoordinateCalculations.vertexToScreen(
+      { __brand: 'vertex' as const, x: line.endX, y: line.endY },
+      pixeloidScale
+    )
+
+    graphics.moveTo(start.x, start.y)
+    graphics.lineTo(end.x, end.y)
 
     graphics.stroke({
-      width: line.strokeWidth || gameStore.geometry.drawing.settings.defaultStrokeWidth,
+      width: (line.strokeWidth || gameStore.geometry.drawing.settings.defaultStrokeWidth) * pixeloidScale,
       color: line.color,
       alpha: line.strokeAlpha
     })
@@ -260,8 +290,14 @@ export class SelectionFilterRenderer {
    * Render point shape to graphics (same logic as GeometryRenderer)
    */
   private renderPointToGraphics(point: GeometricPoint, pixeloidScale: number, graphics: Graphics): void {
-    const pointRadius = 2 / pixeloidScale
-    graphics.circle(point.x, point.y, pointRadius)
+    // Convert vertex position to screen coordinates
+    const pos = CoordinateCalculations.vertexToScreen(
+      { __brand: 'vertex' as const, x: point.x, y: point.y },
+      pixeloidScale
+    )
+    
+    const pointRadius = 2  // Fixed pixel size
+    graphics.circle(pos.x, pos.y, pointRadius)
     graphics.fill({
       color: point.color,
       alpha: point.strokeAlpha
@@ -271,14 +307,32 @@ export class SelectionFilterRenderer {
   /**
    * Render diamond shape to graphics (same logic as GeometryRenderer)
    */
-  private renderDiamondToGraphics(diamond: GeometricDiamond, graphics: Graphics): void {
+  private renderDiamondToGraphics(diamond: GeometricDiamond, pixeloidScale: number, graphics: Graphics): void {
     const vertices = GeometryHelper.calculateDiamondVertices(diamond)
     
-    graphics.moveTo(vertices.west.x, vertices.west.y)    // West
-    graphics.lineTo(vertices.north.x, vertices.north.y)  // North
-    graphics.lineTo(vertices.east.x, vertices.east.y)    // East
-    graphics.lineTo(vertices.south.x, vertices.south.y)  // South
-    graphics.lineTo(vertices.west.x, vertices.west.y)    // Back to West (close)
+    // Convert each vertex to screen coordinates
+    const west = CoordinateCalculations.vertexToScreen(
+      { __brand: 'vertex' as const, x: vertices.west.x, y: vertices.west.y },
+      pixeloidScale
+    )
+    const north = CoordinateCalculations.vertexToScreen(
+      { __brand: 'vertex' as const, x: vertices.north.x, y: vertices.north.y },
+      pixeloidScale
+    )
+    const east = CoordinateCalculations.vertexToScreen(
+      { __brand: 'vertex' as const, x: vertices.east.x, y: vertices.east.y },
+      pixeloidScale
+    )
+    const south = CoordinateCalculations.vertexToScreen(
+      { __brand: 'vertex' as const, x: vertices.south.x, y: vertices.south.y },
+      pixeloidScale
+    )
+    
+    graphics.moveTo(west.x, west.y)    // West
+    graphics.lineTo(north.x, north.y)  // North
+    graphics.lineTo(east.x, east.y)    // East
+    graphics.lineTo(south.x, south.y)  // South
+    graphics.lineTo(west.x, west.y)    // Back to West (close)
 
     if (diamond.fillColor !== undefined) {
       graphics.fill({
@@ -288,7 +342,7 @@ export class SelectionFilterRenderer {
     }
 
     graphics.stroke({
-      width: diamond.strokeWidth || gameStore.geometry.drawing.settings.defaultStrokeWidth,
+      width: (diamond.strokeWidth || gameStore.geometry.drawing.settings.defaultStrokeWidth) * pixeloidScale,
       color: diamond.color,
       alpha: diamond.strokeAlpha
     })

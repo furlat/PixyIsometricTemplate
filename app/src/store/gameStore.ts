@@ -131,7 +131,7 @@ export const gameStore = proxy<GameState>({
       selection: true,   // Selection highlights
       raycast: true,     // Raycast lines and debug visuals
       bbox: false,       // Bounding box overlay for comparison (off by default)
-      bboxTest: false,   // Bbox texture test layer (perfect geometry mirror)
+      mirror: false,     // Mirror layer for cached texture sprites (off by default)
       mouse: true        // Mouse visualization
     },
     filterEffects: {
@@ -603,7 +603,7 @@ export const updateGameStore = {
     }
   },
 
-  setLayerVisibility: (layer: 'background' | 'geometry' | 'selection' | 'raycast' | 'bbox' | 'bboxTest' | 'mouse', visible: boolean) => {
+  setLayerVisibility: (layer: 'background' | 'geometry' | 'selection' | 'raycast' | 'bbox' | 'mirror' | 'mouse', visible: boolean) => {
     gameStore.geometry.layerVisibility[layer] = visible
   },
 
@@ -811,6 +811,13 @@ export const updateGameStore = {
   removeObjectTexture: (objectId: string) => {
     delete gameStore.textureRegistry.objectTextures[objectId]
     gameStore.textureRegistry.stats.totalTextures = Object.keys(gameStore.textureRegistry.objectTextures).length
+  },
+
+  removeRenderingTexture: (objectId: string) => {
+    // This method handles removal of rendering-specific textures
+    // Currently delegates to removeObjectTexture, but could be expanded
+    // for more complex texture management in the future
+    updateGameStore.removeObjectTexture(objectId)
   },
 
   clearTextureCache: () => {

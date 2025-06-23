@@ -1,6 +1,7 @@
 import { Graphics, Container, Renderer, Rectangle } from 'pixi.js'
 import { gameStore, updateGameStore } from '../store/gameStore'
 import { GeometryHelper } from './GeometryHelper'
+import { CoordinateCalculations } from './CoordinateCalculations'
 import { subscribe } from 'valtio'
 import type {
   ViewportCorners,
@@ -84,7 +85,7 @@ export class GeometryRenderer {
     }
 
     // Always render preview for active drawing (also with coordinate conversion)
-    this.renderPreviewWithCoordinateConversion()
+    this.renderPreviewWithCoordinateConversion(pixeloidScale)
     
     console.log('✅ GeometryRenderer: Render completed - always renders every call')
   }
@@ -288,13 +289,13 @@ export class GeometryRenderer {
   private renderGeometricObjectToGraphics(obj: GeometricObject, pixeloidScale: number, graphics: Graphics): void {
     // Type narrowing based on object properties
     if ('anchorX' in obj && 'anchorY' in obj) {
-      this.renderDiamondToGraphics(obj as GeometricDiamond, graphics)
+      this.renderDiamondToGraphics(obj as GeometricDiamond, pixeloidScale, graphics)
     } else if ('width' in obj && 'height' in obj) {
-      this.renderRectangleToGraphics(obj as GeometricRectangle, graphics)
+      this.renderRectangleToGraphics(obj as GeometricRectangle, pixeloidScale, graphics)
     } else if ('radius' in obj) {
-      this.renderCircleToGraphics(obj as GeometricCircle, graphics)
+      this.renderCircleToGraphics(obj as GeometricCircle, pixeloidScale, graphics)
     } else if ('startX' in obj && 'endX' in obj) {
-      this.renderLineToGraphics(obj as GeometricLine, graphics)
+      this.renderLineToGraphics(obj as GeometricLine, pixeloidScale, graphics)
     } else if ('x' in obj && 'y' in obj && !('width' in obj)) {
       this.renderPointToGraphics(obj as GeometricPoint, pixeloidScale, graphics)
     }
@@ -303,14 +304,18 @@ export class GeometryRenderer {
   /**
    * Render a rectangle shape to specific graphics
    */
-  private renderRectangleToGraphics(rect: GeometricRectangle, graphics: Graphics): void {
-    // Use raw pixeloid coordinates - camera transform handles scaling
-    const x = rect.x
-    const y = rect.y
-    const width = rect.width
-    const height = rect.height
+  private renderRectangleToGraphics(rect: GeometricRectangle, pixeloidScale: number, graphics: Graphics): void {
+    // Convert vertex coordinates to screen coordinates
+    const topLeft = CoordinateCalculations.vertexToScreen(
+      { __brand: 'vertex' as const, x: rect.x, y: rect.y },
+      pixeloidScale
+    )
+    const x = topLeft.x
+    const y = topLeft.y
+    const width = rect.width * pixeloidScale
+    const height = rect.height * pixeloidScale
 
-    // Draw rectangle
+    // Draw rectangle at screen coordinates
     graphics.rect(x, y, width, height)
 
     // Apply fill if specified
@@ -321,9 +326,9 @@ export class GeometryRenderer {
       })
     }
 
-    // Apply stroke (strokeWidth is multiplier over pixeloidScale)
+    // Apply stroke (strokeWidth is in pixeloids, multiply by scale)
     graphics.stroke({
-      width: rect.strokeWidth || gameStore.geometry.drawing.settings.defaultStrokeWidth,
+      width: (rect.strokeWidth || gameStore.geometry.drawing.settings.defaultStrokeWidth) * pixeloidScale,
       color: rect.color,
       alpha: rect.strokeAlpha
     })
@@ -332,13 +337,17 @@ export class GeometryRenderer {
   /**
    * Render a circle shape to specific graphics
    */
-  private renderCircleToGraphics(circle: GeometricCircle, graphics: Graphics): void {
-    // Use raw pixeloid coordinates - camera transform handles scaling
-    const centerX = circle.centerX
-    const centerY = circle.centerY
-    const radius = circle.radius
+  private renderCircleToGraphics(circle: GeometricCircle, pixeloidScale: number, graphics: Graphics): void {
+    // Convert center vertex to screen coordinates
+    const center = CoordinateCalculations.vertexToScreen(
+      { __brand: 'vertex' as const, x: circle.centerX, y: circle.centerY },
+      pixeloidScale
+    )
+    const centerX = center.x
+    const centerY = center.y
+    const radius = circle.radius * pixeloidScale
 
-    // Draw circle
+    // Draw circle at screen coordinates
     graphics.circle(centerX, centerY, radius)
 
     // Apply fill if specified
@@ -349,9 +358,9 @@ export class GeometryRenderer {
       })
     }
 
-    // Apply stroke (strokeWidth is multiplier over pixeloidScale)
+    // Apply stroke (strokeWidth is in pixeloids, multiply by scale)
     graphics.stroke({
-      width: circle.strokeWidth || gameStore.geometry.drawing.settings.defaultStrokeWidth,
+      width: (circle.strokeWidth || gameStore.geometry.drawing.settings.defaultStrokeWidth) * pixeloidScale,
       color: circle.color,
       alpha: circle.strokeAlpha
     })
@@ -360,20 +369,24 @@ export class GeometryRenderer {
   /**
    * Render a line shape to specific graphics
    */
-  private renderLineToGraphics(line: GeometricLine, graphics: Graphics): void {
-    // Use raw pixeloid coordinates - camera transform handles scaling
-    const startX = line.startX
-    const startY = line.startY
-    const endX = line.endX
-    const endY = line.endY
+  private renderLineToGraphics(line: GeometricLine, pixeloidScale: number, graphics: Graphics): void {
+    // Convert both endpoints to screen coordinates
+    const start = CoordinateCalculations.vertexToScreen(
+      { __brand: 'vertex' as const, x: line.startX, y: line.startY },
+      pixeloidScale
+    )
+    const end = CoordinateCalculations.vertexToScreen(
+      { __brand: 'vertex' as const, x: line.endX, y: line.endY },
+      pixeloidScale
+    )
 
-    // Draw line
-    graphics.moveTo(startX, startY)
-    graphics.lineTo(endX, endY)
+    // Draw line at screen coordinates
+    graphics.moveTo(start.x, start.y)
+    graphics.lineTo(end.x, end.y)
 
-    // Apply stroke (strokeWidth is multiplier over pixeloidScale)
+    // Apply stroke (strokeWidth is in pixeloids, multiply by scale)
     graphics.stroke({
-      width: line.strokeWidth || gameStore.geometry.drawing.settings.defaultStrokeWidth,
+      width: (line.strokeWidth || gameStore.geometry.drawing.settings.defaultStrokeWidth) * pixeloidScale,
       color: line.color,
       alpha: line.strokeAlpha
     })
@@ -383,13 +396,15 @@ export class GeometryRenderer {
    * Render a point shape to specific graphics
    */
   private renderPointToGraphics(point: GeometricPoint, pixeloidScale: number, graphics: Graphics): void {
-    // Use raw pixeloid coordinates - camera transform handles scaling
-    const x = point.x
-    const y = point.y
-
-    // Draw point as small circle (scale radius by pixeloidScale for consistent size)
-    const pointRadius = 2 / pixeloidScale
-    graphics.circle(x, y, pointRadius)
+    // Convert vertex position to screen coordinates
+    const pos = CoordinateCalculations.vertexToScreen(
+      { __brand: 'vertex' as const, x: point.x, y: point.y },
+      pixeloidScale
+    )
+    
+    // Draw point as small circle with fixed pixel size
+    const pointRadius = 2  // Fixed pixel size, no scaling needed
+    graphics.circle(pos.x, pos.y, pointRadius)
     graphics.fill({
       color: point.color,
       alpha: point.strokeAlpha
@@ -399,16 +414,34 @@ export class GeometryRenderer {
   /**
    * Render an isometric diamond shape to specific graphics
    */
-  private renderDiamondToGraphics(diamond: GeometricDiamond, graphics: Graphics): void {
-    // Use centralized geometry calculations
+  private renderDiamondToGraphics(diamond: GeometricDiamond, pixeloidScale: number, graphics: Graphics): void {
+    // Use centralized geometry calculations (already in vertex coordinates)
     const vertices = GeometryHelper.calculateDiamondVertices(diamond)
     
-    // Draw diamond shape using calculated vertices
-    graphics.moveTo(vertices.west.x, vertices.west.y)    // West
-    graphics.lineTo(vertices.north.x, vertices.north.y)  // North
-    graphics.lineTo(vertices.east.x, vertices.east.y)    // East
-    graphics.lineTo(vertices.south.x, vertices.south.y)  // South
-    graphics.lineTo(vertices.west.x, vertices.west.y)    // Back to West (close)
+    // Convert each vertex to screen coordinates
+    const west = CoordinateCalculations.vertexToScreen(
+      { __brand: 'vertex' as const, x: vertices.west.x, y: vertices.west.y },
+      pixeloidScale
+    )
+    const north = CoordinateCalculations.vertexToScreen(
+      { __brand: 'vertex' as const, x: vertices.north.x, y: vertices.north.y },
+      pixeloidScale
+    )
+    const east = CoordinateCalculations.vertexToScreen(
+      { __brand: 'vertex' as const, x: vertices.east.x, y: vertices.east.y },
+      pixeloidScale
+    )
+    const south = CoordinateCalculations.vertexToScreen(
+      { __brand: 'vertex' as const, x: vertices.south.x, y: vertices.south.y },
+      pixeloidScale
+    )
+    
+    // Draw diamond shape using screen coordinates
+    graphics.moveTo(west.x, west.y)    // West
+    graphics.lineTo(north.x, north.y)  // North
+    graphics.lineTo(east.x, east.y)    // East
+    graphics.lineTo(south.x, south.y)  // South
+    graphics.lineTo(west.x, west.y)    // Back to West (close)
 
     // Apply fill if specified
     if (diamond.fillColor !== undefined) {
@@ -418,9 +451,9 @@ export class GeometryRenderer {
       })
     }
 
-    // Apply stroke (strokeWidth is multiplier over pixeloidScale)
+    // Apply stroke (strokeWidth is in pixeloids, multiply by scale)
     graphics.stroke({
-      width: diamond.strokeWidth || gameStore.geometry.drawing.settings.defaultStrokeWidth,
+      width: (diamond.strokeWidth || gameStore.geometry.drawing.settings.defaultStrokeWidth) * pixeloidScale,
       color: diamond.color,
       alpha: diamond.strokeAlpha
     })
@@ -461,7 +494,7 @@ export class GeometryRenderer {
   /**
    * Render preview for active drawing operations - NEW: uses unified preview system
    */
-  private renderPreviewWithCoordinateConversion(): void {
+  private renderPreviewWithCoordinateConversion(pixeloidScale: number): void {
     this.previewGraphics.clear()
     
     const preview = gameStore.geometry.drawing.preview
@@ -470,16 +503,24 @@ export class GeometryRenderer {
       return
     }
 
-    // ✅ COORDINATE CONVERSION: Convert preview vertices using EXACT conversion
+    // ✅ COORDINATE CONVERSION: Convert preview vertices from pixeloid to vertex
     const offset = gameStore.mesh.vertex_to_pixeloid_offset
-    const renderVertices = preview.vertices.map(vertex => ({
-      x: vertex.x - offset.x,  // EXACT conversion, no rounding
+    const vertexVertices = preview.vertices.map(vertex => ({
+      x: vertex.x - offset.x,  // pixeloid to vertex
       y: vertex.y - offset.y
     }))
 
+    // Then convert from vertex to screen coordinates
+    const renderVertices = vertexVertices.map(vertex =>
+      CoordinateCalculations.vertexToScreen(
+        { __brand: 'vertex' as const, x: vertex.x, y: vertex.y },
+        pixeloidScale
+      )
+    )
+
     const previewAlpha = 0.6
 
-    // Render based on geometry type using converted vertices (same logic as new renderActiveDrawing)
+    // Render based on geometry type using screen coordinates
     switch (preview.type) {
       case 'point':
         if (renderVertices[0]) {
@@ -496,7 +537,7 @@ export class GeometryRenderer {
           this.previewGraphics.moveTo(renderVertices[0].x, renderVertices[0].y)
           this.previewGraphics.lineTo(renderVertices[1].x, renderVertices[1].y)
           this.previewGraphics.stroke({
-            width: preview.style.strokeWidth,
+            width: preview.style.strokeWidth * pixeloidScale,
             color: preview.style.color,
             alpha: previewAlpha * preview.style.strokeAlpha
           })
@@ -519,7 +560,7 @@ export class GeometryRenderer {
             }
             
             this.previewGraphics.stroke({
-              width: preview.style.strokeWidth,
+              width: preview.style.strokeWidth * pixeloidScale,
               color: preview.style.color,
               alpha: previewAlpha * preview.style.strokeAlpha
             })
@@ -545,7 +586,7 @@ export class GeometryRenderer {
             }
             
             this.previewGraphics.stroke({
-              width: preview.style.strokeWidth,
+              width: preview.style.strokeWidth * pixeloidScale,
               color: preview.style.color,
               alpha: previewAlpha * preview.style.strokeAlpha
             })
@@ -571,7 +612,7 @@ export class GeometryRenderer {
           }
           
           this.previewGraphics.stroke({
-            width: preview.style.strokeWidth,
+            width: preview.style.strokeWidth * pixeloidScale,
             color: preview.style.color,
             alpha: previewAlpha * preview.style.strokeAlpha
           })

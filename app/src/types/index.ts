@@ -468,7 +468,7 @@ export interface GeometryState {
     selection: boolean   // Selection highlights (selectionLayer)
     raycast: boolean     // Raycast lines and debug visuals (raycastLayer)
     bbox: boolean        // Bounding box overlay for comparison (bboxLayer)
-    bboxTest: boolean    // Bbox texture test layer (perfect geometry mirror)
+    mirror: boolean      // Mirror layer for cached texture sprites
     mouse: boolean       // Mouse visualization (mouseLayer)
   }
   // Filter effects state

@@ -6,6 +6,7 @@ import { SelectionFilterRenderer } from './SelectionFilterRenderer'
 import { PixelateFilterRenderer } from './PixelateFilterRenderer'
 import { MouseHighlightShader } from './MouseHighlightShader'
 import { BoundingBoxRenderer } from './BoundingBoxRenderer'
+import { MirrorLayerRenderer } from './MirrorLayerRenderer'
 import { TextureRegistry } from './TextureRegistry'
 import { StaticMeshManager } from './StaticMeshManager'
 import { gameStore, createPixeloidCoordinate } from '../store/gameStore'
@@ -27,7 +28,7 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
   private geometryLayer: Container
   private selectionLayer: Container  // NEW: Separate layer for selection highlighting
   private pixelateLayer: Container   // NEW: Separate layer for pixelate effects
-  private bboxTestLayer: Container   // NEW: Test layer for bbox texture sprites
+  private mirrorLayer: Container     // Mirror layer for cached texture sprites
   private raycastLayer: Container
   private bboxLayer: Container      // NEW: Separate layer for bbox overlay
   private mouseLayer: Container     // NEW: Separate layer for mouse visualization
@@ -50,6 +51,9 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
   
   // Simple bounding box renderer for comparison
   private boundingBoxRenderer: BoundingBoxRenderer
+  
+  // Mirror layer renderer for cached texture sprites
+  private mirrorLayerRenderer: MirrorLayerRenderer
   
   // Texture registry for StoreExplorer previews (SAFE - no store subscriptions)
   private textureRegistry: TextureRegistry | null = null
@@ -77,7 +81,7 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
     this.geometryLayer = new Container({ isRenderGroup: true })
     this.selectionLayer = new Container({ isRenderGroup: true }) // Selection layer on top of geometry
     this.pixelateLayer = new Container({ isRenderGroup: true })  // Pixelate layer for GPU-accelerated effects
-    this.bboxTestLayer = new Container({ isRenderGroup: true })  // Test layer for bbox texture sprites
+    this.mirrorLayer = new Container({ isRenderGroup: true })    // Mirror layer for cached texture sprites
     this.raycastLayer = new Container({ isRenderGroup: true })
     this.bboxLayer = new Container({ isRenderGroup: true })     // Bbox layer for comparison overlay
     this.mouseLayer = new Container({ isRenderGroup: true })    // Mouse layer on top
@@ -99,6 +103,9 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
     
     // Initialize simple bounding box renderer for comparison
     this.boundingBoxRenderer = new BoundingBoxRenderer()
+
+    // Initialize mirror layer renderer
+    this.mirrorLayerRenderer = new MirrorLayerRenderer()
 
     // Initialize static mesh manager for transform coherence
     this.staticMeshManager = new StaticMeshManager()
@@ -123,14 +130,17 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
       this.gridGraphics.parent.removeChild(this.gridGraphics)
     }
 
-    // Add layers to camera transform in correct order (back to front)
+    // Only background layer goes under camera transform (needs scaling)
     this.cameraTransform.addChild(this.backgroundLayer)    // Grid and background elements
-    this.cameraTransform.addChild(this.geometryLayer)      // Geometric shapes and objects
-    this.cameraTransform.addChild(this.selectionLayer)     // Selection highlights on top of geometry
-    this.cameraTransform.addChild(this.pixelateLayer)      // Pixelate effects (independent from selection)
-    this.cameraTransform.addChild(this.bboxTestLayer)      // TEST: Bbox texture sprites (for perfect overlap testing)
-    this.cameraTransform.addChild(this.raycastLayer)       // Raycast lines and debug visuals
-    this.cameraTransform.addChild(this.bboxLayer)          // Bbox layer for comparison overlay
+    
+    // All other layers go directly to container (no scaling - they draw at screen coordinates)
+    const mainContainer = this.getContainer()
+    mainContainer.addChild(this.geometryLayer)            // Geometric shapes at screen coords
+    mainContainer.addChild(this.selectionLayer)           // Selection highlights at screen coords
+    mainContainer.addChild(this.pixelateLayer)            // Pixelate effects at screen coords
+    mainContainer.addChild(this.mirrorLayer)              // Mirror layer at screen coords
+    mainContainer.addChild(this.raycastLayer)             // Raycast lines at screen coords
+    mainContainer.addChild(this.bboxLayer)                // Bbox layer at screen coords
     
     // Selection layer gets the selection filter renderer container
     this.selectionLayer.addChild(this.selectionFilterRenderer.getContainer())
@@ -163,7 +173,9 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
    */
   public initializeRenderers(): void {
     if (this.app?.renderer) {
-      console.log('LayeredInfiniteCanvas: Initialized pixelate and bbox test renderers with dependencies')
+      // Initialize MirrorLayerRenderer with the PixiJS renderer for texture extraction
+      this.mirrorLayerRenderer.initializeWithRenderer(this.app.renderer)
+      console.log('LayeredInfiniteCanvas: Initialized pixelate and mirror layer renderers with dependencies')
     } else {
       console.warn('LayeredInfiniteCanvas: App renderer not available for renderer initialization')
     }
@@ -206,6 +218,8 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
     // Render pixelate effects (independent, GPU-accelerated)
     this.renderPixelateLayer(paddedCorners, pixeloidScale)
     
+    // Render mirror layer (cached texture sprites)
+    this.renderMirrorLayer(paddedCorners, pixeloidScale)
     
     // Render bbox layer (comparison overlay)
     this.renderBboxLayer(paddedCorners, pixeloidScale)
@@ -298,6 +312,29 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
     }
   }
 
+  /**
+   * Render mirror layer - cached texture sprites that mirror the geometry layer
+   */
+  private renderMirrorLayer(corners: ViewportCorners, pixeloidScale: number): void {
+    // Only render if mirror layer is visible (controlled by UI)
+    if (gameStore.geometry.layerVisibility.mirror) {
+      // Pass the geometry renderer for texture extraction
+      this.mirrorLayerRenderer.render(
+        corners,
+        pixeloidScale,
+        this.geometryRenderer
+      )
+      
+      // Add the mirror renderer container to the layer
+      this.mirrorLayer.removeChildren()
+      this.mirrorLayer.addChild(this.mirrorLayerRenderer.getContainer())
+      this.mirrorLayer.visible = true
+      
+      console.log('🎯 LayeredInfiniteCanvas: Rendered mirror layer with cached texture sprites')
+    } else {
+      this.mirrorLayer.visible = false
+    }
+  }
   
   /**
    * Render bbox layer - separate from mask layer for independent control with proper coordinate system
@@ -507,6 +544,7 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
     this.geometryRenderer.destroy()
     this.selectionFilterRenderer.destroy()
     this.pixelateFilterRenderer.destroy()
+    this.mirrorLayerRenderer.destroy()
     this.boundingBoxRenderer.destroy()
 
     // Destroy layer containers
@@ -514,7 +552,7 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
     this.geometryLayer.destroy()
     this.selectionLayer.destroy()
     this.pixelateLayer.destroy()
-    this.bboxTestLayer.destroy()
+    this.mirrorLayer.destroy()
     this.raycastLayer.destroy()
     this.bboxLayer.destroy()
 

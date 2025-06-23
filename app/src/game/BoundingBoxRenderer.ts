@@ -1,5 +1,6 @@
 import { Graphics } from 'pixi.js'
 import { gameStore } from '../store/gameStore'
+import { CoordinateCalculations } from './CoordinateCalculations'
 import type { ViewportCorners, GeometricObject } from '../types'
 
 /**
@@ -124,16 +125,24 @@ export class BoundingBoxRenderer {
     const offset = gameStore.mesh.vertex_to_pixeloid_offset
     const bounds = convertedObj.metadata.bounds
     
-    const x = bounds.minX - offset.x
-    const y = bounds.minY - offset.y
+    const vertexX = bounds.minX - offset.x
+    const vertexY = bounds.minY - offset.y
     const width = bounds.maxX - bounds.minX
     const height = bounds.maxY - bounds.minY
 
-    // Draw bounding box with scale-appropriate stroke width for visibility at all zoom levels
-    const strokeWidth = Math.max(0.1, 2 / pixeloidScale)
+    // Convert vertex coordinates to screen coordinates
+    const screenPos = CoordinateCalculations.vertexToScreen(
+      { __brand: 'vertex' as const, x: vertexX, y: vertexY },
+      pixeloidScale
+    )
+    const screenWidth = width * pixeloidScale
+    const screenHeight = height * pixeloidScale
+
+    // Draw bounding box with fixed 1 pixel stroke width (no scaling)
+    const strokeWidth = 1
 
     this.graphics
-      .rect(x, y, width, height)
+      .rect(screenPos.x, screenPos.y, screenWidth, screenHeight)
       .fill({
         color: 0xff0000,  // Red fill for easy distinction
         alpha: 0.1        // Very transparent
