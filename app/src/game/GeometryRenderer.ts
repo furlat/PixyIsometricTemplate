@@ -1,7 +1,17 @@
 import { Graphics, Container } from 'pixi.js'
 import { gameStore } from '../store/gameStore'
 import { GeometryHelper } from './GeometryHelper'
-import type { ViewportCorners, GeometricObject, GeometricRectangle, GeometricCircle, GeometricLine, GeometricPoint, GeometricDiamond } from '../types'
+import { CoordinateHelper } from './CoordinateHelper'
+import { subscribe } from 'valtio'
+import type {
+  ViewportCorners,
+  GeometricObject,
+  GeometricRectangle,
+  GeometricCircle,
+  GeometricLine,
+  GeometricPoint,
+  GeometricDiamond
+} from '../types'
 
 /**
  * GeometryRenderer handles rendering of user-drawn geometric shapes
@@ -11,21 +21,32 @@ export class GeometryRenderer {
   private mainContainer: Container = new Container()
   private objectContainers: Map<string, Graphics> = new Map()
   private previewGraphics: Graphics = new Graphics()
-
+  
   constructor() {
     // Setup main container structure
     this.mainContainer.addChild(this.previewGraphics)
   }
 
   /**
-   * Render geometric objects with smart object management and viewport culling
+   * Simple render system - always renders when called by LayeredInfiniteCanvas
+   * No memoization, no optimization - just reliable rendering every time
    */
   public render(corners: ViewportCorners, pixeloidScale: number): void {
-    // Get all geometric objects from store
-    const objects = gameStore.geometry.objects
+    console.log('🎨 GeometryRenderer: Always rendering (no memoization)', {
+      offset: { ...gameStore.mesh.vertex_to_pixeloid_offset },
+      scale: pixeloidScale,
+      objectCount: gameStore.geometry.objects.length,
+      timestamp: Date.now()
+    })
 
-    // Only render visible objects that are within or near the viewport
-    const visibleObjects = objects.filter(obj => obj.isVisible && this.isObjectInViewport(obj, corners))
+    // Get all objects from store
+    const objects = gameStore.geometry.objects
+    
+    // Filter objects in viewport (use original pixeloid coordinates for culling)
+    const visibleObjects = objects.filter(obj =>
+      obj.isVisible && this.isObjectInViewport(obj, corners)
+    )
+    
     const currentObjectIds = new Set(visibleObjects.map(obj => obj.id))
 
     // Remove objects that are no longer visible or deleted
@@ -34,24 +55,25 @@ export class GeometryRenderer {
         this.mainContainer.removeChild(graphics)
         graphics.destroy()
         this.objectContainers.delete(objectId)
+        console.log(`GeometryRenderer: Removed object ${objectId} (no longer visible)`)
       }
     }
 
-    // Update visible objects
+    // Update visible objects (convert to vertex coordinates for rendering)
     for (const obj of visibleObjects) {
-      this.updateGeometricObject(obj, pixeloidScale)
+      this.updateGeometricObjectWithCoordinateConversion(obj, pixeloidScale)
     }
 
-    // Note: currentObjectIds tracking is handled by the objectContainers Map
-
-    // Always render preview for active drawing
-    this.renderPreview()
+    // Always render preview for active drawing (also with coordinate conversion)
+    this.renderPreviewWithCoordinateConversion()
+    
+    console.log('✅ GeometryRenderer: Render completed - always renders every call')
   }
 
   /**
-   * Update or create a single geometric object
+   * Update or create a single geometric object with coordinate conversion
    */
-  private updateGeometricObject(obj: GeometricObject, pixeloidScale: number): void {
+  private updateGeometricObjectWithCoordinateConversion(obj: GeometricObject, pixeloidScale: number): void {
     let graphics = this.objectContainers.get(obj.id)
     
     if (!graphics) {
@@ -63,7 +85,90 @@ export class GeometryRenderer {
 
     // Clear and re-render the object
     graphics.clear()
-    this.renderGeometricObjectToGraphics(obj, pixeloidScale, graphics)
+    
+    // ✅ COORDINATE CONVERSION: Convert object from pixeloid to vertex coordinates
+    const convertedObject = this.convertObjectToVertexCoordinates(obj)
+    
+    // Position graphics at (0,0) and draw object at vertex coordinates
+    graphics.position.set(0, 0)
+    this.renderGeometricObjectToGraphics(convertedObject, pixeloidScale, graphics)
+  }
+
+  /**
+   * Convert object from pixeloid coordinates to vertex coordinates using existing utilities
+   */
+  private convertObjectToVertexCoordinates(obj: GeometricObject): GeometricObject {
+    if ('anchorX' in obj && 'anchorY' in obj) {
+      // Diamond object - use existing coordinate utility
+      const vertexCoord = CoordinateHelper.pixeloidToMeshVertex({
+        __brand: 'pixeloid',
+        x: obj.anchorX,
+        y: obj.anchorY
+      })
+      return {
+        ...obj,
+        anchorX: vertexCoord.x,
+        anchorY: vertexCoord.y
+      }
+    } else if ('x' in obj && 'width' in obj && 'height' in obj) {
+      // Rectangle object - use existing coordinate utility
+      const vertexCoord = CoordinateHelper.pixeloidToMeshVertex({
+        __brand: 'pixeloid',
+        x: obj.x,
+        y: obj.y
+      })
+      return {
+        ...obj,
+        x: vertexCoord.x,
+        y: vertexCoord.y
+      }
+    } else if ('centerX' in obj && 'centerY' in obj) {
+      // Circle object - use existing coordinate utility
+      const vertexCoord = CoordinateHelper.pixeloidToMeshVertex({
+        __brand: 'pixeloid',
+        x: obj.centerX,
+        y: obj.centerY
+      })
+      return {
+        ...obj,
+        centerX: vertexCoord.x,
+        centerY: vertexCoord.y
+      }
+    } else if ('startX' in obj && 'endX' in obj) {
+      // Line object - convert both points using existing coordinate utility
+      const startVertexCoord = CoordinateHelper.pixeloidToMeshVertex({
+        __brand: 'pixeloid',
+        x: obj.startX,
+        y: obj.startY
+      })
+      const endVertexCoord = CoordinateHelper.pixeloidToMeshVertex({
+        __brand: 'pixeloid',
+        x: obj.endX,
+        y: obj.endY
+      })
+      return {
+        ...obj,
+        startX: startVertexCoord.x,
+        startY: startVertexCoord.y,
+        endX: endVertexCoord.x,
+        endY: endVertexCoord.y
+      }
+    } else if ('x' in obj && 'y' in obj) {
+      // Point object - use existing coordinate utility
+      const vertexCoord = CoordinateHelper.pixeloidToMeshVertex({
+        __brand: 'pixeloid',
+        x: obj.x,
+        y: obj.y
+      })
+      return {
+        ...obj,
+        x: vertexCoord.x,
+        y: vertexCoord.y
+      }
+    }
+    
+    // Fallback - return original object
+    return obj
   }
 
   /**
@@ -406,6 +511,144 @@ export class GeometryRenderer {
    */
   public getObjectContainers(): Map<string, Graphics> {
     return new Map(this.objectContainers) // Return copy to prevent external modification
+  }
+
+
+  /**
+   * Render preview for active drawing operations with coordinate conversion
+   */
+  private renderPreviewWithCoordinateConversion(): void {
+    this.previewGraphics.clear()
+    
+    const activeDrawing = gameStore.geometry.drawing.activeDrawing
+    
+    if (!activeDrawing.isDrawing || !activeDrawing.startPoint || !activeDrawing.currentPoint) {
+      return
+    }
+
+    // ✅ COORDINATE CONVERSION: Convert preview coordinates using existing utilities
+    const startPoint = CoordinateHelper.pixeloidToMeshVertex({
+      __brand: 'pixeloid',
+      x: activeDrawing.startPoint.x,
+      y: activeDrawing.startPoint.y
+    })
+    const currentPoint = CoordinateHelper.pixeloidToMeshVertex({
+      __brand: 'pixeloid',
+      x: activeDrawing.currentPoint.x,
+      y: activeDrawing.currentPoint.y
+    })
+
+    const previewAlpha = 0.6
+
+    if (activeDrawing.type === 'rectangle') {
+      // Calculate preview rectangle properties
+      const minX = Math.min(startPoint.x, currentPoint.x)
+      const minY = Math.min(startPoint.y, currentPoint.y)
+      const maxX = Math.max(startPoint.x, currentPoint.x)
+      const maxY = Math.max(startPoint.y, currentPoint.y)
+      
+      const width = maxX - minX
+      const height = maxY - minY
+      
+      // Only render preview if it has some size
+      if (width >= 1 && height >= 1) {
+        this.previewGraphics.rect(minX, minY, width, height)
+        
+        // Apply fill if enabled
+        if (gameStore.geometry.drawing.settings.fillEnabled) {
+          this.previewGraphics.fill({
+            color: gameStore.geometry.drawing.settings.defaultFillColor,
+            alpha: previewAlpha * gameStore.geometry.drawing.settings.fillAlpha
+          })
+        }
+        
+        this.previewGraphics.stroke({
+          width: gameStore.geometry.drawing.settings.defaultStrokeWidth,
+          color: gameStore.geometry.drawing.settings.defaultColor,
+          alpha: previewAlpha * gameStore.geometry.drawing.settings.strokeAlpha
+        })
+      }
+    } else if (activeDrawing.type === 'line') {
+      // Calculate distance for minimum line length
+      const distance = Math.sqrt(Math.pow(currentPoint.x - startPoint.x, 2) + Math.pow(currentPoint.y - startPoint.y, 2))
+      
+      if (distance >= 1) {
+        this.previewGraphics.moveTo(startPoint.x, startPoint.y)
+        this.previewGraphics.lineTo(currentPoint.x, currentPoint.y)
+        this.previewGraphics.stroke({
+          width: gameStore.geometry.drawing.settings.defaultStrokeWidth,
+          color: gameStore.geometry.drawing.settings.defaultColor,
+          alpha: previewAlpha * gameStore.geometry.drawing.settings.strokeAlpha
+        })
+      }
+    } else if (activeDrawing.type === 'circle') {
+      // Calculate radius
+      const radius = Math.sqrt(Math.pow(currentPoint.x - startPoint.x, 2) + Math.pow(currentPoint.y - startPoint.y, 2))
+      
+      if (radius >= 1) {
+        this.previewGraphics.circle(startPoint.x, startPoint.y, radius)
+        
+        // Apply fill if enabled
+        if (gameStore.geometry.drawing.settings.fillEnabled) {
+          this.previewGraphics.fill({
+            color: gameStore.geometry.drawing.settings.defaultFillColor,
+            alpha: previewAlpha * gameStore.geometry.drawing.settings.fillAlpha
+          })
+        }
+        
+        this.previewGraphics.stroke({
+          width: gameStore.geometry.drawing.settings.defaultStrokeWidth,
+          color: gameStore.geometry.drawing.settings.defaultColor,
+          alpha: previewAlpha * gameStore.geometry.drawing.settings.strokeAlpha
+        })
+      }
+    } else if (activeDrawing.type === 'diamond') {
+      // Convert vertex coordinates back to pixeloid for GeometryHelper
+      const startPixeloid = CoordinateHelper.meshVertexToPixeloid({
+        x: startPoint.x,
+        y: startPoint.y
+      })
+      const currentPixeloid = CoordinateHelper.meshVertexToPixeloid({
+        x: currentPoint.x,
+        y: currentPoint.y
+      })
+      
+      // Use centralized geometry calculations for preview
+      const preview = GeometryHelper.calculateDiamondPreview(startPixeloid, currentPixeloid)
+      
+      if (preview.width >= 2) {
+        const vertices = preview.vertices
+        
+        // Convert vertices to vertex coordinates for rendering using coordinate utilities
+        const convertedVertices = {
+          west: CoordinateHelper.pixeloidToMeshVertex(vertices.west),
+          north: CoordinateHelper.pixeloidToMeshVertex(vertices.north),
+          east: CoordinateHelper.pixeloidToMeshVertex(vertices.east),
+          south: CoordinateHelper.pixeloidToMeshVertex(vertices.south)
+        }
+        
+        // Draw diamond preview using converted vertices
+        this.previewGraphics.moveTo(convertedVertices.west.x, convertedVertices.west.y)    // West
+        this.previewGraphics.lineTo(convertedVertices.north.x, convertedVertices.north.y)  // North
+        this.previewGraphics.lineTo(convertedVertices.east.x, convertedVertices.east.y)    // East
+        this.previewGraphics.lineTo(convertedVertices.south.x, convertedVertices.south.y)  // South
+        this.previewGraphics.lineTo(convertedVertices.west.x, convertedVertices.west.y)    // Back to West
+        
+        // Apply fill if enabled
+        if (gameStore.geometry.drawing.settings.fillEnabled) {
+          this.previewGraphics.fill({
+            color: gameStore.geometry.drawing.settings.defaultFillColor,
+            alpha: previewAlpha * gameStore.geometry.drawing.settings.fillAlpha
+          })
+        }
+        
+        this.previewGraphics.stroke({
+          width: gameStore.geometry.drawing.settings.defaultStrokeWidth,
+          color: gameStore.geometry.drawing.settings.defaultColor,
+          alpha: previewAlpha * gameStore.geometry.drawing.settings.strokeAlpha
+        })
+      }
+    }
   }
 
   /**

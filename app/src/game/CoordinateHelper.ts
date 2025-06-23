@@ -95,4 +95,5 @@ export class CoordinateHelper {
     const vertex = this.pixeloidToVertex(pixeloid, offset)
     return { x: Math.round(vertex.x), y: Math.round(vertex.y) }
   }
+
 }

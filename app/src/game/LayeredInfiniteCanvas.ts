@@ -58,9 +58,8 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
   // Track which objects need texture capture (performance optimization)
   private objectsNeedingTexture: Set<string> = new Set()
   
-  // Dirty tracking with smarter camera handling
+  // Dirty tracking with smarter camera handling (background only)
   private backgroundDirty = true
-  private geometryDirty = true
   private lastPixeloidScale = 0
   private renderBufferPadding = 200 // Large buffer to avoid re-renders on movement
   private isBackgroundRendering = false
@@ -183,11 +182,8 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
       this.isBackgroundRendering = false
     }
 
-    // Check if geometry needs re-rendering (only on data changes or zoom)
-    if (this.geometryDirty || pixeloidScale !== this.lastPixeloidScale) {
-      this.renderGeometryLayer(paddedCorners, pixeloidScale)
-      this.geometryDirty = false
-    }
+    // Always render geometry every frame at 60fps (full redraw ensures old positions cleared)
+    this.renderGeometryLayer(paddedCorners, pixeloidScale)
     
     // Render selection highlights (reactive, always updates based on store state)
     this.renderSelectionLayer(paddedCorners, pixeloidScale)
@@ -236,7 +232,7 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
   }
   
   /**
-   * Render geometry layer only when needed
+   * Render geometry layer with store-driven offset positioning
    */
   private renderGeometryLayer(corners: ViewportCorners, pixeloidScale: number): void {
     if (gameStore.geometry.layerVisibility.geometry) {
@@ -245,6 +241,9 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
       // CRITICAL: Always add the full renderer container (includes preview meshes)
       this.geometryLayer.removeChildren()
       this.geometryLayer.addChild(this.geometryRenderer.getContainer())
+      
+      // ✅ NO LAYER POSITIONING: Keep layer at (0,0) and let GeometryRenderer handle coordinates
+      this.geometryLayer.position.set(0, 0)
       
       // IMPROVED: Capture textures synchronously after render is complete
       if (this.objectsNeedingTexture.size > 0) {
@@ -317,24 +316,17 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
   }
   
   /**
-   * Subscribe to store changes to mark layers as dirty when data changes
+   * Subscribe to store changes for side effects (no geometry dirty flags - renders every frame)
    */
   private subscribeToStoreChanges(): void {
-    // Subscribe to geometry objects specifically to track new/modified objects
+    // Subscribe to geometry objects for texture capture side effects only
     subscribe(gameStore.geometry.objects, () => {
-      this.geometryDirty = true
       this.markNewObjectsForTextureCapture()
     })
 
-    // Subscribe to activeDrawing changes for preview rendering during drag-and-drop
-    subscribe(gameStore.geometry.drawing.activeDrawing, () => {
-      this.geometryDirty = true
-    })
-
-    // Subscribe to layer visibility changes to trigger re-rendering
+    // Subscribe to layer visibility changes for background re-rendering
     subscribe(gameStore.geometry.layerVisibility, () => {
       this.backgroundDirty = true
-      this.geometryDirty = true
     })
 
     // Subscribe to camera changes for background re-rendering (less aggressive)
@@ -345,6 +337,9 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
         this.lastPixeloidScale = gameStore.camera.pixeloid_scale
       }
     })
+
+    // No offset subscription needed - geometry renders every frame and reads current offset
+    // No activeDrawing subscription needed - geometry renders every frame and reads current drawing state
   }
 
   /**
@@ -434,7 +429,7 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
    */
   public forceRefresh(): void {
     this.backgroundDirty = true
-    this.geometryDirty = true
+    // No geometryDirty needed - geometry renders every frame
   }
 
   /**

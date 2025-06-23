@@ -23,6 +23,15 @@ export class InputManager {
   private keydownHandler: (event: KeyboardEvent) => void = () => {}
   private keyupHandler: (event: KeyboardEvent) => void = () => {}
   private contextMenuHandler: (event: Event) => void = () => {}
+  
+  // Track last key states for pixeloid-perfect movement
+  private lastKeys = {
+    w: false,
+    a: false,
+    s: false,
+    d: false,
+    space: false
+  }
 
   /**
    * Initialize input management - MESH EVENT SYSTEM ONLY
@@ -598,7 +607,7 @@ export class InputManager {
 
   /**
    * Update movement based on current key states - called from game loop
-   * ✅ NEW: Proper separation of input tracking vs action execution
+   * ✅ HYBRID: Smooth movement while held, snap to integer on release
    */
   public updateMovement(deltaTime: number): void {
     const keys = gameStore.input.keys
@@ -614,15 +623,51 @@ export class InputManager {
     if (keys.a) deltaX -= baseDistance  // Move left = decrease offset X
     if (keys.d) deltaX += baseDistance  // Move right = increase offset X
 
-    // Apply movement if any keys are pressed
+    // Apply smooth movement if any keys are pressed
     if (deltaX !== 0 || deltaY !== 0) {
       const currentOffset = gameStore.mesh.vertex_to_pixeloid_offset
-      updateGameStore.setVertexToPixeloidOffset(
-        createPixeloidCoordinate(currentOffset.x + deltaX, currentOffset.y + deltaY)
+      const newOffset = createPixeloidCoordinate(
+        currentOffset.x + deltaX,
+        currentOffset.y + deltaY
       )
       
-      console.log(`InputManager: Movement (${deltaX.toFixed(2)}, ${deltaY.toFixed(2)}) -> Offset(${(currentOffset.x + deltaX).toFixed(2)}, ${(currentOffset.y + deltaY).toFixed(2)})`)
+      console.log(`🎮 InputManager.updateMovement: About to update offset`, {
+        currentOffset: { ...currentOffset },
+        delta: { x: deltaX, y: deltaY },
+        newOffset: { ...newOffset },
+        keysPressed: { w: keys.w, a: keys.a, s: keys.s, d: keys.d },
+        timestamp: Date.now()
+      })
+      
+      updateGameStore.setVertexToPixeloidOffset(newOffset)
+      
+      console.log(`✅ InputManager.updateMovement: Offset update completed`)
     }
+    
+    // ✅ SNAP TO INTEGER: Check for key releases and snap to perfect pixeloid alignment
+    const anyKeyReleased = (
+      (this.lastKeys.w && !keys.w) ||
+      (this.lastKeys.s && !keys.s) ||
+      (this.lastKeys.a && !keys.a) ||
+      (this.lastKeys.d && !keys.d)
+    )
+    
+    const noMovementKeys = !keys.w && !keys.s && !keys.a && !keys.d
+    
+    if (anyKeyReleased && noMovementKeys) {
+      // Snap to nearest integer pixeloid for perfect alignment
+      const currentOffset = gameStore.mesh.vertex_to_pixeloid_offset
+      const snappedOffset = createPixeloidCoordinate(
+        Math.round(currentOffset.x),
+        Math.round(currentOffset.y)
+      )
+      
+      updateGameStore.setVertexToPixeloidOffset(snappedOffset)
+      console.log(`WASD: Snapped to integer alignment (${snappedOffset.x}, ${snappedOffset.y})`)
+    }
+
+    // Update last key states for next frame
+    this.lastKeys = { ...keys }
 
     // Handle space key for recentering
     if (keys.space) {
