@@ -1,6 +1,7 @@
 import { Graphics, Container } from 'pixi.js'
 import { gameStore } from '../store/gameStore'
 import { GeometryHelper } from './GeometryHelper'
+import { CoordinateHelper } from './CoordinateHelper'
 import type { ViewportCorners, GeometricObject, GeometricRectangle, GeometricCircle, GeometricLine, GeometricPoint, GeometricDiamond } from '../types'
 
 /**
@@ -40,7 +41,7 @@ export class SelectionHighlightRenderer {
       return
     }
 
-    // Render selection highlight
+    // Convert object coordinates and render selection highlight
     this.renderSelectionHighlight(selectedObject, pixeloidScale)
   }
 
@@ -112,17 +113,97 @@ export class SelectionHighlightRenderer {
   }
 
   /**
+   * Convert object from pixeloid coordinates to vertex coordinates using existing utilities
+   */
+  private convertObjectToVertexCoordinates(obj: GeometricObject): GeometricObject {
+    if ('anchorX' in obj && 'anchorY' in obj) {
+      // Diamond object - use existing coordinate utility
+      const vertexCoord = CoordinateHelper.pixeloidToMeshVertex({
+        __brand: 'pixeloid',
+        x: obj.anchorX,
+        y: obj.anchorY
+      })
+      return {
+        ...obj,
+        anchorX: vertexCoord.x,
+        anchorY: vertexCoord.y
+      }
+    } else if ('x' in obj && 'width' in obj && 'height' in obj) {
+      // Rectangle object - use existing coordinate utility
+      const vertexCoord = CoordinateHelper.pixeloidToMeshVertex({
+        __brand: 'pixeloid',
+        x: obj.x,
+        y: obj.y
+      })
+      return {
+        ...obj,
+        x: vertexCoord.x,
+        y: vertexCoord.y
+      }
+    } else if ('centerX' in obj && 'centerY' in obj) {
+      // Circle object - use existing coordinate utility
+      const vertexCoord = CoordinateHelper.pixeloidToMeshVertex({
+        __brand: 'pixeloid',
+        x: obj.centerX,
+        y: obj.centerY
+      })
+      return {
+        ...obj,
+        centerX: vertexCoord.x,
+        centerY: vertexCoord.y
+      }
+    } else if ('startX' in obj && 'endX' in obj) {
+      // Line object - convert both points using existing coordinate utility
+      const startVertexCoord = CoordinateHelper.pixeloidToMeshVertex({
+        __brand: 'pixeloid',
+        x: obj.startX,
+        y: obj.startY
+      })
+      const endVertexCoord = CoordinateHelper.pixeloidToMeshVertex({
+        __brand: 'pixeloid',
+        x: obj.endX,
+        y: obj.endY
+      })
+      return {
+        ...obj,
+        startX: startVertexCoord.x,
+        startY: startVertexCoord.y,
+        endX: endVertexCoord.x,
+        endY: endVertexCoord.y
+      }
+    } else if ('x' in obj && 'y' in obj) {
+      // Point object - use existing coordinate utility
+      const vertexCoord = CoordinateHelper.pixeloidToMeshVertex({
+        __brand: 'pixeloid',
+        x: obj.x,
+        y: obj.y
+      })
+      return {
+        ...obj,
+        x: vertexCoord.x,
+        y: vertexCoord.y
+      }
+    }
+    
+    // Fallback - return original object
+    return obj
+  }
+
+  /**
    * Render selection highlight for a specific object
    */
   private renderSelectionHighlight(obj: GeometricObject, pixeloidScale: number): void {
+    // Convert object from pixeloid to vertex coordinates
+    const convertedObject = this.convertObjectToVertexCoordinates(obj)
+    
     const selectionColor = obj.color // Use the object's actual color for highlighting
     const selectionAlpha = 0.8 // More opaque to better show the object's color
     const extraThickness = 4 // Extra thickness for selection highlight
     const pulseEffect = 1 + 0.2 * Math.sin(Date.now() * 0.005) // Subtle pulse animation
 
-    if ('anchorX' in obj && 'anchorY' in obj) {
-      // Diamond selection highlight
-      const diamond = obj as GeometricDiamond
+    if ('anchorX' in convertedObject && 'anchorY' in convertedObject) {
+      // Diamond selection highlight (using converted coordinates)
+      const diamond = convertedObject as GeometricDiamond
       const vertices = GeometryHelper.calculateDiamondVertices(diamond)
       
       this.selectionGraphics.moveTo(vertices.west.x, vertices.west.y)
@@ -135,27 +216,27 @@ export class SelectionHighlightRenderer {
         color: selectionColor,
         alpha: selectionAlpha
       })
-    } else if ('width' in obj && 'height' in obj) {
-      // Rectangle selection highlight
-      const rect = obj as GeometricRectangle
+    } else if ('width' in convertedObject && 'height' in convertedObject) {
+      // Rectangle selection highlight (using converted coordinates)
+      const rect = convertedObject as GeometricRectangle
       this.selectionGraphics.rect(rect.x, rect.y, rect.width, rect.height)
       this.selectionGraphics.stroke({
         width: (rect.strokeWidth + extraThickness) * pulseEffect / pixeloidScale,
         color: selectionColor,
         alpha: selectionAlpha
       })
-    } else if ('radius' in obj) {
-      // Circle selection highlight
-      const circle = obj as GeometricCircle
+    } else if ('radius' in convertedObject) {
+      // Circle selection highlight (using converted coordinates)
+      const circle = convertedObject as GeometricCircle
       this.selectionGraphics.circle(circle.centerX, circle.centerY, circle.radius)
       this.selectionGraphics.stroke({
         width: (circle.strokeWidth + extraThickness) * pulseEffect / pixeloidScale,
         color: selectionColor,
         alpha: selectionAlpha
       })
-    } else if ('startX' in obj && 'endX' in obj) {
-      // Line selection highlight
-      const line = obj as GeometricLine
+    } else if ('startX' in convertedObject && 'endX' in convertedObject) {
+      // Line selection highlight (using converted coordinates)
+      const line = convertedObject as GeometricLine
       this.selectionGraphics.moveTo(line.startX, line.startY)
       this.selectionGraphics.lineTo(line.endX, line.endY)
       this.selectionGraphics.stroke({
@@ -163,9 +244,9 @@ export class SelectionHighlightRenderer {
         color: selectionColor,
         alpha: selectionAlpha
       })
-    } else if ('x' in obj && 'y' in obj && !('width' in obj)) {
-      // Point selection highlight - draw a larger circle around the point
-      const point = obj as GeometricPoint
+    } else if ('x' in convertedObject && 'y' in convertedObject && !('width' in convertedObject)) {
+      // Point selection highlight - draw a larger circle around the point (using converted coordinates)
+      const point = convertedObject as GeometricPoint
       const highlightRadius = (6 + extraThickness) * pulseEffect / pixeloidScale
       this.selectionGraphics.circle(point.x, point.y, highlightRadius)
       this.selectionGraphics.stroke({

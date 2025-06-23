@@ -500,8 +500,8 @@ export class StoreExplorer {
    * Navigate viewport to center on the selected object
    */
   private navigateToObject(objectId: string): void {
-    // Use the new store method that leverages metadata for precise centering
-    updateGameStore.centerCameraOnObject(objectId)
+    // Use the offset-based method that works with WASD movement
+    updateGameStore.centerViewportOnObject(objectId)
   }
 
   /**

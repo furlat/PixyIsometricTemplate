@@ -1223,3 +1223,170 @@ import vertex from './custom.vert';
     filter.resources.timeUniforms.uniforms.uTime += 0.04 * ticker.deltaTime;
   });
 })();
+
+PixiJS Filters
+Node.js CI npm version
+
+Compatibility
+Depending on your version of PixiJS, you'll need to figure out which major version of PixiJS Filters to use.
+
+PixiJS	PixiJS Filters
+v5.x	v3.x
+v6.x	v4.x
+v7.x	v5.x
+v8.x	v6.x
+Installation
+Installation is available using NPM:
+
+npm install pixi-filters
+Alternatively, you can use a CDN such as JSDelivr:
+
+<script src="https://cdn.jsdelivr.net/npm/pixi-filters@latest/dist/browser/pixi-filters.min.js"></script>
+If all else failes, you can manually download the bundled file from the releases section and include it in your project.
+
+Demo
+View the PixiJS Filters Demo to interactively play with filters to see how they work.
+
+Filters
+Filter	Preview
+AdjustmentFilter
+pixi-filters/adjustment
+View demo	adjustment
+AdvancedBloomFilter
+pixi-filters/advanced-bloom
+View demo	advanced-bloom
+AsciiFilter
+pixi-filters/ascii
+View demo	ascii
+BackdropBlurFilter
+pixi-filters/backdrop-blur
+View demo	backdrop-blur
+BevelFilter
+pixi-filters/bevel
+View demo	bevel
+BloomFilter
+pixi-filters/bloom
+View demo	bloom
+BulgePinchFilter
+pixi-filters/bulge-pinch
+View demo	bulge-pinch
+ColorGradientFilter
+pixi-filters/color-gradient
+View demo	color-gradient
+ColorMapFilter
+pixi-filters/color-map
+View demo	color-map
+ColorOverlayFilter
+pixi-filters/color-overlay
+View demo	color-overlay
+ColorReplaceFilter
+pixi-filters/color-replace
+View demo	color-replace
+ConvolutionFilter
+pixi-filters/convolution
+View demo	convolution
+CrossHatchFilter
+pixi-filters/cross-hatch
+View demo	cross-hatch
+CRTFilter
+pixi-filters/crt
+View demo	crt
+DotFilter
+pixi-filters/dot
+View demo	dot
+DropShadowFilter
+pixi-filters/drop-shadow
+View demo	drop-shadow
+EmbossFilter
+pixi-filters/emboss
+View demo	emboss
+GlitchFilter
+pixi-filters/glitch
+View demo	glitch
+GlowFilter
+pixi-filters/glow
+View demo	glow
+GodrayFilter
+pixi-filters/godray
+View demo	godray
+GrayscaleFilter
+pixi-filters/grayscale
+View demo	grayscale
+HslAdjustmentFilter
+pixi-filters/hsl-adjustment
+View demo	hsl-adjustment
+KawaseBlurFilter
+pixi-filters/kawase-blur
+View demo	kawase-blur
+MotionBlurFilter
+pixi-filters/motion-blur
+View demo	motion-blur
+MultiColorReplaceFilter
+pixi-filters/multi-color-replace
+View demo	multi-color-replace
+OldFilmFilter
+pixi-filters/old-film
+View demo	old-film
+OutlineFilter
+pixi-filters/outline
+View demo	outline
+PixelateFilter
+pixi-filters/pixelate
+View demo	pixelate
+RadialBlurFilter
+pixi-filters/radial-blur
+View demo	radial-blur
+ReflectionFilter
+pixi-filters/reflection
+View demo	reflection
+RGBSplitFilter
+pixi-filters/rgb-split
+View demo	rgb split
+ShockwaveFilter
+pixi-filters/shockwave
+View demo	shockwave
+SimpleLightmapFilter
+pixi-filters/simple-lightmap
+View demo	simple-lightmap
+SimplexNoiseFilter
+pixi-filters/simplex-noise
+View demo	simplex-noise
+TiltShiftFilter
+pixi-filters/tilt-shift
+View demo	tilt-shift
+TwistFilter
+pixi-filters/twist
+View demo	twist
+ZoomBlurFilter
+pixi-filters/zoom-blur
+View demo	zoom-blur
+Built-In Filters
+PixiJS has a handful of core filters that are built-in to the PixiJS library.
+
+Filter	Preview
+AlphaFilter
+View demo	alpha
+BlurFilter
+View demo	blur
+ColorMatrixFilter (contrast)
+View demo	color-matrix-contrast
+ColorMatrixFilter (desaturate)
+View demo	color-matrix-desaturate
+ColorMatrixFilter (kodachrome)
+View demo	color-matrix-kodachrome
+ColorMatrixFilter (lsd)
+View demo	color-matrix-lsd
+ColorMatrixFilter (negative)
+View demo	color-matrix-negative
+ColorMatrixFilter (polaroid)
+View demo	color-matrix-polaroid
+ColorMatrixFilter (predator)
+View demo	color-matrix-predator
+ColorMatrixFilter (saturate)
+View demo	color-matrix-saturate
+ColorMatrixFilter (sepia)
+View demo	color-matrix-sepia
+DisplacementFilter
+View demo	displacement
+NoiseFilter
+View demo	noise

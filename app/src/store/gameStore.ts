@@ -781,6 +781,23 @@ export const updateGameStore = {
     }
   },
 
+  centerViewportOnObject: (objectId: string) => {
+    const object = gameStore.geometry.objects.find(obj => obj.id === objectId)
+    if (object && object.metadata) {
+      // Calculate offset to center object at screen center (compatible with WASD movement)
+      const screenCenterX = gameStore.windowWidth / 2 / gameStore.camera.pixeloid_scale
+      const screenCenterY = gameStore.windowHeight / 2 / gameStore.camera.pixeloid_scale
+      const targetOffset = createPixeloidCoordinate(
+        object.metadata.center.x - screenCenterX,
+        object.metadata.center.y - screenCenterY
+      )
+      updateGameStore.setVertexToPixeloidOffset(targetOffset)
+      console.log(`Store: Centered viewport on object ${objectId} with offset (${targetOffset.x.toFixed(1)}, ${targetOffset.y.toFixed(1)})`)
+    } else {
+      console.warn(`Store: Cannot center viewport on object ${objectId} - object not found or missing metadata`)
+    }
+  },
+
   // Texture Registry actions (WRITE-ONLY from rendering perspective)
   setObjectTexture: (objectId: string, textureData: ObjectTextureData) => {
     gameStore.textureRegistry.objectTextures[objectId] = textureData
