@@ -143,6 +143,12 @@ export const gameStore = proxy<GameState>({
     },
     favorites: {
       favoriteObjectIds: []
+    },
+    // Scale tracking for OOM prevention
+    scaleTracking: {
+      minCreationScale: null,
+      maxCreationScale: null,
+      SCALE_SPAN_LIMIT: 8  // 12x maximum span between min and max creation scales
     }
   },
   // Texture registry for StoreExplorer previews (ISOLATED from main rendering)
@@ -247,6 +253,14 @@ export const updateGameStore = {
     // Clamp scale between reasonable values (minimum 1 pixeloid - full zoom out unlocked)
     const clampedScale = Math.max(1, Math.min(100, scale))
     
+    // Check if zoom is allowed based on scale tracking
+    const zoomCheck = updateGameStore.canZoomToScale(clampedScale)
+    if (!zoomCheck.allowed) {
+      console.warn(`Zoom blocked: ${zoomCheck.reason}`)
+      // TODO: Show dialog to user
+      return
+    }
+    
     isUpdatingCoordinates = true
     try {
       // Update primary value
@@ -273,9 +287,22 @@ export const updateGameStore = {
       // Update visibility for all objects after zoom
       for (const obj of gameStore.geometry.objects) {
         if (!obj.metadata) continue
+        
+        // Initialize visibility cache if needed
+        if (!obj.metadata.visibilityCache) {
+          obj.metadata.visibilityCache = new Map()
+        }
+        
         const visibilityInfo = GeometryHelper.calculateVisibilityState(obj, clampedScale)
-        obj.metadata.visibility = visibilityInfo.visibility
-        obj.metadata.onScreenBounds = visibilityInfo.onScreenBounds
+        
+        // Store in scale-indexed cache
+        obj.metadata.visibilityCache.set(clampedScale, {
+          visibility: visibilityInfo.visibility,
+          onScreenBounds: visibilityInfo.onScreenBounds
+        })
+        
+        // Clean up old scales (keep current ±1)
+        cleanupVisibilityCache(obj.metadata.visibilityCache, clampedScale)
       }
       
     } finally {
@@ -308,9 +335,22 @@ export const updateGameStore = {
       // Update visibility for all objects after camera movement
       for (const obj of gameStore.geometry.objects) {
         if (!obj.metadata) continue
+        
+        // Initialize visibility cache if needed
+        if (!obj.metadata.visibilityCache) {
+          obj.metadata.visibilityCache = new Map()
+        }
+        
         const visibilityInfo = GeometryHelper.calculateVisibilityState(obj, scale)
-        obj.metadata.visibility = visibilityInfo.visibility
-        obj.metadata.onScreenBounds = visibilityInfo.onScreenBounds
+        
+        // Store in scale-indexed cache
+        obj.metadata.visibilityCache.set(scale, {
+          visibility: visibilityInfo.visibility,
+          onScreenBounds: visibilityInfo.onScreenBounds
+        })
+        
+        // Clean up old scales (keep current ±1)
+        cleanupVisibilityCache(obj.metadata.visibilityCache, scale)
       }
       
     } finally {
@@ -366,9 +406,22 @@ export const updateGameStore = {
       // Update visibility for all objects after window resize
       for (const obj of gameStore.geometry.objects) {
         if (!obj.metadata) continue
+        
+        // Initialize visibility cache if needed
+        if (!obj.metadata.visibilityCache) {
+          obj.metadata.visibilityCache = new Map()
+        }
+        
         const visibilityInfo = GeometryHelper.calculateVisibilityState(obj, scale)
-        obj.metadata.visibility = visibilityInfo.visibility
-        obj.metadata.onScreenBounds = visibilityInfo.onScreenBounds
+        
+        // Store in scale-indexed cache
+        obj.metadata.visibilityCache.set(scale, {
+          visibility: visibilityInfo.visibility,
+          onScreenBounds: visibilityInfo.onScreenBounds
+        })
+        
+        // Clean up old scales (keep current ±1)
+        cleanupVisibilityCache(obj.metadata.visibilityCache, scale)
       }
       
     } finally {
@@ -423,8 +476,36 @@ export const updateGameStore = {
   addGeometricObject: (object: GeometricObject) => {
     // Check for duplicate IDs and generate new one if needed
     const ensuredObject = updateGameStore.ensureUniqueId(object)
-    gameStore.geometry.objects.push(ensuredObject)
     
+    // Ensure metadata exists
+    if (!ensuredObject.metadata) {
+      // Calculate metadata based on object type
+      if ('anchorX' in ensuredObject && 'anchorY' in ensuredObject) {
+        ensuredObject.metadata = GeometryHelper.calculateDiamondMetadata(ensuredObject as any)
+      } else if ('centerX' in ensuredObject && 'centerY' in ensuredObject) {
+        ensuredObject.metadata = GeometryHelper.calculateCircleMetadata(ensuredObject as any)
+      } else if ('x' in ensuredObject && 'width' in ensuredObject) {
+        ensuredObject.metadata = GeometryHelper.calculateRectangleMetadata(ensuredObject as any)
+      } else if ('startX' in ensuredObject && 'endX' in ensuredObject) {
+        ensuredObject.metadata = GeometryHelper.calculateLineMetadata(ensuredObject as any)
+      } else if ('x' in ensuredObject && 'y' in ensuredObject) {
+        ensuredObject.metadata = GeometryHelper.calculatePointMetadata(ensuredObject as any)
+      }
+    }
+    
+    // Initialize visibility cache if not present
+    if (ensuredObject.metadata && !ensuredObject.metadata.visibilityCache) {
+      const currentScale = gameStore.camera.pixeloid_scale
+      const visibilityInfo = GeometryHelper.calculateVisibilityState(ensuredObject, currentScale)
+      
+      ensuredObject.metadata.visibilityCache = new Map()
+      ensuredObject.metadata.visibilityCache.set(currentScale, {
+        visibility: visibilityInfo.visibility,
+        onScreenBounds: visibilityInfo.onScreenBounds
+      })
+    }
+    
+    gameStore.geometry.objects.push(ensuredObject)
   },
 
   // Ensure unique ID for objects (handles copying and duplicate prevention)
@@ -465,8 +546,86 @@ export const updateGameStore = {
     return id
   },
 
+  // Helper to update min/max creation scales
+  updateCreationScaleTracking: (newScale: number) => {
+    const tracking = gameStore.geometry.scaleTracking
+    
+    if (tracking.minCreationScale === null || newScale < tracking.minCreationScale) {
+      tracking.minCreationScale = newScale
+    }
+    
+    if (tracking.maxCreationScale === null || newScale > tracking.maxCreationScale) {
+      tracking.maxCreationScale = newScale
+    }
+    
+    console.log(`Store: Updated scale tracking - min: ${tracking.minCreationScale}, max: ${tracking.maxCreationScale}`)
+  },
+
+  // Helper to recalculate min/max scales from all objects
+  recalculateScaleTracking: () => {
+    let min: number | null = null
+    let max: number | null = null
+    
+    for (const obj of gameStore.geometry.objects) {
+      if (obj.metadata?.createdAtScale) {
+        if (min === null || obj.metadata.createdAtScale < min) {
+          min = obj.metadata.createdAtScale
+        }
+        if (max === null || obj.metadata.createdAtScale > max) {
+          max = obj.metadata.createdAtScale
+        }
+      }
+    }
+    
+    gameStore.geometry.scaleTracking.minCreationScale = min
+    gameStore.geometry.scaleTracking.maxCreationScale = max
+    
+    console.log(`Store: Recalculated scale tracking - min: ${min}, max: ${max}`)
+  },
+
+  /**
+   * Check if zoom to a scale is allowed based on scale tracking.
+   *
+   * Simple 16x span limit: objects track their FIRST creation scale only.
+   * - minAllowed = maxCreationScale / 16 (but >= 1)
+   * - maxAllowed = minCreationScale * 16 (but <= 100)
+   * - If no objects exist, allow full range 1-100
+   */
+  canZoomToScale: (targetScale: number): { allowed: boolean, reason?: string } => {
+    const tracking = gameStore.geometry.scaleTracking
+    
+    // No objects yet, allow any scale 1-100
+    if (tracking.minCreationScale === null || tracking.maxCreationScale === null) {
+      return { allowed: true }
+    }
+    
+    // Simple 16x span calculation
+    const minAllowed = Math.max(1, tracking.maxCreationScale / tracking.SCALE_SPAN_LIMIT)
+    const maxAllowed = Math.min(100, tracking.minCreationScale * tracking.SCALE_SPAN_LIMIT)
+    
+    if (targetScale < minAllowed) {
+      return {
+        allowed: false,
+        reason: `Zoom out blocked. Objects exist at scale ${tracking.maxCreationScale}. Minimum allowed scale is ${minAllowed.toFixed(0)}.`
+      }
+    }
+    
+    if (targetScale > maxAllowed) {
+      return {
+        allowed: false,
+        reason: `Zoom in blocked. Objects exist at scale ${tracking.minCreationScale}. Maximum allowed scale is ${maxAllowed.toFixed(0)}.`
+      }
+    }
+    
+    return { allowed: true }
+  },
+
   // Factory methods for creating objects with proper metadata
   createPoint: (x: number, y: number) => {
+    const currentScale = gameStore.camera.pixeloid_scale
+    const metadata = GeometryHelper.calculatePointMetadata({ x, y })
+    metadata.createdAtScale = currentScale
+    
     const point: GeometricPoint = {
       id: updateGameStore.generateUniqueId('point'),
       x,
@@ -475,13 +634,31 @@ export const updateGameStore = {
       strokeAlpha: gameStore.geometry.drawing.settings.strokeAlpha,
       isVisible: true,
       createdAt: Date.now(),
-      metadata: GeometryHelper.calculatePointMetadata({ x, y })
+      metadata
     }
+    
+    // Initialize visibility cache
+    const visibilityInfo = GeometryHelper.calculateVisibilityState(point, currentScale)
+    
+    point.metadata!.visibilityCache = new Map()
+    point.metadata!.visibilityCache.set(currentScale, {
+      visibility: visibilityInfo.visibility,
+      onScreenBounds: visibilityInfo.onScreenBounds
+    })
+    
     gameStore.geometry.objects.push(point)
+    
+    // Update scale tracking
+    updateGameStore.updateCreationScaleTracking(currentScale)
+    
     return point
   },
 
   createLine: (startX: number, startY: number, endX: number, endY: number) => {
+    const currentScale = gameStore.camera.pixeloid_scale
+    const metadata = GeometryHelper.calculateLineMetadata({ startX, startY, endX, endY })
+    metadata.createdAtScale = currentScale
+    
     const line: GeometricLine = {
       id: updateGameStore.generateUniqueId('line'),
       startX,
@@ -493,13 +670,31 @@ export const updateGameStore = {
       strokeAlpha: gameStore.geometry.drawing.settings.strokeAlpha,
       isVisible: true,
       createdAt: Date.now(),
-      metadata: GeometryHelper.calculateLineMetadata({ startX, startY, endX, endY })
+      metadata
     }
+    
+    // Initialize visibility cache
+    const visibilityInfo = GeometryHelper.calculateVisibilityState(line, currentScale)
+    
+    line.metadata!.visibilityCache = new Map()
+    line.metadata!.visibilityCache.set(currentScale, {
+      visibility: visibilityInfo.visibility,
+      onScreenBounds: visibilityInfo.onScreenBounds
+    })
+    
     gameStore.geometry.objects.push(line)
+    
+    // Update scale tracking
+    updateGameStore.updateCreationScaleTracking(currentScale)
+    
     return line
   },
 
   createCircle: (centerX: number, centerY: number, radius: number) => {
+    const currentScale = gameStore.camera.pixeloid_scale
+    const metadata = GeometryHelper.calculateCircleMetadata({ centerX, centerY, radius })
+    metadata.createdAtScale = currentScale
+    
     const circle: GeometricCircle = {
       id: updateGameStore.generateUniqueId('circle'),
       centerX,
@@ -514,13 +709,31 @@ export const updateGameStore = {
       }),
       isVisible: true,
       createdAt: Date.now(),
-      metadata: GeometryHelper.calculateCircleMetadata({ centerX, centerY, radius })
+      metadata
     }
+    
+    // Initialize visibility cache
+    const visibilityInfo = GeometryHelper.calculateVisibilityState(circle, currentScale)
+    
+    circle.metadata!.visibilityCache = new Map()
+    circle.metadata!.visibilityCache.set(currentScale, {
+      visibility: visibilityInfo.visibility,
+      onScreenBounds: visibilityInfo.onScreenBounds
+    })
+    
     gameStore.geometry.objects.push(circle)
+    
+    // Update scale tracking
+    updateGameStore.updateCreationScaleTracking(currentScale)
+    
     return circle
   },
 
   createRectangle: (x: number, y: number, width: number, height: number) => {
+    const currentScale = gameStore.camera.pixeloid_scale
+    const metadata = GeometryHelper.calculateRectangleMetadata({ x, y, width, height })
+    metadata.createdAtScale = currentScale
+    
     const rectangle: GeometricRectangle = {
       id: updateGameStore.generateUniqueId('rect'),
       x,
@@ -536,13 +749,31 @@ export const updateGameStore = {
       }),
       isVisible: true,
       createdAt: Date.now(),
-      metadata: GeometryHelper.calculateRectangleMetadata({ x, y, width, height })
+      metadata
     }
+    
+    // Initialize visibility cache
+    const visibilityInfo = GeometryHelper.calculateVisibilityState(rectangle, currentScale)
+    
+    rectangle.metadata!.visibilityCache = new Map()
+    rectangle.metadata!.visibilityCache.set(currentScale, {
+      visibility: visibilityInfo.visibility,
+      onScreenBounds: visibilityInfo.onScreenBounds
+    })
+    
     gameStore.geometry.objects.push(rectangle)
+    
+    // Update scale tracking
+    updateGameStore.updateCreationScaleTracking(currentScale)
+    
     return rectangle
   },
 
   createDiamond: (anchorX: number, anchorY: number, width: number, height: number) => {
+    const currentScale = gameStore.camera.pixeloid_scale
+    const metadata = GeometryHelper.calculateDiamondMetadata({ anchorX, anchorY, width, height })
+    metadata.createdAtScale = currentScale
+    
     const diamond: GeometricDiamond = {
       id: updateGameStore.generateUniqueId('diamond'),
       anchorX,
@@ -558,9 +789,23 @@ export const updateGameStore = {
       }),
       isVisible: true,
       createdAt: Date.now(),
-      metadata: GeometryHelper.calculateDiamondMetadata({ anchorX, anchorY, width, height })
+      metadata
     }
+    
+    // Initialize visibility cache
+    const visibilityInfo = GeometryHelper.calculateVisibilityState(diamond, currentScale)
+    
+    diamond.metadata!.visibilityCache = new Map()
+    diamond.metadata!.visibilityCache.set(currentScale, {
+      visibility: visibilityInfo.visibility,
+      onScreenBounds: visibilityInfo.onScreenBounds
+    })
+    
     gameStore.geometry.objects.push(diamond)
+    
+    // Update scale tracking
+    updateGameStore.updateCreationScaleTracking(currentScale)
+    
     return diamond
   },
 
@@ -570,6 +815,8 @@ export const updateGameStore = {
       gameStore.geometry.objects.splice(index, 1)
       // Remove textures when object is deleted
       updateGameStore.removeObjectTexture(id)
+      // Recalculate scale tracking after deletion
+      updateGameStore.recalculateScaleTracking()
     }
   },
 
@@ -618,11 +865,21 @@ export const updateGameStore = {
     const object = gameStore.geometry.objects.find(obj => obj.id === objectId)
     if (!object || !object.metadata) return
     
+    // Initialize visibility cache if needed
+    if (!object.metadata.visibilityCache) {
+      object.metadata.visibilityCache = new Map()
+    }
+    
     const visibilityInfo = GeometryHelper.calculateVisibilityState(object, pixeloidScale)
     
-    // Update metadata with visibility info
-    object.metadata.visibility = visibilityInfo.visibility
-    object.metadata.onScreenBounds = visibilityInfo.onScreenBounds
+    // Store in scale-indexed cache
+    object.metadata.visibilityCache.set(pixeloidScale, {
+      visibility: visibilityInfo.visibility,
+      onScreenBounds: visibilityInfo.onScreenBounds
+    })
+    
+    // Clean up old scales (keep current ±1)
+    cleanupVisibilityCache(object.metadata.visibilityCache, pixeloidScale)
   },
 
   // Batch update all objects' visibility
@@ -630,9 +887,21 @@ export const updateGameStore = {
     for (const obj of gameStore.geometry.objects) {
       if (!obj.metadata) continue
       
+      // Initialize visibility cache if needed
+      if (!obj.metadata.visibilityCache) {
+        obj.metadata.visibilityCache = new Map()
+      }
+      
       const visibilityInfo = GeometryHelper.calculateVisibilityState(obj, pixeloidScale)
-      obj.metadata.visibility = visibilityInfo.visibility
-      obj.metadata.onScreenBounds = visibilityInfo.onScreenBounds
+      
+      // Store in scale-indexed cache
+      obj.metadata.visibilityCache.set(pixeloidScale, {
+        visibility: visibilityInfo.visibility,
+        onScreenBounds: visibilityInfo.onScreenBounds
+      })
+      
+      // Clean up old scales (keep current ±1)
+      cleanupVisibilityCache(obj.metadata.visibilityCache, pixeloidScale)
     }
   },
 
@@ -758,8 +1027,20 @@ export const updateGameStore = {
     } else if ('x' in newObject && 'y' in newObject) {
       newObject.metadata = GeometryHelper.calculatePointMetadata(newObject as any)
     }
+    
+    // Initialize visibility cache for pasted object
+    if (newObject.metadata) {
+      const currentScale = gameStore.camera.pixeloid_scale
+      const visibilityInfo = GeometryHelper.calculateVisibilityState(newObject, currentScale)
+      
+      newObject.metadata.visibilityCache = new Map()
+      newObject.metadata.visibilityCache.set(currentScale, {
+        visibility: visibilityInfo.visibility,
+        onScreenBounds: visibilityInfo.onScreenBounds
+      })
+    }
 
-    // Use proper method that handles object setup
+    // Use proper method that handles object setup (but we already initialized visibility cache)
     updateGameStore.addGeometricObject(newObject)
     
     // Select the new object
@@ -1022,6 +1303,17 @@ export const updateGameStore = {
       createdAt: Date.now(),
       metadata: GeometryHelper.calculatePointMetadata({ x: anchoredPos.x, y: anchoredPos.y })
     }
+    
+    // Initialize visibility cache
+    const currentScale = gameStore.camera.pixeloid_scale
+    const visibilityInfo = GeometryHelper.calculateVisibilityState(point, currentScale)
+    
+    point.metadata!.visibilityCache = new Map()
+    point.metadata!.visibilityCache.set(currentScale, {
+      visibility: visibilityInfo.visibility,
+      onScreenBounds: visibilityInfo.onScreenBounds
+    })
+    
     gameStore.geometry.objects.push(point)
     
     return point
@@ -1047,6 +1339,17 @@ export const updateGameStore = {
         endX: dragPos.x, endY: dragPos.y
       })
     }
+    
+    // Initialize visibility cache
+    const currentScale = gameStore.camera.pixeloid_scale
+    const visibilityInfo = GeometryHelper.calculateVisibilityState(line, currentScale)
+    
+    line.metadata!.visibilityCache = new Map()
+    line.metadata!.visibilityCache.set(currentScale, {
+      visibility: visibilityInfo.visibility,
+      onScreenBounds: visibilityInfo.onScreenBounds
+    })
+    
     gameStore.geometry.objects.push(line)
     
     return line
@@ -1080,6 +1383,17 @@ export const updateGameStore = {
         radius
       })
     }
+    
+    // Initialize visibility cache
+    const currentScale = gameStore.camera.pixeloid_scale
+    const visibilityInfo = GeometryHelper.calculateVisibilityState(circle, currentScale)
+    
+    circle.metadata!.visibilityCache = new Map()
+    circle.metadata!.visibilityCache.set(currentScale, {
+      visibility: visibilityInfo.visibility,
+      onScreenBounds: visibilityInfo.onScreenBounds
+    })
+    
     gameStore.geometry.objects.push(circle)
     
     return circle
@@ -1111,6 +1425,17 @@ export const updateGameStore = {
         x: anchoredStart.x, y: anchoredStart.y, width, height
       })
     }
+    
+    // Initialize visibility cache
+    const currentScale = gameStore.camera.pixeloid_scale
+    const visibilityInfo = GeometryHelper.calculateVisibilityState(rectangle, currentScale)
+    
+    rectangle.metadata!.visibilityCache = new Map()
+    rectangle.metadata!.visibilityCache.set(currentScale, {
+      visibility: visibilityInfo.visibility,
+      onScreenBounds: visibilityInfo.onScreenBounds
+    })
+    
     gameStore.geometry.objects.push(rectangle)
     
     return rectangle
@@ -1147,6 +1472,17 @@ export const updateGameStore = {
         anchorX: westX, anchorY: westY, width, height
       })
     }
+    
+    // Initialize visibility cache
+    const currentScale = gameStore.camera.pixeloid_scale
+    const visibilityInfo = GeometryHelper.calculateVisibilityState(diamond, currentScale)
+    
+    diamond.metadata!.visibilityCache = new Map()
+    diamond.metadata!.visibilityCache.set(currentScale, {
+      visibility: visibilityInfo.visibility,
+      onScreenBounds: visibilityInfo.onScreenBounds
+    })
+    
     gameStore.geometry.objects.push(diamond)
     
     return diamond
@@ -1157,6 +1493,48 @@ export const updateGameStore = {
 window.addEventListener('resize', () => {
   updateGameStore.updateWindowSize(window.innerWidth, window.innerHeight)
 })
+
+// Helper function for visibility cache cleanup with distance-based eviction
+function cleanupVisibilityCache(cache: Map<number, any>, currentScale: number): void {
+  // Use requestIdleCallback to avoid blocking rendering during cleanup
+  requestIdleCallback(() => {
+    // Distance-based eviction configuration
+    const CRITICAL_SCALES = [1] // Never evict scale 1 (too expensive to regenerate)
+    const DISTANCE_THRESHOLD = 2   // Evict scales more than 2 away from current
+    
+    // Keep current scale and adjacent scales (±1)
+    const adjacentScalesToKeep = new Set([
+      currentScale,
+      currentScale - 1,
+      currentScale + 1
+    ].filter(s => s >= 1 && s <= 100))
+    
+    const scalesToDelete: number[] = []
+    
+    for (const [scale] of cache) {
+      // Keep if in adjacent range
+      if (adjacentScalesToKeep.has(scale)) continue
+      
+      // Keep critical scales
+      if (CRITICAL_SCALES.includes(scale)) continue
+      
+      // Evict if distance > threshold OR outside valid range
+      const distance = Math.abs(scale - currentScale)
+      if (distance > DISTANCE_THRESHOLD || scale < 1 || scale > 100) {
+        scalesToDelete.push(scale)
+      }
+    }
+    
+    // Perform cleanup during idle time
+    for (const scale of scalesToDelete) {
+      cache.delete(scale)
+    }
+    
+    if (scalesToDelete.length > 0) {
+      console.log(`Store: Distance-based visibility cache cleanup removed scales [${scalesToDelete.join(', ')}] (distance > ${DISTANCE_THRESHOLD} from scale ${currentScale})`)
+    }
+  })
+}
 
 // ================================
 // COORDINATE HELPER EXPORTS FOR OTHER FILES

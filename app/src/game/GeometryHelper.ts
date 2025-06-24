@@ -296,7 +296,8 @@ export class GeometryHelper {
         maxX: pixeloidX + 1,  // Full pixeloid width
         minY: pixeloidY,
         maxY: pixeloidY + 1   // Full pixeloid height
-      }
+      },
+      visibilityCache: new Map()
     }
   }
 
@@ -314,7 +315,8 @@ export class GeometryHelper {
         maxX: Math.max(line.startX, line.endX),
         minY: Math.min(line.startY, line.endY),
         maxY: Math.max(line.startY, line.endY)
-      }
+      },
+      visibilityCache: new Map()
     }
   }
 
@@ -330,7 +332,8 @@ export class GeometryHelper {
         maxX: Math.ceil(circle.centerX + circle.radius),
         minY: Math.floor(circle.centerY - circle.radius),
         maxY: Math.ceil(circle.centerY + circle.radius)
-      }
+      },
+      visibilityCache: new Map()
     }
   }
 
@@ -348,7 +351,8 @@ export class GeometryHelper {
         maxX: rectangle.x + rectangle.width,
         minY: rectangle.y,
         maxY: rectangle.y + rectangle.height
-      }
+      },
+      visibilityCache: new Map()
     }
   }
 
@@ -366,7 +370,8 @@ export class GeometryHelper {
         maxX: diamond.anchorX + diamond.width,
         minY: Math.floor(diamond.anchorY - diamond.height), // ✅ Round DOWN - include full pixeloid containing north vertex
         maxY: Math.ceil(diamond.anchorY + diamond.height)   // ✅ Round UP - include full pixeloid containing south vertex
-      }
+      },
+      visibilityCache: new Map()
     }
   }
 

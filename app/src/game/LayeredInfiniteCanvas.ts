@@ -210,7 +210,7 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
     }
 
     // Always render geometry every frame at 60fps (full redraw ensures old positions cleared)
-    this.renderGeometryLayer(paddedCorners, pixeloidScale)
+    this.renderGeometryLayer(pixeloidScale)
     
     // Render selection highlights (reactive, always updates based on store state)
     this.renderSelectionLayer(paddedCorners, pixeloidScale)
@@ -265,9 +265,9 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
    * Render geometry layer with store-driven offset positioning
    * ALWAYS renders to maintain object containers for mirror layer
    */
-  private renderGeometryLayer(corners: ViewportCorners, pixeloidScale: number): void {
+  private renderGeometryLayer(pixeloidScale: number): void {
     // ALWAYS render to maintain object containers (required for mirror layer)
-    this.geometryRenderer.render(corners, pixeloidScale)
+    this.geometryRenderer.render(pixeloidScale)
     
     // Clear and re-add to ensure fresh state
     this.geometryLayer.removeChildren()

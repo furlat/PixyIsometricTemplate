@@ -120,15 +120,34 @@ export class BoundingBoxRenderer {
   private renderBoundingBoxRectangle(convertedObj: GeometricObject, pixeloidScale: number): void {
     if (!convertedObj.metadata) return
 
-    // ✅ USE CENTRALIZED METADATA BOUNDS (single source of truth)
-    // Apply coordinate conversion to metadata bounds, don't recalculate them
-    const offset = gameStore.mesh.vertex_to_pixeloid_offset
-    const bounds = convertedObj.metadata.bounds
+    // Check visibility cache for the current scale
+    let boundsToRender = convertedObj.metadata.bounds
+    let isPartiallyVisible = false
     
-    const vertexX = bounds.minX - offset.x
-    const vertexY = bounds.minY - offset.y
-    const width = bounds.maxX - bounds.minX
-    const height = bounds.maxY - bounds.minY
+    if (convertedObj.metadata.visibilityCache) {
+      const cachedVisibility = convertedObj.metadata.visibilityCache.get(pixeloidScale)
+      
+      if (cachedVisibility) {
+        // If object is partially visible, use the on-screen bounds
+        if (cachedVisibility.visibility === 'partially-onscreen' && cachedVisibility.onScreenBounds) {
+          boundsToRender = cachedVisibility.onScreenBounds
+          isPartiallyVisible = true
+        }
+        // If offscreen, skip rendering entirely (shouldn't happen due to viewport culling)
+        else if (cachedVisibility.visibility === 'offscreen') {
+          return
+        }
+        // If fully visible, use the full bounds (default behavior)
+      }
+    }
+    
+    // Apply coordinate conversion to bounds
+    const offset = gameStore.mesh.vertex_to_pixeloid_offset
+    
+    const vertexX = boundsToRender.minX - offset.x
+    const vertexY = boundsToRender.minY - offset.y
+    const width = boundsToRender.maxX - boundsToRender.minX
+    const height = boundsToRender.maxY - boundsToRender.minY
 
     // Convert vertex coordinates to screen coordinates
     const screenPos = CoordinateCalculations.vertexToScreen(
@@ -140,17 +159,22 @@ export class BoundingBoxRenderer {
 
     // Draw bounding box with fixed 1 pixel stroke width (no scaling)
     const strokeWidth = 1
+    
+    // Use different styling for partial visibility
+    const fillAlpha = isPartiallyVisible ? 0.2 : 0.1
+    const strokeAlpha = isPartiallyVisible ? 1.0 : 0.8
+    const strokeColor = isPartiallyVisible ? 0xff8800 : 0xff0000 // Orange for partial, red for full
 
     this.graphics
       .rect(screenPos.x, screenPos.y, screenWidth, screenHeight)
       .fill({
         color: 0xff0000,  // Red fill for easy distinction
-        alpha: 0.1        // Very transparent
+        alpha: fillAlpha
       })
       .stroke({
         width: strokeWidth,
-        color: 0xff0000,  // Red outline
-        alpha: 0.8        // More visible outline
+        color: strokeColor,
+        alpha: strokeAlpha
       })
   }
 

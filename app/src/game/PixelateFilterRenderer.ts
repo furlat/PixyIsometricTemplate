@@ -2,6 +2,7 @@ import { Container, Sprite, Rectangle, Texture } from 'pixi.js'
 import { PixelateFilter } from 'pixi-filters'
 import { gameStore } from '../store/gameStore'
 import { CoordinateCalculations } from './CoordinateCalculations'
+import { GeometryHelper } from './GeometryHelper'
 import type { ViewportCorners } from '../types'
 import type { MirrorLayerRenderer } from './MirrorLayerRenderer'
 
@@ -51,10 +52,29 @@ export class PixelateFilterRenderer {
     const textureCache = mirrorRenderer.getTextureCache()
     
     // Get visible objects from store for positioning, excluding offscreen objects
-    const visibleObjects = gameStore.geometry.objects.filter(obj =>
-      obj.isVisible &&
-      (!obj.metadata?.visibility || obj.metadata.visibility !== 'offscreen')
-    )
+    const visibleObjects = gameStore.geometry.objects.filter(obj => {
+      if (!obj.isVisible || !obj.metadata) return false
+      
+      // Get visibility from scale-indexed cache
+      const visibilityData = obj.metadata.visibilityCache?.get(pixeloidScale)
+      
+      if (!visibilityData) {
+        // Calculate and cache if not present
+        if (!obj.metadata.visibilityCache) {
+          obj.metadata.visibilityCache = new Map()
+        }
+        
+        const visibilityInfo = GeometryHelper.calculateVisibilityState(obj, pixeloidScale)
+        obj.metadata.visibilityCache.set(pixeloidScale, {
+          visibility: visibilityInfo.visibility,
+          onScreenBounds: visibilityInfo.onScreenBounds
+        })
+        
+        return visibilityInfo.visibility !== 'offscreen'
+      }
+      
+      return visibilityData.visibility !== 'offscreen'
+    })
     const visibleObjectIds = new Set(visibleObjects.map(obj => obj.id))
     
     // Remove containers for objects no longer visible
@@ -68,7 +88,9 @@ export class PixelateFilterRenderer {
     
     // Process each visible object that has a cached texture
     for (const obj of visibleObjects) {
-      const cache = textureCache.get(obj.id)
+      // Cache key now includes scale (format: "objectId_scale")
+      const cacheKey = `${obj.id}_${pixeloidScale}`
+      const cache = textureCache.get(cacheKey)
       if (!cache || !obj.metadata?.bounds) continue
       
       // Get or create individual container for this object
@@ -101,11 +123,12 @@ export class PixelateFilterRenderer {
       let textureToUse: Texture | any = cache.texture
       
       // Check if we need to create a texture region for partially visible objects
-      const isPartial = obj.metadata.visibility === 'partially-onscreen' && obj.metadata.onScreenBounds
+      const visibilityData = obj.metadata.visibilityCache?.get(pixeloidScale)
+      const isPartial = visibilityData?.visibility === 'partially-onscreen' && visibilityData?.onScreenBounds
       
-      if (isPartial && obj.metadata.onScreenBounds) {
+      if (isPartial && visibilityData?.onScreenBounds) {
         const fullBounds = obj.metadata.bounds
-        const visibleBounds = obj.metadata.onScreenBounds
+        const visibleBounds = visibilityData.onScreenBounds
         
         // Calculate offset within the texture (in screen pixels)
         const offsetX = (visibleBounds.minX - fullBounds.minX) * pixeloidScale
@@ -154,7 +177,7 @@ export class PixelateFilterRenderer {
       // EXACT SAME POSITIONING AS MIRROR LAYER
       // Step 1: Get bounds from object metadata (pixeloid coordinates)
       // For partially visible objects, use onScreenBounds for positioning
-      const currentBounds = isPartial ? obj.metadata.onScreenBounds : obj.metadata.bounds
+      const currentBounds = (isPartial && visibilityData?.onScreenBounds) ? visibilityData.onScreenBounds : obj.metadata.bounds
       
       // Safety check - bounds should always exist if we got here
       if (!currentBounds) {

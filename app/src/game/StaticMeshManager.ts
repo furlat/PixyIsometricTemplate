@@ -21,10 +21,11 @@ import { subscribe } from 'valtio'
  */
 export class StaticMeshManager {
   // Smart cache configuration
-  private static readonly CRITICAL_SCALES = [1, 2] // Never evict these
+  private static readonly CRITICAL_SCALES = [1] // Never evict scale 1 (too expensive to regenerate)
   private static readonly ADJACENT_RANGE = 2 // Cache ±2 scales around current
   private static readonly EVICTION_TIME_MS = 60000 // 60 seconds unused = eligible for eviction
   private static readonly MAX_CACHED_SCALES = 15 // Higher limit for time-based eviction
+  private static readonly DISTANCE_THRESHOLD = 2 // Evict scales more than 2 away from current
   
   // Current scale tracking
   private currentScale: number = 10
@@ -333,6 +334,9 @@ export class StaticMeshManager {
     // Set active mesh for immediate use
     this.setActiveMesh(newScale)
     
+    // NEW: Async distance-based eviction on scale change
+    this.performDistanceBasedEvictionAsync(newScale)
+    
     // Start async pre-caching of adjacent scales
     const adjacentScales = this.getAdjacentScales(newScale)
     this.preloadScalesAsync(adjacentScales)
@@ -471,6 +475,50 @@ export class StaticMeshManager {
         console.log('StaticMeshManager: Stopped eviction timer (cache size manageable)')
       }
     }
+  }
+
+  /**
+   * Distance-based eviction - remove scales more than 4 away from current (async to avoid blocking rendering)
+   */
+  private performDistanceBasedEvictionAsync(currentScale: number): void {
+    // Use requestIdleCallback to avoid blocking rendering
+    requestIdleCallback(() => {
+      const cachedScales = Array.from(gameStore.staticMesh.meshCache.keys())
+      const toEvict: number[] = []
+      
+      for (const scale of cachedScales) {
+        // Never evict critical scales
+        if (StaticMeshManager.CRITICAL_SCALES.includes(scale)) {
+          continue
+        }
+        
+        // Never evict current scale
+        if (scale === currentScale) {
+          continue
+        }
+        
+        // Evict if distance > threshold
+        const distance = Math.abs(scale - currentScale)
+        if (distance > StaticMeshManager.DISTANCE_THRESHOLD) {
+          toEvict.push(scale)
+        }
+      }
+      
+      // Perform eviction during idle time
+      if (toEvict.length > 0) {
+        toEvict.forEach(scale => {
+          gameStore.staticMesh.meshCache.delete(scale)
+          gameStore.staticMesh.coordinateMappings.delete(scale)
+          this.scaleAccessTimes.delete(scale)
+        })
+        
+        console.log(`StaticMeshManager: Distance-based eviction removed scales [${toEvict.join(', ')}] (distance > ${StaticMeshManager.DISTANCE_THRESHOLD} from scale ${currentScale})`)
+        
+        // Update stats
+        gameStore.staticMesh.stats.totalCachedMeshes = gameStore.staticMesh.meshCache.size
+        gameStore.staticMesh.stats.totalCachedMappings = gameStore.staticMesh.coordinateMappings.size
+      }
+    })
   }
 
   /**

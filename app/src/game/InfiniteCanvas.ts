@@ -159,7 +159,20 @@ export class InfiniteCanvas {
     const newScale = this.localPixeloidScale + this.pendingZoomDelta
     
     // Clamp zoom levels to integers between 1 and 100 (unlocked full zoom out)
-    this.localPixeloidScale = Math.max(1, Math.min(100, newScale))
+    const clampedScale = Math.max(1, Math.min(100, newScale))
+    
+    // Check if zoom is allowed based on scale tracking
+    const zoomCheck = updateGameStore.canZoomToScale(clampedScale)
+    if (!zoomCheck.allowed) {
+      console.warn(`InfiniteCanvas: ${zoomCheck.reason}`)
+      // Reset zoom delta without applying
+      this.pendingZoomDelta = 0
+      this.zoomTargetScreen = null
+      // TODO: Show dialog to user about zoom restriction
+      return
+    }
+    
+    this.localPixeloidScale = clampedScale
     
     // Reset zoom delta
     this.pendingZoomDelta = 0

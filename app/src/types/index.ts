@@ -217,19 +217,23 @@ export interface GeometricMetadata {
     minY: number
     maxY: number
   }
-  // NEW: Visibility state
-  visibility?: 'fully-onscreen' | 'partially-onscreen' | 'offscreen'
   
-  // NEW: On-screen bounds (only valid when partially-onscreen)
-  onScreenBounds?: {
-    minX: number
-    maxX: number
-    minY: number
-    maxY: number
-    // Texture region info for partial rendering
-    textureOffsetX: number  // Pixels to skip in texture X
-    textureOffsetY: number  // Pixels to skip in texture Y
-  }
+  // Track the scale at which this object was created
+  createdAtScale: number
+  
+  // Scale-indexed visibility cache to prevent race conditions
+  visibilityCache?: Map<number, {
+    visibility: 'fully-onscreen' | 'partially-onscreen' | 'offscreen'
+    onScreenBounds?: {
+      minX: number
+      maxX: number
+      minY: number
+      maxY: number
+      // Texture region info for partial rendering
+      textureOffsetX: number  // Pixels to skip in texture X
+      textureOffsetY: number  // Pixels to skip in texture Y
+    }
+  }>
 }
 
 // Bbox mesh reference for pixeloid-perfect filtering
@@ -500,6 +504,12 @@ export interface GeometryState {
   // Favorites system
   favorites: {
     favoriteObjectIds: string[]
+  }
+  // Scale tracking for OOM prevention
+  scaleTracking: {
+    minCreationScale: number | null
+    maxCreationScale: number | null
+    SCALE_SPAN_LIMIT: number  // 16x maximum span between min and max creation scales
   }
 }
 

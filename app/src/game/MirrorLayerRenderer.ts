@@ -1,6 +1,7 @@
 import { Container, Sprite, RenderTexture, Matrix, Renderer, Texture, Rectangle } from 'pixi.js'
 import { gameStore } from '../store/gameStore'
 import { CoordinateCalculations } from './CoordinateCalculations'
+import { GeometryHelper } from './GeometryHelper'
 import type { ViewportCorners, GeometricObject } from '../types'
 import type { GeometryRenderer } from './GeometryRenderer'
 
@@ -19,7 +20,7 @@ export class MirrorLayerRenderer {
   private renderer: Renderer | null = null
   private mirrorSprites: Map<string, Sprite> = new Map()
   
-  // Texture cache with scale tracking
+  // Texture cache with scale-indexed keys for zoom stability
   private textureCache: Map<string, {
     texture: RenderTexture
     visualVersion: number  // Only visual properties, not position
@@ -29,12 +30,23 @@ export class MirrorLayerRenderer {
   // Track object versions for change detection
   private objectVersions: Map<string, number> = new Map()
   
+  // Cache eviction configuration
+  private static readonly CRITICAL_SCALES = [1] // Never evict scale 1 (too expensive to regenerate)
+  private static readonly DISTANCE_THRESHOLD = 2 // Evict scales more than 2 away from current
+  
   /**
    * Initialize with renderer for texture extraction
    */
   public initializeWithRenderer(renderer: Renderer): void {
     this.renderer = renderer
     console.log('MirrorLayerRenderer: Initialized with multi-pass rendering pattern')
+  }
+
+  /**
+   * Generate cache key that includes scale for proper zoom caching
+   */
+  private getCacheKey(objectId: string, scale: number): string {
+    return `${objectId}_${scale}`
   }
 
   /**
@@ -51,10 +63,29 @@ export class MirrorLayerRenderer {
     }
 
     // Get visible objects from store, excluding offscreen objects
-    const visibleObjects = gameStore.geometry.objects.filter(obj =>
-      obj.isVisible &&
-      (!obj.metadata?.visibility || obj.metadata.visibility !== 'offscreen')
-    )
+    const visibleObjects = gameStore.geometry.objects.filter(obj => {
+      if (!obj.isVisible || !obj.metadata) return false
+      
+      // Get visibility from scale-indexed cache
+      const visibilityData = obj.metadata.visibilityCache?.get(pixeloidScale)
+      
+      if (!visibilityData) {
+        // Calculate and cache if not present
+        if (!obj.metadata.visibilityCache) {
+          obj.metadata.visibilityCache = new Map()
+        }
+        
+        const visibilityInfo = GeometryHelper.calculateVisibilityState(obj, pixeloidScale)
+        obj.metadata.visibilityCache.set(pixeloidScale, {
+          visibility: visibilityInfo.visibility,
+          onScreenBounds: visibilityInfo.onScreenBounds
+        })
+        
+        return visibilityInfo.visibility !== 'offscreen'
+      }
+      
+      return visibilityData.visibility !== 'offscreen'
+    })
     
     if (visibleObjects.length === 0) {
       this.container.removeChildren()
@@ -77,6 +108,60 @@ export class MirrorLayerRenderer {
     for (const obj of visibleObjects) {
       this.processObject(obj, geometryRenderer, pixeloidScale)
     }
+    
+    // Async distance-based cache cleanup to avoid blocking rendering
+    this.performDistanceBasedEvictionAsync(pixeloidScale)
+  }
+
+  /**
+   * Distance-based cache eviction - async to avoid blocking rendering
+   */
+  private performDistanceBasedEvictionAsync(currentScale: number): void {
+    // Use requestIdleCallback to avoid blocking rendering
+    requestIdleCallback(() => {
+      // Keep current scale and adjacent scales (±1)
+      const scalesToKeep = new Set([
+        currentScale,
+        currentScale - 1,
+        currentScale + 1
+      ].filter(s => s >= 1 && s <= 100))
+      
+      // Find keys to delete based on distance threshold
+      const keysToDelete: string[] = []
+      
+      for (const [key, ] of this.textureCache) {
+        // Extract scale from cache key (format: objectId_scale)
+        const parts = key.split('_')
+        const scale = parseInt(parts[parts.length - 1])
+        
+        if (isNaN(scale)) continue
+        
+        // Keep if in adjacent range
+        if (scalesToKeep.has(scale)) continue
+        
+        // Keep critical scales
+        if (MirrorLayerRenderer.CRITICAL_SCALES.includes(scale)) continue
+        
+        // Evict if distance > threshold
+        const distance = Math.abs(scale - currentScale)
+        if (distance > MirrorLayerRenderer.DISTANCE_THRESHOLD) {
+          keysToDelete.push(key)
+        }
+      }
+      
+      // Delete during idle time
+      for (const key of keysToDelete) {
+        const cache = this.textureCache.get(key)
+        if (cache) {
+          cache.texture.destroy()
+          this.textureCache.delete(key)
+        }
+      }
+      
+      if (keysToDelete.length > 0) {
+        console.log(`MirrorLayerRenderer: Distance-based eviction removed ${keysToDelete.length} texture caches (distance > ${MirrorLayerRenderer.DISTANCE_THRESHOLD} from scale ${currentScale})`)
+      }
+    })
   }
 
   /**
@@ -88,15 +173,15 @@ export class MirrorLayerRenderer {
     pixeloidScale: number
   ): void {
     const visualVersion = this.getVisualVersion(obj)
-    const cache = this.textureCache.get(obj.id)
+    const cacheKey = this.getCacheKey(obj.id, pixeloidScale)
+    const cache = this.textureCache.get(cacheKey)
     
     // Check if we need to extract a new texture
-    const needsNewTexture = !cache ||
-                           cache.visualVersion !== visualVersion ||
-                           cache.scale !== pixeloidScale
+    // Now scale is part of the cache key, so we only check visual version
+    const needsNewTexture = !cache || cache.visualVersion !== visualVersion
     
     if (needsNewTexture) {
-      console.log(`MirrorLayerRenderer: Object ${obj.id} needs new texture (visual=${visualVersion}, scale=${pixeloidScale})`)
+      console.log(`MirrorLayerRenderer: Object ${obj.id} needs new texture at scale ${pixeloidScale} (visual=${visualVersion})`)
       this.extractAndCacheTexture(obj, geometryRenderer, pixeloidScale)
     }
     
@@ -119,25 +204,25 @@ export class MirrorLayerRenderer {
       return
     }
 
-    // Extract texture in the same coordinate space as GeometryRenderer
-    // For partial visibility, use onScreenBounds to clip texture
-    const bounds = (obj.metadata.visibility === 'partially-onscreen' && obj.metadata.onScreenBounds)
-      ? obj.metadata.onScreenBounds
-      : obj.metadata.bounds
+    // Always extract texture using full bounds to prevent distortion
+    // The sprite creation logic will handle showing only the visible portion
+    const bounds = obj.metadata.bounds
     const texture = this.extractObjectTexture(objectContainer, bounds, pixeloidScale)
     
     if (texture) {
-      // Destroy old texture if exists
-      const oldCache = this.textureCache.get(obj.id)
+      const cacheKey = this.getCacheKey(obj.id, pixeloidScale)
+      
+      // Destroy old texture at this scale if exists
+      const oldCache = this.textureCache.get(cacheKey)
       if (oldCache) {
         oldCache.texture.destroy()
       }
       
-      // Cache new texture with scale tracking
-      this.textureCache.set(obj.id, {
+      // Cache new texture with scale-indexed key
+      this.textureCache.set(cacheKey, {
         texture,
         visualVersion: this.getVisualVersion(obj),
-        scale: pixeloidScale  // Store the scale
+        scale: pixeloidScale  // Store the scale for reference
       })
     }
   }
@@ -173,19 +258,8 @@ export class MirrorLayerRenderer {
       return null
     }
 
-    // Add texture size limits to prevent OOM
-    const MAX_TEXTURE_SIZE = 4096 // Maximum texture dimension
-    const MAX_TEXTURE_AREA = 8192 * 8192 // Maximum total pixels
-    
-    if (textureWidth > MAX_TEXTURE_SIZE || textureHeight > MAX_TEXTURE_SIZE) {
-      console.warn(`MirrorLayerRenderer: Texture too large (${textureWidth}x${textureHeight}), skipping object at zoom ${pixeloidScale}`)
-      return null
-    }
-    
-    if (textureWidth * textureHeight > MAX_TEXTURE_AREA) {
-      console.warn(`MirrorLayerRenderer: Texture area too large (${textureWidth * textureHeight} pixels), skipping object at zoom ${pixeloidScale}`)
-      return null
-    }
+    // No hardcoded texture size limits - the visibility cache system
+    // naturally prevents OOM by clipping objects to screen bounds
 
     // Create render texture (following multi-pass pattern)
     const texture = RenderTexture.create({
@@ -222,17 +296,19 @@ export class MirrorLayerRenderer {
    * Update or create sprite for an object
    */
   private updateOrCreateSprite(obj: GeometricObject, pixeloidScale: number): void {
-    const cache = this.textureCache.get(obj.id)
+    const cacheKey = this.getCacheKey(obj.id, pixeloidScale)
+    const cache = this.textureCache.get(cacheKey)
     if (!cache || !obj.metadata?.bounds) return
 
-    const isPartial = obj.metadata.visibility === 'partially-onscreen' && obj.metadata.onScreenBounds
+    const visibilityData = obj.metadata.visibilityCache?.get(pixeloidScale)
+    const isPartial = visibilityData?.visibility === 'partially-onscreen' && visibilityData?.onScreenBounds
     
     // Calculate texture or texture region to use
     let textureToUse: Texture | RenderTexture = cache.texture
     
-    if (isPartial && obj.metadata.onScreenBounds) {
+    if (isPartial && visibilityData?.onScreenBounds) {
       const fullBounds = obj.metadata.bounds
-      const visibleBounds = obj.metadata.onScreenBounds
+      const visibleBounds = visibilityData.onScreenBounds
       
       // Calculate offset within the texture (in screen pixels)
       const offsetX = (visibleBounds.minX - fullBounds.minX) * pixeloidScale
@@ -274,7 +350,7 @@ export class MirrorLayerRenderer {
 
     // Position sprite using CURRENT bounds from object metadata
     // For partially visible objects, use onScreenBounds for positioning
-    const currentBounds = isPartial ? obj.metadata.onScreenBounds : obj.metadata.bounds
+    const currentBounds = (isPartial && visibilityData?.onScreenBounds) ? visibilityData.onScreenBounds : obj.metadata.bounds
     
     // Safety check - bounds should always exist if we got here
     if (!currentBounds) {
@@ -332,6 +408,7 @@ export class MirrorLayerRenderer {
   /**
    * Get texture cache for external access (used by filter renderers)
    * Returns a copy to prevent external modification
+   * Note: Cache keys now include scale (format: "objectId_scale")
    */
   public getTextureCache(): Map<string, {
     texture: RenderTexture
@@ -339,6 +416,15 @@ export class MirrorLayerRenderer {
     scale: number
   }> {
     return new Map(this.textureCache)
+  }
+  
+  /**
+   * Get cached texture for a specific object and scale
+   */
+  public getCachedTextureForScale(objectId: string, scale: number): RenderTexture | null {
+    const cacheKey = this.getCacheKey(objectId, scale)
+    const cache = this.textureCache.get(cacheKey)
+    return cache?.texture || null
   }
 
   /**

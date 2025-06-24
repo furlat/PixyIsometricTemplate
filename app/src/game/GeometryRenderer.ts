@@ -4,7 +4,6 @@ import { GeometryHelper } from './GeometryHelper'
 import { CoordinateCalculations } from './CoordinateCalculations'
 import { subscribe } from 'valtio'
 import type {
-  ViewportCorners,
   GeometricObject,
   GeometricRectangle,
   GeometricCircle,
@@ -49,7 +48,7 @@ export class GeometryRenderer {
    * Simple render system - always renders when called by LayeredInfiniteCanvas
    * No memoization, no optimization - just reliable rendering every time
    */
-  public render(corners: ViewportCorners, pixeloidScale: number): void {
+  public render(pixeloidScale: number): void {
     console.log('🎨 GeometryRenderer: Always rendering (no memoization)', {
       offset: { ...gameStore.mesh.vertex_to_pixeloid_offset },
       scale: pixeloidScale,
@@ -61,10 +60,29 @@ export class GeometryRenderer {
     const objects = gameStore.geometry.objects
     
     // Filter objects using pre-computed visibility state
-    const visibleObjects = objects.filter(obj =>
-      obj.isVisible &&
-      (!obj.metadata?.visibility || obj.metadata.visibility !== 'offscreen')  // Skip off-screen objects
-    )
+    const visibleObjects = objects.filter(obj => {
+      if (!obj.isVisible || !obj.metadata) return false
+      
+      // Get visibility from scale-indexed cache
+      const visibilityData = obj.metadata.visibilityCache?.get(pixeloidScale)
+      
+      if (!visibilityData) {
+        // Calculate and cache if not present
+        if (!obj.metadata.visibilityCache) {
+          obj.metadata.visibilityCache = new Map()
+        }
+        
+        const visibilityInfo = GeometryHelper.calculateVisibilityState(obj, pixeloidScale)
+        obj.metadata.visibilityCache.set(pixeloidScale, {
+          visibility: visibilityInfo.visibility,
+          onScreenBounds: visibilityInfo.onScreenBounds
+        })
+        
+        return visibilityInfo.visibility !== 'offscreen'
+      }
+      
+      return visibilityData.visibility !== 'offscreen'
+    })
     
     const currentObjectIds = new Set(visibleObjects.map(obj => obj.id))
 
