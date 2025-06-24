@@ -19,11 +19,11 @@ export class MirrorLayerRenderer {
   private renderer: Renderer | null = null
   private mirrorSprites: Map<string, Sprite> = new Map()
   
-  // Texture cache with version tracking
+  // Texture cache with scale tracking
   private textureCache: Map<string, {
     texture: RenderTexture
-    version: number
-    bounds: any
+    visualVersion: number  // Only visual properties, not position
+    scale: number         // Track the scale when texture was created
   }> = new Map()
   
   // Track object versions for change detection
@@ -84,18 +84,20 @@ export class MirrorLayerRenderer {
     geometryRenderer: GeometryRenderer,
     pixeloidScale: number
   ): void {
-    // Get current version (using createdAt as version for now)
-    const currentVersion = this.getObjectVersion(obj)
-    const cachedVersion = this.objectVersions.get(obj.id) || 0
+    const visualVersion = this.getVisualVersion(obj)
+    const cache = this.textureCache.get(obj.id)
     
     // Check if we need to extract a new texture
-    if (currentVersion > cachedVersion) {
-      console.log(`MirrorLayerRenderer: Object ${obj.id} changed, extracting new texture`)
+    const needsNewTexture = !cache ||
+                           cache.visualVersion !== visualVersion ||
+                           cache.scale !== pixeloidScale
+    
+    if (needsNewTexture) {
+      console.log(`MirrorLayerRenderer: Object ${obj.id} needs new texture (visual=${visualVersion}, scale=${pixeloidScale})`)
       this.extractAndCacheTexture(obj, geometryRenderer, pixeloidScale)
-      this.objectVersions.set(obj.id, currentVersion)
     }
     
-    // Update or create sprite
+    // ALWAYS update sprite position (even with cached texture)
     this.updateOrCreateSprite(obj, pixeloidScale)
   }
 
@@ -125,11 +127,11 @@ export class MirrorLayerRenderer {
         oldCache.texture.destroy()
       }
       
-      // Cache new texture
+      // Cache new texture with scale tracking
       this.textureCache.set(obj.id, {
         texture,
-        version: this.getObjectVersion(obj),
-        bounds
+        visualVersion: this.getVisualVersion(obj),
+        scale: pixeloidScale  // Store the scale
       })
     }
   }
@@ -218,11 +220,12 @@ export class MirrorLayerRenderer {
       }
     }
 
-    // Position sprite in screen coordinates (same as GeometryRenderer now does)
+    // Position sprite using CURRENT bounds from object metadata
+    const currentBounds = obj.metadata.bounds
     const offset = gameStore.mesh.vertex_to_pixeloid_offset
     const vertexPos = {
-      x: cache.bounds.minX - offset.x,
-      y: cache.bounds.minY - offset.y
+      x: currentBounds.minX - offset.x,  // Use current position!
+      y: currentBounds.minY - offset.y
     }
     const screenPos = CoordinateCalculations.vertexToScreen(
       { __brand: 'vertex' as const, x: vertexPos.x, y: vertexPos.y },
@@ -238,9 +241,28 @@ export class MirrorLayerRenderer {
   }
 
   /**
-   * Get version number for an object (used for change detection)
+   * Get visual version number (excludes position)
    */
-  private getObjectVersion(obj: GeometricObject): number {
+  private getVisualVersion(obj: GeometricObject): number {
+    let version = obj.createdAt
+    
+    // Visual properties only
+    if ('color' in obj) version += obj.color
+    if ('strokeWidth' in obj) version += (obj as any).strokeWidth * 1000
+    if ('fillColor' in obj) version += (obj as any).fillColor || 0
+    
+    // Size properties (not position)
+    if ('width' in obj) version += (obj as any).width * 100
+    if ('height' in obj) version += (obj as any).height * 100
+    if ('radius' in obj) version += (obj as any).radius * 100
+    
+    return version
+  }
+
+  /**
+   * Get full version including position (kept for compatibility)
+   */
+  private getFullObjectVersion(obj: GeometricObject): number {
     // For now, use a combination of properties that affect rendering
     // In the future, this should be a proper version number from the store
     let version = obj.createdAt
