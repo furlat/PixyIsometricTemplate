@@ -1,5 +1,6 @@
 import { Container, Sprite, RenderTexture, Matrix, Renderer } from 'pixi.js'
 import { gameStore } from '../store/gameStore'
+import { CoordinateCalculations } from './CoordinateCalculations'
 import type { ViewportCorners, GeometricObject } from '../types'
 import type { GeometryRenderer } from './GeometryRenderer'
 
@@ -134,7 +135,7 @@ export class MirrorLayerRenderer {
   }
 
   /**
-   * Extract texture in vertex coordinate space (matching GeometryRenderer)
+   * Extract texture from container that's already rendered at screen coordinates
    * Using multi-pass rendering pattern from docs - no cloning needed!
    */
   private extractObjectTexture(
@@ -147,7 +148,7 @@ export class MirrorLayerRenderer {
     // Get the offset used by GeometryRenderer
     const offset = gameStore.mesh.vertex_to_pixeloid_offset
 
-    // Calculate bounds in vertex space (same as GeometryRenderer)
+    // Calculate bounds in vertex space first
     const vertexBounds = {
       minX: bounds.minX - offset.x,
       maxX: bounds.maxX - offset.x,
@@ -155,7 +156,7 @@ export class MirrorLayerRenderer {
       maxY: bounds.maxY - offset.y
     }
 
-    // Calculate texture dimensions at current scale
+    // Calculate texture dimensions (already at screen scale)
     const textureWidth = Math.ceil((vertexBounds.maxX - vertexBounds.minX) * pixeloidScale)
     const textureHeight = Math.ceil((vertexBounds.maxY - vertexBounds.minY) * pixeloidScale)
 
@@ -172,11 +173,16 @@ export class MirrorLayerRenderer {
       scaleMode: 'nearest' // Pixel-perfect
     })
 
-    // Create transform to extract just the bbox area
-    // This captures the object at its vertex position and translates to texture origin
+    // Since GeometryRenderer already draws at screen coordinates,
+    // we need to capture from the screen position
+    const screenPos = CoordinateCalculations.vertexToScreen(
+      { __brand: 'vertex' as const, x: vertexBounds.minX, y: vertexBounds.minY },
+      pixeloidScale
+    )
+
+    // Create transform to extract just the bbox area at screen coordinates
     const transform = new Matrix()
-      .scale(pixeloidScale, pixeloidScale)
-      .translate(-vertexBounds.minX * pixeloidScale, -vertexBounds.minY * pixeloidScale)
+      .translate(-screenPos.x, -screenPos.y)
 
     // Render to texture using multi-pass pattern (no cloning!)
     // This is safe because we're not modifying the container
@@ -212,12 +218,17 @@ export class MirrorLayerRenderer {
       }
     }
 
-    // Position sprite in vertex coordinates (same as GeometryRenderer)
+    // Position sprite in screen coordinates (same as GeometryRenderer now does)
     const offset = gameStore.mesh.vertex_to_pixeloid_offset
-    sprite.position.set(
-      cache.bounds.minX - offset.x,
-      cache.bounds.minY - offset.y
+    const vertexPos = {
+      x: cache.bounds.minX - offset.x,
+      y: cache.bounds.minY - offset.y
+    }
+    const screenPos = CoordinateCalculations.vertexToScreen(
+      { __brand: 'vertex' as const, x: vertexPos.x, y: vertexPos.y },
+      pixeloidScale
     )
+    sprite.position.set(screenPos.x, screenPos.y)
     
     // Scale is 1 because texture is already at correct scale
     sprite.scale.set(1)

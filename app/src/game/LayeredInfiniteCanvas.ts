@@ -263,28 +263,28 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
   
   /**
    * Render geometry layer with store-driven offset positioning
+   * ALWAYS renders to maintain object containers for mirror layer
    */
   private renderGeometryLayer(corners: ViewportCorners, pixeloidScale: number): void {
-    if (gameStore.geometry.layerVisibility.geometry) {
-      this.geometryRenderer.render(corners, pixeloidScale)
-      
-      // CRITICAL: Always add the full renderer container (includes preview meshes)
-      this.geometryLayer.removeChildren()
-      this.geometryLayer.addChild(this.geometryRenderer.getContainer())
-      
-      // ✅ NO LAYER POSITIONING: Keep layer at (0,0) and let GeometryRenderer handle coordinates
-      this.geometryLayer.position.set(0, 0)
-      
-      // IMPROVED: Capture textures synchronously after render is complete
-      if (this.objectsNeedingTexture.size > 0) {
-        // Use requestAnimationFrame to ensure render is complete before capture
-        requestAnimationFrame(() => {
-          this.captureSpecificObjectTexturesSync()
-        })
-      }
-    } else {
-      // Clear layer if not visible
-      this.geometryLayer.removeChildren()
+    // ALWAYS render to maintain object containers (required for mirror layer)
+    this.geometryRenderer.render(corners, pixeloidScale)
+    
+    // Clear and re-add to ensure fresh state
+    this.geometryLayer.removeChildren()
+    this.geometryLayer.addChild(this.geometryRenderer.getContainer())
+    
+    // Control visibility instead of conditional rendering
+    this.geometryLayer.visible = gameStore.geometry.layerVisibility.geometry
+    
+    // ✅ NO LAYER POSITIONING: Keep layer at (0,0) and let GeometryRenderer handle coordinates
+    this.geometryLayer.position.set(0, 0)
+    
+    // IMPROVED: Capture textures synchronously after render is complete
+    if (this.objectsNeedingTexture.size > 0) {
+      // Use requestAnimationFrame to ensure render is complete before capture
+      requestAnimationFrame(() => {
+        this.captureSpecificObjectTexturesSync()
+      })
     }
   }
   
