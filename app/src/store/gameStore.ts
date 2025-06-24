@@ -148,7 +148,7 @@ export const gameStore = proxy<GameState>({
     scaleTracking: {
       minCreationScale: null,
       maxCreationScale: null,
-      SCALE_SPAN_LIMIT: 8  // 12x maximum span between min and max creation scales
+      SCALE_SPAN_LIMIT: 12  // 12x maximum span between min and max creation scales
     }
   },
   // Texture registry for StoreExplorer previews (ISOLATED from main rendering)
@@ -1499,7 +1499,6 @@ function cleanupVisibilityCache(cache: Map<number, any>, currentScale: number): 
   // Use requestIdleCallback to avoid blocking rendering during cleanup
   requestIdleCallback(() => {
     // Distance-based eviction configuration
-    const CRITICAL_SCALES = [1] // Never evict scale 1 (too expensive to regenerate)
     const DISTANCE_THRESHOLD = 2   // Evict scales more than 2 away from current
     
     // Keep current scale and adjacent scales (±1)
@@ -1509,14 +1508,21 @@ function cleanupVisibilityCache(cache: Map<number, any>, currentScale: number): 
       currentScale + 1
     ].filter(s => s >= 1 && s <= 100))
     
+    // Get current zoom bounds to protect
+    const tracking = gameStore.geometry.scaleTracking
+    const zoomBounds = (tracking.minCreationScale !== null && tracking.maxCreationScale !== null) ? {
+      minAllowed: Math.max(1, tracking.maxCreationScale / tracking.SCALE_SPAN_LIMIT),
+      maxAllowed: Math.min(100, tracking.minCreationScale * tracking.SCALE_SPAN_LIMIT)
+    } : null
+    
     const scalesToDelete: number[] = []
     
     for (const [scale] of cache) {
       // Keep if in adjacent range
       if (adjacentScalesToKeep.has(scale)) continue
       
-      // Keep critical scales
-      if (CRITICAL_SCALES.includes(scale)) continue
+      // Keep zoom bounds (min/max allowed scales)
+      if (zoomBounds && (scale === zoomBounds.minAllowed || scale === zoomBounds.maxAllowed)) continue
       
       // Evict if distance > threshold OR outside valid range
       const distance = Math.abs(scale - currentScale)

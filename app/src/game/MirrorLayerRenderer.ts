@@ -31,7 +31,6 @@ export class MirrorLayerRenderer {
   private objectVersions: Map<string, number> = new Map()
   
   // Cache eviction configuration
-  private static readonly CRITICAL_SCALES = [1] // Never evict scale 1 (too expensive to regenerate)
   private static readonly DISTANCE_THRESHOLD = 2 // Evict scales more than 2 away from current
   
   /**
@@ -40,6 +39,22 @@ export class MirrorLayerRenderer {
   public initializeWithRenderer(renderer: Renderer): void {
     this.renderer = renderer
     console.log('MirrorLayerRenderer: Initialized with multi-pass rendering pattern')
+  }
+
+  /**
+   * Get current zoom bounds from store
+   */
+  private getCurrentZoomBounds(): { minAllowed: number, maxAllowed: number } | null {
+    const tracking = gameStore.geometry.scaleTracking
+    
+    if (tracking.minCreationScale === null || tracking.maxCreationScale === null) {
+      return null
+    }
+    
+    const minAllowed = Math.max(1, tracking.maxCreationScale / tracking.SCALE_SPAN_LIMIT)
+    const maxAllowed = Math.min(100, tracking.minCreationScale * tracking.SCALE_SPAN_LIMIT)
+    
+    return { minAllowed, maxAllowed }
   }
 
   /**
@@ -139,8 +154,9 @@ export class MirrorLayerRenderer {
         // Keep if in adjacent range
         if (scalesToKeep.has(scale)) continue
         
-        // Keep critical scales
-        if (MirrorLayerRenderer.CRITICAL_SCALES.includes(scale)) continue
+        // Keep zoom bounds (min/max allowed scales)
+        const bounds = this.getCurrentZoomBounds()
+        if (bounds && (scale === bounds.minAllowed || scale === bounds.maxAllowed)) continue
         
         // Evict if distance > threshold
         const distance = Math.abs(scale - currentScale)

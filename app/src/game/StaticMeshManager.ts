@@ -21,7 +21,6 @@ import { subscribe } from 'valtio'
  */
 export class StaticMeshManager {
   // Smart cache configuration
-  private static readonly CRITICAL_SCALES = [1] // Never evict scale 1 (too expensive to regenerate)
   private static readonly ADJACENT_RANGE = 2 // Cache ±2 scales around current
   private static readonly EVICTION_TIME_MS = 60000 // 60 seconds unused = eligible for eviction
   private static readonly MAX_CACHED_SCALES = 15 // Higher limit for time-based eviction
@@ -281,8 +280,7 @@ export class StaticMeshManager {
     const adjacentScales = this.getAdjacentScales(initialScale)
     await this.preloadScales(adjacentScales, 'adjacent')
     
-    // Phase 2: Pre-cache critical expensive scales
-    await this.preloadScales(StaticMeshManager.CRITICAL_SCALES, 'critical')
+    // Phase 2: No fixed critical scales to pre-cache (will protect dynamic bounds)
     
     console.log('StaticMeshManager: Smart caching initialization complete')
   }
@@ -433,13 +431,14 @@ export class StaticMeshManager {
     const toEvict: number[] = []
     
     for (const scale of cachedScales) {
-      // Never evict critical scales
-      if (StaticMeshManager.CRITICAL_SCALES.includes(scale)) {
+      // Never evict current scale
+      if (scale === this.currentScale) {
         continue
       }
       
-      // Never evict current scale
-      if (scale === this.currentScale) {
+      // Never evict zoom bounds (min/max allowed scales)
+      const bounds = this.getCurrentZoomBounds()
+      if (bounds && (scale === bounds.minAllowed || scale === bounds.maxAllowed)) {
         continue
       }
       
@@ -487,13 +486,14 @@ export class StaticMeshManager {
       const toEvict: number[] = []
       
       for (const scale of cachedScales) {
-        // Never evict critical scales
-        if (StaticMeshManager.CRITICAL_SCALES.includes(scale)) {
+        // Never evict current scale
+        if (scale === currentScale) {
           continue
         }
         
-        // Never evict current scale
-        if (scale === currentScale) {
+        // Never evict zoom bounds (min/max allowed scales)
+        const bounds = this.getCurrentZoomBounds()
+        if (bounds && (scale === bounds.minAllowed || scale === bounds.maxAllowed)) {
           continue
         }
         
@@ -522,6 +522,22 @@ export class StaticMeshManager {
   }
 
   /**
+   * Get current zoom bounds from store
+   */
+  private getCurrentZoomBounds(): { minAllowed: number, maxAllowed: number } | null {
+    const tracking = gameStore.geometry.scaleTracking
+    
+    if (tracking.minCreationScale === null || tracking.maxCreationScale === null) {
+      return null
+    }
+    
+    const minAllowed = Math.max(1, tracking.maxCreationScale / tracking.SCALE_SPAN_LIMIT)
+    const maxAllowed = Math.min(100, tracking.minCreationScale * tracking.SCALE_SPAN_LIMIT)
+    
+    return { minAllowed, maxAllowed }
+  }
+
+  /**
    * Get the current active mesh
    */
   public getActiveMesh(): StaticMeshData | null {
@@ -540,18 +556,21 @@ export class StaticMeshManager {
    */
   public getCacheStats(): {
     totalCached: number,
-    criticalCached: boolean,
+    boundsCached: boolean,
     currentAdjacentCached: number,
     memoryEfficient: boolean
   } {
     const cached = Array.from(gameStore.staticMesh.meshCache.keys())
-    const criticalCached = StaticMeshManager.CRITICAL_SCALES.every(scale => cached.includes(scale))
+    const bounds = this.getCurrentZoomBounds()
+    const boundsCached = bounds ?
+      cached.includes(bounds.minAllowed) && cached.includes(bounds.maxAllowed) :
+      true
     const adjacentScales = this.getAdjacentScales(this.currentScale)
     const adjacentCached = adjacentScales.filter(scale => cached.includes(scale)).length
     
     return {
       totalCached: cached.length,
-      criticalCached,
+      boundsCached,
       currentAdjacentCached: adjacentCached,
       memoryEfficient: cached.length <= StaticMeshManager.MAX_CACHED_SCALES
     }
