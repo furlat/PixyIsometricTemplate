@@ -4,6 +4,7 @@ import { GeometryHelper } from './GeometryHelper'
 import { CoordinateCalculations } from './CoordinateCalculations'
 import { subscribe } from 'valtio'
 import type {
+  ViewportCorners,
   GeometricObject,
   GeometricRectangle,
   GeometricCircle,
@@ -48,7 +49,7 @@ export class GeometryRenderer {
    * Simple render system - always renders when called by LayeredInfiniteCanvas
    * No memoization, no optimization - just reliable rendering every time
    */
-  public render(pixeloidScale: number): void {
+  public render(corners: ViewportCorners, pixeloidScale: number): void {
     console.log('🎨 GeometryRenderer: Always rendering (no memoization)', {
       offset: { ...gameStore.mesh.vertex_to_pixeloid_offset },
       scale: pixeloidScale,
@@ -209,6 +210,10 @@ export class GeometryRenderer {
     return obj
   }
 
+  /**
+   * Check if object is within or near the viewport for culling
+   */
+ 
   /**
    * Render a single geometric object to specific graphics context
    */
