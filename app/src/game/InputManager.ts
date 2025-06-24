@@ -204,19 +204,16 @@ export class InputManager {
     
     wheelEvent.preventDefault()
     
-    // Use the vertex coordinates for zoom-to-center functionality
-    // Convert back to screen coordinates for the InfiniteCanvas zoom method
-    const activeMesh = gameStore.staticMesh.activeMesh
-    if (!activeMesh) return
+    // Use the current pixeloid scale for correct vertex-to-screen conversion
+    // The mesh resolution level is for internal optimization, not coordinate conversion
+    const pixeloidScale = gameStore.camera.pixeloid_scale
+    const screenX = vertexX * pixeloidScale
+    const screenY = vertexY * pixeloidScale
     
-    const { level } = activeMesh.resolution
-    const screenX = vertexX * level
-    const screenY = vertexY * level
-    
-    // Handle zoom with vertex position for zoom-to-center functionality
+    // Handle zoom with correctly converted screen position
     this.infiniteCanvas.handleZoom(wheelEvent.deltaY, screenX, screenY)
     
-    console.log(`InputManager: Mesh wheel event at Vertex(${vertexX}, ${vertexY}) → Screen(${screenX}, ${screenY})`)
+    console.log(`InputManager: Mesh wheel event at Vertex(${vertexX}, ${vertexY}) → Screen(${screenX}, ${screenY}) with scale ${pixeloidScale}`)
   }
 
   /**

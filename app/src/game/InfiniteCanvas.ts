@@ -24,6 +24,11 @@ export class InfiniteCanvas {
   // Mouse-centered zooming
   private zoomTargetScreen: { x: number, y: number } | null = null
   
+  // Zoom center locking to prevent drift during continuous scrolling
+  private zoomLockTimeout: number | null = null
+  private lockedZoomPixeloid: PixeloidCoordinate | null = null
+  private readonly ZOOM_LOCK_RESET_DELAY = 200 // ms
+  
   // ✅ REMOVED: Movement state tracking - now handled by InputManager
 
   constructor() {
@@ -106,6 +111,26 @@ export class InfiniteCanvas {
    * Handle zoom input (mouse wheel) with batching and mouse-centered zooming
    */
   public handleZoom(deltaY: number, mouseScreenX?: number, mouseScreenY?: number): void {
+    // Capture and lock pixeloid position on first event
+    if (!this.lockedZoomPixeloid && mouseScreenX !== undefined && mouseScreenY !== undefined) {
+      // Use the store's mouse pixeloid position - it's already correctly maintained by BackgroundGridRenderer!
+      this.lockedZoomPixeloid = createPixeloidCoordinate(
+        gameStore.mouse.pixeloid_position.x,
+        gameStore.mouse.pixeloid_position.y
+      )
+      console.log(`Zoom locked to pixeloid (${this.lockedZoomPixeloid.x.toFixed(2)}, ${this.lockedZoomPixeloid.y.toFixed(2)}) from store`)
+    }
+    
+    // Reset lock timer - release lock after no scrolling for 200ms
+    if (this.zoomLockTimeout) {
+      clearTimeout(this.zoomLockTimeout)
+    }
+    this.zoomLockTimeout = window.setTimeout(() => {
+      this.lockedZoomPixeloid = null
+      this.zoomLockTimeout = null
+      console.log('Zoom lock released')
+    }, this.ZOOM_LOCK_RESET_DELAY)
+    
     // Accumulate zoom delta
     const zoomStep = deltaY > 0 ? -1 : 1
     this.pendingZoomDelta += zoomStep
@@ -142,59 +167,49 @@ export class InfiniteCanvas {
     // Clamp zoom levels to integers between 1 and 100 (unlocked full zoom out)
     this.localPixeloidScale = Math.max(1, Math.min(100, newScale))
     
-    // Apply mouse-centered zoom only during zoom IN to prevent double renders during zoom out
-    // When zooming out, new pixeloids come into view causing double render (zoom + recenter)
-    // When zooming in, recentering is smooth and doesn't cause double renders
-    const isZoomingOut = this.localPixeloidScale < oldScale
-    if (this.zoomTargetScreen && oldScale !== this.localPixeloidScale && !isZoomingOut) {
+    // Reset zoom delta
+    this.pendingZoomDelta = 0
+    
+    // ✅ UPDATE SCALE IN STORE FIRST (before offset calculation)
+    updateGameStore.setPixeloidScale(this.localPixeloidScale)
+    
+    // ✅ THEN apply mouse-centered zoom (which needs the new scale in store)
+    // Apply for both zoom in and zoom out to keep pixeloid under mouse
+    if (this.lockedZoomPixeloid && oldScale !== this.localPixeloidScale) {
       this.applyMouseCenteredZoom(oldScale, this.localPixeloidScale)
     }
     
-    // Reset state
-    this.pendingZoomDelta = 0
+    // Reset target screen AFTER using it
     this.zoomTargetScreen = null
-    
-    // ✅ FIXED: No camera snapping - camera stays fixed for static mesh design
-    // Only update scale in store (offset changes handled separately if needed)
-    updateGameStore.setPixeloidScale(this.localPixeloidScale)
     
     console.log(`InfiniteCanvas: Zoom completed - scale: ${this.localPixeloidScale} (static mesh design)`)
   }
   
   /**
-   * ✅ FIXED: Adjust OFFSET so target pixeloid stays under mouse (static mesh design)
-   * Camera stays fixed, only offset changes to maintain static mesh
+   * ✅ ZOOM-TO-MOUSE: Keep the pixeloid under mouse at the same screen position
+   * The pixeloid that was under the mouse before zoom stays under the mouse after zoom
    */
   private applyMouseCenteredZoom(oldScale: number, newScale: number): void {
-    if (!this.zoomTargetScreen) return
+    if (!this.lockedZoomPixeloid || !this.zoomTargetScreen) return
     
-    // Convert mouse screen to vertex coordinates (screen → vertex is simple division)
-    const mouseVertexX = this.zoomTargetScreen.x / oldScale
-    const mouseVertexY = this.zoomTargetScreen.y / oldScale
+    // The mouse screen position where we want to keep the pixeloid
+    const mouseScreenX = this.zoomTargetScreen.x
+    const mouseScreenY = this.zoomTargetScreen.y
     
-    // Calculate what pixeloid was under the mouse before zoom
-    const currentOffset = gameStore.mesh.vertex_to_pixeloid_offset
-    const targetPixeloidX = mouseVertexX + currentOffset.x
-    const targetPixeloidY = mouseVertexY + currentOffset.y
+    // Convert mouse screen position to vertex coordinates at NEW scale
+    const mouseVertexX = mouseScreenX / newScale
+    const mouseVertexY = mouseScreenY / newScale
     
-    // Calculate new vertex position after scale change
-    const newMouseVertexX = this.zoomTargetScreen.x / newScale
-    const newMouseVertexY = this.zoomTargetScreen.y / newScale
-    
-    // Calculate new offset to keep same pixeloid under mouse
-    const rawOffsetX = targetPixeloidX - newMouseVertexX
-    const rawOffsetY = targetPixeloidY - newMouseVertexY
-    
-    // ✅ FIX: Round to integers for pixeloid-perfect alignment (eliminates geometry drift)
-    const newOffsetX = Math.round(rawOffsetX)  // DISCRETE INTEGER alignment
-    const newOffsetY = Math.round(rawOffsetY)  // DISCRETE INTEGER alignment
-    
-    // Update offset with integer values for perfect pixeloid grid alignment
-    updateGameStore.setVertexToPixeloidOffset(
-      createPixeloidCoordinate(newOffsetX, newOffsetY)
+    // Calculate the offset that keeps the locked pixeloid at the mouse position
+    // offset = pixeloid - vertex (at mouse position)
+    const targetOffset = createPixeloidCoordinate(
+      this.lockedZoomPixeloid.x - mouseVertexX,
+      this.lockedZoomPixeloid.y - mouseVertexY
     )
     
-    console.log(`InfiniteCanvas: Mouse-centered zoom - offset adjusted to INTEGER (${newOffsetX}, ${newOffsetY}) [raw: (${rawOffsetX.toFixed(2)}, ${rawOffsetY.toFixed(2)})]`)
+    updateGameStore.setVertexToPixeloidOffset(targetOffset)
+    
+    console.log(`Zoom-to-Mouse: Pixeloid (${this.lockedZoomPixeloid.x.toFixed(1)}, ${this.lockedZoomPixeloid.y.toFixed(1)}) stays at screen (${mouseScreenX}, ${mouseScreenY})`)
   }
 
   /**
@@ -309,6 +324,12 @@ export class InfiniteCanvas {
     if (this.zoomBatchTimeout !== null) {
       clearTimeout(this.zoomBatchTimeout)
       this.zoomBatchTimeout = null
+    }
+    
+    // Clear any pending zoom lock timeout
+    if (this.zoomLockTimeout !== null) {
+      clearTimeout(this.zoomLockTimeout)
+      this.zoomLockTimeout = null
     }
     
     this.gridGraphics.destroy()
