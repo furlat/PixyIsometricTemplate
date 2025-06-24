@@ -1,4 +1,4 @@
-import { Container, Sprite, Rectangle } from 'pixi.js'
+import { Container, Sprite, Rectangle, Texture } from 'pixi.js'
 import { PixelateFilter } from 'pixi-filters'
 import { gameStore } from '../store/gameStore'
 import { CoordinateCalculations } from './CoordinateCalculations'
@@ -50,8 +50,11 @@ export class PixelateFilterRenderer {
     // Get texture cache from mirror renderer
     const textureCache = mirrorRenderer.getTextureCache()
     
-    // Get visible objects from store for positioning
-    const visibleObjects = gameStore.geometry.objects.filter(obj => obj.isVisible)
+    // Get visible objects from store for positioning, excluding offscreen objects
+    const visibleObjects = gameStore.geometry.objects.filter(obj =>
+      obj.isVisible &&
+      (!obj.metadata?.visibility || obj.metadata.visibility !== 'offscreen')
+    )
     const visibleObjectIds = new Set(visibleObjects.map(obj => obj.id))
     
     // Remove containers for objects no longer visible
@@ -79,26 +82,68 @@ export class PixelateFilterRenderer {
         this.objectContainers.set(obj.id, spriteContainer)
       }
       
-      // Set filterArea to prevent pixel bleeding
+      // Set filterArea to prevent pixel bleeding AND OOM
       const bounds = obj.metadata.bounds
-      const width = (bounds.maxX - bounds.minX) * pixeloidScale
-      const height = (bounds.maxY - bounds.minY) * pixeloidScale
-      spriteContainer.filterArea = new Rectangle(0, 0, width, height)
+      const rawWidth = (bounds.maxX - bounds.minX) * pixeloidScale
+      const rawHeight = (bounds.maxY - bounds.minY) * pixeloidScale
+
+      // 🚨 CONSTRAIN INDIVIDUAL FILTER AREAS to screen bounds to prevent GPU OOM
+      const safeWidth = Math.min(rawWidth, gameStore.windowWidth)
+      const safeHeight = Math.min(rawHeight, gameStore.windowHeight)
+      spriteContainer.filterArea = new Rectangle(0, 0, safeWidth, safeHeight)
+
+      // Debug logging when we constrain large filter areas
+      if (rawWidth > gameStore.windowWidth || rawHeight > gameStore.windowHeight) {
+        console.warn(`PixelateFilter OOM Prevention: Constrained filterArea from ${rawWidth}x${rawHeight} to ${safeWidth}x${safeHeight}`)
+      }
+      
+      // Calculate texture or texture region to use
+      let textureToUse: Texture | any = cache.texture
+      
+      // Check if we need to create a texture region for partially visible objects
+      const isPartial = obj.metadata.visibility === 'partially-onscreen' && obj.metadata.onScreenBounds
+      
+      if (isPartial && obj.metadata.onScreenBounds) {
+        const fullBounds = obj.metadata.bounds
+        const visibleBounds = obj.metadata.onScreenBounds
+        
+        // Calculate offset within the texture (in screen pixels)
+        const offsetX = (visibleBounds.minX - fullBounds.minX) * pixeloidScale
+        const offsetY = (visibleBounds.minY - fullBounds.minY) * pixeloidScale
+        const width = (visibleBounds.maxX - visibleBounds.minX) * pixeloidScale
+        const height = (visibleBounds.maxY - visibleBounds.minY) * pixeloidScale
+        
+        // Create texture region for the visible portion
+        const frame = new Rectangle()
+        frame.x = offsetX
+        frame.y = offsetY
+        frame.width = width
+        frame.height = height
+        
+        textureToUse = new Texture({
+          source: cache.texture.source,
+          frame: frame
+        })
+        
+        console.log(`PixelateFilterRenderer: Created texture region for object ${obj.id}`, {
+          fullBounds: `${fullBounds.minX},${fullBounds.minY} to ${fullBounds.maxX},${fullBounds.maxY}`,
+          visibleBounds: `${visibleBounds.minX},${visibleBounds.minY} to ${visibleBounds.maxX},${visibleBounds.maxY}`,
+          textureRegion: `offset=${offsetX},${offsetY} size=${width}x${height}`
+        })
+      }
       
       // Get or create sprite
       let sprite = this.pixelateSprites.get(obj.id)
       
       if (!sprite) {
-        // Create new sprite from cached texture
-        sprite = new Sprite(cache.texture)
+        // Create new sprite with the appropriate texture/region
+        sprite = new Sprite(textureToUse)
         sprite.name = `pixelated_${obj.id}`
         spriteContainer.addChild(sprite)
         this.pixelateSprites.set(obj.id, sprite)
       } else {
-        // Update texture if changed
-        if (sprite.texture !== cache.texture) {
-          sprite.texture = cache.texture
-        }
+        // Update texture - this handles both full texture and region updates
+        sprite.texture = textureToUse
         // Ensure sprite is in correct container
         if (sprite.parent !== spriteContainer) {
           sprite.parent?.removeChild(sprite)
@@ -108,7 +153,14 @@ export class PixelateFilterRenderer {
       
       // EXACT SAME POSITIONING AS MIRROR LAYER
       // Step 1: Get bounds from object metadata (pixeloid coordinates)
-      const currentBounds = obj.metadata.bounds
+      // For partially visible objects, use onScreenBounds for positioning
+      const currentBounds = isPartial ? obj.metadata.onScreenBounds : obj.metadata.bounds
+      
+      // Safety check - bounds should always exist if we got here
+      if (!currentBounds) {
+        console.warn(`PixelateFilterRenderer: No bounds available for object ${obj.id}`)
+        continue
+      }
       
       // Step 2: Convert to vertex coordinates by subtracting offset
       const offset = gameStore.mesh.vertex_to_pixeloid_offset

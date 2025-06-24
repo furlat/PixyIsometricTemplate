@@ -1,4 +1,4 @@
-import { Container, Sprite, RenderTexture, Matrix, Renderer } from 'pixi.js'
+import { Container, Sprite, RenderTexture, Matrix, Renderer, Texture, Rectangle } from 'pixi.js'
 import { gameStore } from '../store/gameStore'
 import { CoordinateCalculations } from './CoordinateCalculations'
 import type { ViewportCorners, GeometricObject } from '../types'
@@ -50,8 +50,11 @@ export class MirrorLayerRenderer {
       return
     }
 
-    // Get visible objects from store
-    const visibleObjects = gameStore.geometry.objects.filter(obj => obj.isVisible)
+    // Get visible objects from store, excluding offscreen objects
+    const visibleObjects = gameStore.geometry.objects.filter(obj =>
+      obj.isVisible &&
+      (!obj.metadata?.visibility || obj.metadata.visibility !== 'offscreen')
+    )
     
     if (visibleObjects.length === 0) {
       this.container.removeChildren()
@@ -117,7 +120,10 @@ export class MirrorLayerRenderer {
     }
 
     // Extract texture in the same coordinate space as GeometryRenderer
-    const bounds = obj.metadata.bounds
+    // For partial visibility, use onScreenBounds to clip texture
+    const bounds = (obj.metadata.visibility === 'partially-onscreen' && obj.metadata.onScreenBounds)
+      ? obj.metadata.onScreenBounds
+      : obj.metadata.bounds
     const texture = this.extractObjectTexture(objectContainer, bounds, pixeloidScale)
     
     if (texture) {
@@ -167,6 +173,20 @@ export class MirrorLayerRenderer {
       return null
     }
 
+    // Add texture size limits to prevent OOM
+    const MAX_TEXTURE_SIZE = 4096 // Maximum texture dimension
+    const MAX_TEXTURE_AREA = 8192 * 8192 // Maximum total pixels
+    
+    if (textureWidth > MAX_TEXTURE_SIZE || textureHeight > MAX_TEXTURE_SIZE) {
+      console.warn(`MirrorLayerRenderer: Texture too large (${textureWidth}x${textureHeight}), skipping object at zoom ${pixeloidScale}`)
+      return null
+    }
+    
+    if (textureWidth * textureHeight > MAX_TEXTURE_AREA) {
+      console.warn(`MirrorLayerRenderer: Texture area too large (${textureWidth * textureHeight} pixels), skipping object at zoom ${pixeloidScale}`)
+      return null
+    }
+
     // Create render texture (following multi-pass pattern)
     const texture = RenderTexture.create({
       width: textureWidth,
@@ -205,23 +225,63 @@ export class MirrorLayerRenderer {
     const cache = this.textureCache.get(obj.id)
     if (!cache || !obj.metadata?.bounds) return
 
+    const isPartial = obj.metadata.visibility === 'partially-onscreen' && obj.metadata.onScreenBounds
+    
+    // Calculate texture or texture region to use
+    let textureToUse: Texture | RenderTexture = cache.texture
+    
+    if (isPartial && obj.metadata.onScreenBounds) {
+      const fullBounds = obj.metadata.bounds
+      const visibleBounds = obj.metadata.onScreenBounds
+      
+      // Calculate offset within the texture (in screen pixels)
+      const offsetX = (visibleBounds.minX - fullBounds.minX) * pixeloidScale
+      const offsetY = (visibleBounds.minY - fullBounds.minY) * pixeloidScale
+      const width = (visibleBounds.maxX - visibleBounds.minX) * pixeloidScale
+      const height = (visibleBounds.maxY - visibleBounds.minY) * pixeloidScale
+      
+      // Create texture region for the visible portion
+      const frame = new Rectangle()
+      frame.x = offsetX
+      frame.y = offsetY
+      frame.width = width
+      frame.height = height
+      
+      textureToUse = new Texture({
+        source: cache.texture.source,
+        frame: frame
+      })
+      
+      console.log(`MirrorLayerRenderer: Created texture region for object ${obj.id}`, {
+        fullBounds: `${fullBounds.minX},${fullBounds.minY} to ${fullBounds.maxX},${fullBounds.maxY}`,
+        visibleBounds: `${visibleBounds.minX},${visibleBounds.minY} to ${visibleBounds.maxX},${visibleBounds.maxY}`,
+        textureRegion: `offset=${offsetX},${offsetY} size=${width}x${height}`
+      })
+    }
+
     let sprite = this.mirrorSprites.get(obj.id)
     
     if (!sprite) {
-      // Create new sprite
-      sprite = new Sprite(cache.texture)
+      // Create new sprite with the appropriate texture/region
+      sprite = new Sprite(textureToUse)
       sprite.name = `mirror_${obj.id}`
       this.container.addChild(sprite)
       this.mirrorSprites.set(obj.id, sprite)
     } else {
-      // Update texture if changed
-      if (sprite.texture !== cache.texture) {
-        sprite.texture = cache.texture
-      }
+      // Update texture - this handles both full texture and region updates
+      sprite.texture = textureToUse
     }
 
     // Position sprite using CURRENT bounds from object metadata
-    const currentBounds = obj.metadata.bounds
+    // For partially visible objects, use onScreenBounds for positioning
+    const currentBounds = isPartial ? obj.metadata.onScreenBounds : obj.metadata.bounds
+    
+    // Safety check - bounds should always exist if we got here
+    if (!currentBounds) {
+      console.warn(`MirrorLayerRenderer: No bounds available for object ${obj.id}`)
+      return
+    }
+    
     const offset = gameStore.mesh.vertex_to_pixeloid_offset
     const vertexPos = {
       x: currentBounds.minX - offset.x,  // Use current position!

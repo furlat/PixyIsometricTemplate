@@ -60,9 +60,10 @@ export class GeometryRenderer {
     // Get all objects from store
     const objects = gameStore.geometry.objects
     
-    // Filter objects in viewport (use original pixeloid coordinates for culling)
+    // Filter objects using pre-computed visibility state
     const visibleObjects = objects.filter(obj =>
-      obj.isVisible && this.isObjectInViewport(obj, corners)
+      obj.isVisible &&
+      (!obj.metadata?.visibility || obj.metadata.visibility !== 'offscreen')  // Skip off-screen objects
     )
     
     const currentObjectIds = new Set(visibleObjects.map(obj => obj.id))

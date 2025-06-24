@@ -217,6 +217,19 @@ export interface GeometricMetadata {
     minY: number
     maxY: number
   }
+  // NEW: Visibility state
+  visibility?: 'fully-onscreen' | 'partially-onscreen' | 'offscreen'
+  
+  // NEW: On-screen bounds (only valid when partially-onscreen)
+  onScreenBounds?: {
+    minX: number
+    maxX: number
+    minY: number
+    maxY: number
+    // Texture region info for partial rendering
+    textureOffsetX: number  // Pixels to skip in texture X
+    textureOffsetY: number  // Pixels to skip in texture Y
+  }
 }
 
 // Bbox mesh reference for pixeloid-perfect filtering

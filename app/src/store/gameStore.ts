@@ -270,6 +270,14 @@ export const updateGameStore = {
       gameStore.camera.viewport_bounds = updatedBounds
       gameStore.mesh.screen_to_vertex_scale = clampedScale
       
+      // Update visibility for all objects after zoom
+      for (const obj of gameStore.geometry.objects) {
+        if (!obj.metadata) continue
+        const visibilityInfo = GeometryHelper.calculateVisibilityState(obj, clampedScale)
+        obj.metadata.visibility = visibilityInfo.visibility
+        obj.metadata.onScreenBounds = visibilityInfo.onScreenBounds
+      }
+      
     } finally {
       isUpdatingCoordinates = false
     }
@@ -296,6 +304,14 @@ export const updateGameStore = {
       
       // Apply atomically
       gameStore.camera.viewport_bounds = updatedBounds
+      
+      // Update visibility for all objects after camera movement
+      for (const obj of gameStore.geometry.objects) {
+        if (!obj.metadata) continue
+        const visibilityInfo = GeometryHelper.calculateVisibilityState(obj, scale)
+        obj.metadata.visibility = visibilityInfo.visibility
+        obj.metadata.onScreenBounds = visibilityInfo.onScreenBounds
+      }
       
     } finally {
       isUpdatingCoordinates = false
@@ -346,6 +362,14 @@ export const updateGameStore = {
       )
       
       gameStore.camera.viewport_bounds = updatedBounds
+      
+      // Update visibility for all objects after window resize
+      for (const obj of gameStore.geometry.objects) {
+        if (!obj.metadata) continue
+        const visibilityInfo = GeometryHelper.calculateVisibilityState(obj, scale)
+        obj.metadata.visibility = visibilityInfo.visibility
+        obj.metadata.onScreenBounds = visibilityInfo.onScreenBounds
+      }
       
     } finally {
       isUpdatingCoordinates = false
@@ -586,6 +610,29 @@ export const updateGameStore = {
         updateGameStore.removeRenderingTexture(id)
         console.log(`Store: Invalidated texture caches for object ${id} due to property changes`)
       }
+    }
+  },
+
+  // Visibility calculation action
+  updateObjectVisibility: (objectId: string, pixeloidScale: number) => {
+    const object = gameStore.geometry.objects.find(obj => obj.id === objectId)
+    if (!object || !object.metadata) return
+    
+    const visibilityInfo = GeometryHelper.calculateVisibilityState(object, pixeloidScale)
+    
+    // Update metadata with visibility info
+    object.metadata.visibility = visibilityInfo.visibility
+    object.metadata.onScreenBounds = visibilityInfo.onScreenBounds
+  },
+
+  // Batch update all objects' visibility
+  updateAllObjectsVisibility: (pixeloidScale: number) => {
+    for (const obj of gameStore.geometry.objects) {
+      if (!obj.metadata) continue
+      
+      const visibilityInfo = GeometryHelper.calculateVisibilityState(obj, pixeloidScale)
+      obj.metadata.visibility = visibilityInfo.visibility
+      obj.metadata.onScreenBounds = visibilityInfo.onScreenBounds
     }
   },
 

@@ -14,6 +14,7 @@ import type {
   GeometricMetadata,
   AnchorSnapPoint,
 } from '../types'
+import { gameStore } from '../store/gameStore'
 
 export class GeometryHelper {
 
@@ -502,6 +503,72 @@ export class GeometryHelper {
       maxX: Math.ceil(bounds.maxX),
       minY: Math.floor(bounds.minY),
       maxY: Math.ceil(bounds.maxY)
+    }
+  }
+
+  /**
+   * Calculate visibility state and on-screen bounds for an object
+   * Ensures pixeloid-perfect bounds for consistency
+   */
+  static calculateVisibilityState(
+    obj: GeometricObject,
+    pixeloidScale: number
+  ): {
+    visibility: 'fully-onscreen' | 'partially-onscreen' | 'offscreen'
+    onScreenBounds?: any
+  } {
+    if (!obj.metadata?.bounds) {
+      return { visibility: 'offscreen' }
+    }
+    
+    const bounds = obj.metadata.bounds
+    const offset = gameStore.mesh.vertex_to_pixeloid_offset
+    
+    // Convert pixeloid bounds to screen coordinates
+    const screenBounds = {
+      left: (bounds.minX - offset.x) * pixeloidScale,
+      top: (bounds.minY - offset.y) * pixeloidScale,
+      right: (bounds.maxX - offset.x) * pixeloidScale,
+      bottom: (bounds.maxY - offset.y) * pixeloidScale
+    }
+    
+    const screenWidth = gameStore.windowWidth
+    const screenHeight = gameStore.windowHeight
+    
+    // Check if completely off-screen
+    if (screenBounds.right < 0 || screenBounds.left > screenWidth ||
+        screenBounds.bottom < 0 || screenBounds.top > screenHeight) {
+      return { visibility: 'offscreen' }
+    }
+    
+    // Check if fully on-screen
+    if (screenBounds.left >= 0 && screenBounds.right <= screenWidth &&
+        screenBounds.top >= 0 && screenBounds.bottom <= screenHeight) {
+      return { visibility: 'fully-onscreen' }
+    }
+    
+    // Partially on-screen - calculate intersection
+    const intersection = {
+      left: Math.max(0, screenBounds.left),
+      top: Math.max(0, screenBounds.top),
+      right: Math.min(screenWidth, screenBounds.right),
+      bottom: Math.min(screenHeight, screenBounds.bottom)
+    }
+    
+    // Convert back to pixeloid coordinates (PIXELOID-PERFECT using floor/ceil)
+    const onScreenBounds = {
+      minX: Math.floor(intersection.left / pixeloidScale) + offset.x,
+      maxX: Math.ceil(intersection.right / pixeloidScale) + offset.x,
+      minY: Math.floor(intersection.top / pixeloidScale) + offset.y,
+      maxY: Math.ceil(intersection.bottom / pixeloidScale) + offset.y,
+      // Texture offset - how many pixels to skip when creating sprite
+      textureOffsetX: Math.max(0, -screenBounds.left),
+      textureOffsetY: Math.max(0, -screenBounds.top)
+    }
+    
+    return {
+      visibility: 'partially-onscreen',
+      onScreenBounds
     }
   }
 

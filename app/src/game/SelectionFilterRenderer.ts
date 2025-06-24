@@ -1,4 +1,4 @@
-import { Graphics, Container } from 'pixi.js'
+import { Graphics, Container, Rectangle } from 'pixi.js'
 import { OutlineFilter } from 'pixi-filters'
 import { gameStore } from '../store/gameStore'
 import { GeometryHelper } from './GeometryHelper'
@@ -55,6 +55,15 @@ export class SelectionFilterRenderer {
       
       // Apply OutlineFilter to the entire container for GPU-accelerated red borders
       this.container.filters = [this.outlineFilter]
+      
+      // 🚨 SHADER-LEVEL OOM FIX: Constrain filter processing to screen bounds only
+      // This works correctly here because SelectionFilterRenderer uses single container architecture
+      this.container.filterArea = new Rectangle(
+        0,
+        0,
+        gameStore.windowWidth,
+        gameStore.windowHeight
+      )
       
       console.log(`SelectionFilterRenderer: Applied outline filter to object ${selectedId}`)
     }
