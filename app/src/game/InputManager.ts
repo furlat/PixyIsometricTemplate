@@ -1,7 +1,6 @@
 import { updateGameStore, gameStore, createPixeloidCoordinate } from '../store/gameStore'
 import { GeometryHelper } from './GeometryHelper'
 import { GeometryVertexCalculator } from './GeometryVertexCalculator'
-import { CoordinateHelper } from './CoordinateHelper'
 import type { InfiniteCanvas } from './InfiniteCanvas'
 import type { GeometricRectangle, GeometricPoint, GeometricLine, GeometricCircle, GeometricDiamond, PixeloidCoordinate } from '../types'
 
@@ -374,69 +373,6 @@ export class InputManager {
     }
   }
 
-
-  /**
-   * Create a rectangle from start and end points using unified anchoring
-   */
-  private createRectangle(startPoint: { x: number, y: number }, endPoint: { x: number, y: number }): void {
-    // Calculate rectangle size
-    const width = Math.abs(endPoint.x - startPoint.x)
-    const height = Math.abs(endPoint.y - startPoint.y)
-    
-    // Only create rectangle if it has some size (minimum 1 pixeloid)
-    if (width >= 1 && height >= 1) {
-      updateGameStore.createRectangleWithAnchor(
-        createPixeloidCoordinate(startPoint.x, startPoint.y),
-        createPixeloidCoordinate(endPoint.x, endPoint.y)
-      )
-    }
-  }
-
-  /**
-   * Create a line from start and end points using unified anchoring
-   */
-  private createLine(startPoint: { x: number, y: number }, endPoint: { x: number, y: number }): void {
-    // Only create line if it has some length (minimum 1 pixeloid distance)
-    const distance = Math.sqrt(Math.pow(endPoint.x - startPoint.x, 2) + Math.pow(endPoint.y - startPoint.y, 2))
-    if (distance >= 1) {
-      updateGameStore.createLineWithAnchor(
-        createPixeloidCoordinate(startPoint.x, startPoint.y),
-        createPixeloidCoordinate(endPoint.x, endPoint.y)
-      )
-    }
-  }
-
-  /**
-   * Create a circle using unified anchoring (ISOMETRIC: radius from width)
-   */
-  private createCircle(startPoint: { x: number, y: number }, dragPoint: { x: number, y: number }): void {
-    // Calculate width for isometric circle
-    const width = Math.abs(dragPoint.x - startPoint.x)
-    
-    // Only create circle if it has some size (minimum 1 pixeloid width)
-    if (width >= 1) {
-      updateGameStore.createCircleWithAnchor(
-        createPixeloidCoordinate(startPoint.x, startPoint.y),
-        createPixeloidCoordinate(dragPoint.x, dragPoint.y)
-      )
-    }
-  }
-
-  /**
-   * Create an isometric diamond using unified anchoring (ISOMETRIC: height from width)
-   */
-  private createDiamond(startPoint: { x: number, y: number }, dragPoint: { x: number, y: number }): void {
-    // Calculate width for isometric diamond
-    const width = Math.abs(dragPoint.x - startPoint.x)
-    
-    // Only create diamond if it has some size (any width > 0)
-    if (width > 0) {
-      updateGameStore.createDiamondWithAnchor(
-        createPixeloidCoordinate(startPoint.x, startPoint.y),
-        createPixeloidCoordinate(dragPoint.x, dragPoint.y)
-      )
-    }
-  }
 
   /**
    * Handle object selection when clicking in none mode

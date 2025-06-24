@@ -1,7 +1,7 @@
 import { MeshSimple, Shader, Texture } from 'pixi.js'
 import type { ViewportCorners } from '../types'
 import { CoordinateHelper } from './CoordinateHelper'
-import { gameStore, updateGameStore, createScreenCoordinate, createVertexCoordinate } from '../store/gameStore'
+import { gameStore, updateGameStore, createVertexCoordinate } from '../store/gameStore'
 
 /**
  * Mesh-based background grid renderer
@@ -104,7 +104,7 @@ export class BackgroundGridRenderer {
   /**
    * Generate grid mesh for screen bounds (always starts at 0,0)
    */
-  private regenerateGridMesh(corners: ViewportCorners, pixeloidScale: number): void {
+  private regenerateGridMesh(_corners: ViewportCorners, pixeloidScale: number): void {
     // ✅ FIXED: Always use screen bounds, mesh is screen-aligned
     const screenVertexWidth = Math.ceil(gameStore.windowWidth / pixeloidScale)
     const screenVertexHeight = Math.ceil(gameStore.windowHeight / pixeloidScale)
@@ -190,7 +190,7 @@ export class BackgroundGridRenderer {
    * Try to use static mesh system for vertex-aligned grid rendering
    * Returns true if successful, false if fallback needed
    */
-  private tryUseStaticMesh(corners: ViewportCorners, pixeloidScale: number): boolean {
+  private tryUseStaticMesh(corners: ViewportCorners, _pixeloidScale: number): boolean {
     const staticMeshData = gameStore.staticMesh.activeMesh
     const coordinateMapping = updateGameStore.getCurrentCoordinateMapping()
     
@@ -211,9 +211,9 @@ export class BackgroundGridRenderer {
   private createStaticMeshGrid(
     staticMeshData: any,
     coordinateMapping: any,
-    corners: ViewportCorners
+    _corners: ViewportCorners
   ): void {
-    const { vertices, indices } = staticMeshData
+    const { vertices } = staticMeshData
     const { currentResolution } = coordinateMapping
     
     console.log(`Creating static mesh grid with ${vertices.length / 2} vertices`)

@@ -41,7 +41,7 @@ export class MirrorLayerRenderer {
    * Render the mirror layer - only extracts textures when objects change
    */
   public render(
-    corners: ViewportCorners,
+    _corners: ViewportCorners,
     pixeloidScale: number,
     geometryRenderer?: GeometryRenderer
   ): void {
@@ -252,27 +252,6 @@ export class MirrorLayerRenderer {
     if ('fillColor' in obj) version += (obj as any).fillColor || 0
     
     // Size properties (not position)
-    if ('width' in obj) version += (obj as any).width * 100
-    if ('height' in obj) version += (obj as any).height * 100
-    if ('radius' in obj) version += (obj as any).radius * 100
-    
-    return version
-  }
-
-  /**
-   * Get full version including position (kept for compatibility)
-   */
-  private getFullObjectVersion(obj: GeometricObject): number {
-    // For now, use a combination of properties that affect rendering
-    // In the future, this should be a proper version number from the store
-    let version = obj.createdAt
-    
-    // Add visual properties to version calculation
-    if ('color' in obj) version += obj.color
-    if ('strokeWidth' in obj) version += (obj as any).strokeWidth * 1000
-    if ('fillColor' in obj) version += (obj as any).fillColor || 0
-    if ('x' in obj) version += (obj as any).x * 10
-    if ('y' in obj) version += (obj as any).y * 10
     if ('width' in obj) version += (obj as any).width * 100
     if ('height' in obj) version += (obj as any).height * 100
     if ('radius' in obj) version += (obj as any).radius * 100

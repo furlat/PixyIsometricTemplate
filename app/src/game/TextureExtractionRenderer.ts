@@ -1,6 +1,4 @@
 import { Container, RenderTexture, Sprite, Renderer, Matrix, Graphics } from 'pixi.js'
-import { gameStore } from '../store/gameStore'
-import type { GeometricObject } from '../types'
 
 /**
  * TextureExtractionRenderer - Core texture extraction system for independent filter processing
@@ -26,7 +24,7 @@ export class TextureExtractionRenderer {
    */
   public extractGeometryLayerTexture(
     geometryContainer: Container,
-    pixeloidScale: number
+    _pixeloidScale: number
   ): RenderTexture {
     // Calculate texture dimensions based on container bounds
     const bounds = geometryContainer.getBounds()

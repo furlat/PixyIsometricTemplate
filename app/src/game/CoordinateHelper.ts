@@ -1,8 +1,5 @@
 import type {
-  ViewportCorners,
   PixeloidCoordinate,
-  VertexCoordinate,
-  ScreenCoordinate,
   ViewportBounds
 } from '../types'
 import { CoordinateCalculations } from './CoordinateCalculations'

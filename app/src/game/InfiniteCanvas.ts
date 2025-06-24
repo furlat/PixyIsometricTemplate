@@ -1,6 +1,6 @@
-import { Container, Graphics, Point } from 'pixi.js'
-import { gameStore, updateGameStore, createPixeloidCoordinate, createScreenCoordinate } from '../store/gameStore'
-import type { ViewportCorners, PixeloidCoordinate } from '../types'
+import { Container, Graphics } from 'pixi.js'
+import { gameStore, updateGameStore, createPixeloidCoordinate } from '../store/gameStore'
+import type { PixeloidCoordinate } from '../types'
 import { CoordinateHelper } from './CoordinateHelper'
 
 export class InfiniteCanvas {
@@ -12,9 +12,6 @@ export class InfiniteCanvas {
   protected localCameraPosition = { x: 0, y: 0 }
   protected localPixeloidScale = 10
   protected localViewportSize = { width: window.innerWidth, height: window.innerHeight }
-  
-  // Movement speed in pixeloids per second
-  private readonly CAMERA_SPEED = 50
   
   // Zoom batching to prevent rapid scroll events from causing multiple re-renders
   private zoomBatchTimeout: number | null = null
@@ -82,10 +79,7 @@ export class InfiniteCanvas {
    * Set initial camera position - now defaults to (0,0) for clean top-left alignment
    */
   private setInitialCameraPosition(): void {
-    const initialPosition = CoordinateHelper.calculateInitialCameraPosition(
-      this.localViewportSize,
-      this.localPixeloidScale
-    )
+    const initialPosition = CoordinateHelper.calculateInitialCameraPosition()
     
     this.localCameraPosition.x = initialPosition.x
     this.localCameraPosition.y = initialPosition.y
@@ -189,7 +183,7 @@ export class InfiniteCanvas {
    * ✅ ZOOM-TO-MOUSE: Keep the pixeloid under mouse at the same screen position
    * The pixeloid that was under the mouse before zoom stays under the mouse after zoom
    */
-  private applyMouseCenteredZoom(oldScale: number, newScale: number): void {
+  private applyMouseCenteredZoom(_oldScale: number, newScale: number): void {
     if (!this.lockedZoomPixeloid || !this.zoomTargetScreen) return
     
     // The mouse screen position where we want to keep the pixeloid
@@ -242,7 +236,6 @@ export class InfiniteCanvas {
     this.cameraTransform.scale.set(this.localPixeloidScale)
     const transformPosition = CoordinateHelper.calculateCameraTransformPosition(
       createPixeloidCoordinate(this.localCameraPosition.x, this.localCameraPosition.y),
-      this.localViewportSize,
       this.localPixeloidScale
     )
     this.cameraTransform.position.set(transformPosition.x, transformPosition.y)

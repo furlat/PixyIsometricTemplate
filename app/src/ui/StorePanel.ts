@@ -209,7 +209,7 @@ export class StorePanel {
     const currentScale = gameStore.camera.pixeloid_scale;
     
     if (coordinateMapping) {
-      const { currentResolution, vertexBounds, viewportOffset } = coordinateMapping;
+      const { currentResolution } = coordinateMapping;
       
       // ✅ Calculate screen mesh dimensions once for reuse
       const scale = gameStore.camera.pixeloid_scale;

@@ -203,7 +203,6 @@ export class CoordinateCalculations {
    */
   static calculateCameraTransformPosition(
     cameraPosition: PixeloidCoordinate,
-    viewportSize: { width: number; height: number },
     pixeloidScale: number
   ): PixeloidCoordinate {
     return {
@@ -216,10 +215,7 @@ export class CoordinateCalculations {
   /**
    * Calculate initial camera position (pure function)
    */
-  static calculateInitialCameraPosition(
-    viewportSize: { width: number; height: number },
-    pixeloidScale: number
-  ): PixeloidCoordinate {
+  static calculateInitialCameraPosition(): PixeloidCoordinate {
     return {
       __brand: 'pixeloid',
       x: 0,

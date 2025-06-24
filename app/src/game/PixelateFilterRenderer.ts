@@ -35,7 +35,7 @@ export class PixelateFilterRenderer {
    * Render pixelated sprites with individual containers to prevent bleeding
    */
   public render(
-    corners: ViewportCorners,
+    _corners: ViewportCorners,
     pixeloidScale: number,
     mirrorRenderer?: MirrorLayerRenderer
   ): void {

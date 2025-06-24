@@ -13,8 +13,7 @@ import type {
   PixeloidCoordinate,
   PixeloidVertex,
   PixeloidAnchorPoint,
-  AnchorConfig,
-  GeometryStyle
+  AnchorConfig
 } from '../types'
 import { gameStore } from '../store/gameStore'
 
@@ -93,9 +92,6 @@ export class GeometryVertexCalculator {
       x: (westVertex.x + eastVertex.x) / 2,
       y: (westVertex.y + eastVertex.y) / 2
     }
-    
-    // Calculate radius from west/east distance
-    const radius = Math.abs(eastVertex.x - westVertex.x) / 2
     
     // Store all vertices: [west, east, center] + radius info in metadata
     return [westVertex, eastVertex, center]
@@ -270,7 +266,7 @@ export class GeometryVertexCalculator {
         }
       
       case 'rectangle':
-        const [topLeft, topRight, bottomRight, bottomLeft] = vertices
+        const [topLeft, topRight, , bottomLeft] = vertices
         return {
           x: topLeft.x,
           y: topLeft.y,

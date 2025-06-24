@@ -1,11 +1,8 @@
 import { proxy } from 'valtio'
-import type { GameState, ViewportCorners, GeometricObject, ObjectTextureData, GeometricPoint, GeometricLine, GeometricCircle, GeometricRectangle, GeometricDiamond, PixeloidMeshData, StaticMeshData, PixeloidVertexMapping, MeshResolution, PixeloidCoordinate, VertexCoordinate, ScreenCoordinate, ViewportBounds } from '../types'
+import type { GameState, GeometricObject, ObjectTextureData, GeometricPoint, GeometricLine, GeometricCircle, GeometricRectangle, GeometricDiamond, PixeloidMeshData, StaticMeshData, PixeloidVertexMapping, PixeloidCoordinate, VertexCoordinate, ScreenCoordinate, ViewportBounds } from '../types'
 import { GeometryHelper } from '../game/GeometryHelper'
 import { CoordinateCalculations } from '../game/CoordinateCalculations'
 import type { InfiniteCanvas } from '../game/InfiniteCanvas'
-
-// Global reference to InfiniteCanvas for direct camera control
-let infiniteCanvasRef: InfiniteCanvas | null = null
 
 // ================================
 // INFINITE LOOP PREVENTION
@@ -763,9 +760,9 @@ export const updateGameStore = {
   },
 
   // Set reference to InfiniteCanvas for direct camera control
-  setInfiniteCanvasRef: (canvas: InfiniteCanvas) => {
-    infiniteCanvasRef = canvas
-    console.log('Store: InfiniteCanvas reference set for direct camera control')
+  setInfiniteCanvasRef: (_canvas: InfiniteCanvas) => {
+    // Reference no longer stored - method kept for compatibility
+    console.log('Store: InfiniteCanvas reference method called (legacy compatibility)')
   },
 
   centerCameraOnObject: (objectId: string) => {

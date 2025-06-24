@@ -1,5 +1,5 @@
-import { Graphics, Container, Renderer, Rectangle } from 'pixi.js'
-import { gameStore, updateGameStore } from '../store/gameStore'
+import { Graphics, Container } from 'pixi.js'
+import { gameStore } from '../store/gameStore'
 import { GeometryHelper } from './GeometryHelper'
 import { CoordinateCalculations } from './CoordinateCalculations'
 import { subscribe } from 'valtio'

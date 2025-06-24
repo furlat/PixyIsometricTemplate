@@ -10,7 +10,6 @@ export class MouseHighlightShader {
   private graphics: Graphics
   
   // Highlight properties
-  private highlightRadius: number = 6.0
   private highlightColor: number = 0x00ff00
   private highlightIntensity: number = 0.6
   
@@ -95,7 +94,7 @@ export class MouseHighlightShader {
   /**
    * Render highlight for the grid square containing the mouse
    */
-  private renderVertexHighlights(vertices: Float32Array, alpha: number): void {
+  private renderVertexHighlights(_vertices: Float32Array, alpha: number): void {
     const mouseX = this.currentMouseVertex.x
     const mouseY = this.currentMouseVertex.y
     
@@ -114,8 +113,8 @@ export class MouseHighlightShader {
   /**
    * Set highlight properties
    */
-  public setHighlightRadius(radius: number): void {
-    this.highlightRadius = radius
+  public setHighlightRadius(_radius: number): void {
+    // Radius is no longer used - highlighting is now fixed size grid squares
     this.isDirty = true
   }
 

@@ -3,8 +3,7 @@ import type {
   MeshResolution,
   PixeloidVertexMapping,
   PixeloidCoordinate,
-  MeshVertexCoordinate,
-  ViewportCorners
+  MeshVertexCoordinate
 } from '../types'
 import { gameStore, updateGameStore, createPixeloidCoordinate, createVertexCoordinate } from '../store/gameStore'
 import { subscribe } from 'valtio'
