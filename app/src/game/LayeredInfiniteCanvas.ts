@@ -305,7 +305,8 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
    */
   private renderPixelateLayer(corners: ViewportCorners, pixeloidScale: number): void {
     if (gameStore.geometry.filterEffects.pixelate) {
-      this.pixelateFilterRenderer.render(corners, pixeloidScale)
+      // Pass the mirror renderer to get access to cached textures
+      this.pixelateFilterRenderer.render(corners, pixeloidScale, this.mirrorLayerRenderer)
       this.pixelateLayer.visible = true
     } else {
       this.pixelateLayer.visible = false
@@ -314,25 +315,25 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
 
   /**
    * Render mirror layer - cached texture sprites that mirror the geometry layer
+   * ALWAYS renders to maintain texture cache for filter layers
    */
   private renderMirrorLayer(corners: ViewportCorners, pixeloidScale: number): void {
-    // Only render if mirror layer is visible (controlled by UI)
+    // ALWAYS render to maintain texture cache (required for pixelate and other filters)
+    this.mirrorLayerRenderer.render(
+      corners,
+      pixeloidScale,
+      this.geometryRenderer
+    )
+    
+    // Always update the container content
+    this.mirrorLayer.removeChildren()
+    this.mirrorLayer.addChild(this.mirrorLayerRenderer.getContainer())
+    
+    // Control visibility separately (allows filters to work even when mirror is hidden)
+    this.mirrorLayer.visible = gameStore.geometry.layerVisibility.mirror
+    
     if (gameStore.geometry.layerVisibility.mirror) {
-      // Pass the geometry renderer for texture extraction
-      this.mirrorLayerRenderer.render(
-        corners,
-        pixeloidScale,
-        this.geometryRenderer
-      )
-      
-      // Add the mirror renderer container to the layer
-      this.mirrorLayer.removeChildren()
-      this.mirrorLayer.addChild(this.mirrorLayerRenderer.getContainer())
-      this.mirrorLayer.visible = true
-      
       console.log('🎯 LayeredInfiniteCanvas: Rendered mirror layer with cached texture sprites')
-    } else {
-      this.mirrorLayer.visible = false
     }
   }
   

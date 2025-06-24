@@ -281,15 +281,20 @@ export class GeometryHelper {
 
   /**
    * Calculate metadata for a geometric point
+   * Points occupy at least 1 pixeloid for visibility
    */
   static calculatePointMetadata(point: { x: number; y: number }): GeometricMetadata {
+    // Ensure point occupies the pixeloid it's in
+    const pixeloidX = Math.floor(point.x)
+    const pixeloidY = Math.floor(point.y)
+    
     return {
       center: { __brand: 'pixeloid', x: point.x, y: point.y },
       bounds: {
-        minX: point.x,
-        maxX: point.x,
-        minY: point.y,
-        maxY: point.y
+        minX: pixeloidX,
+        maxX: pixeloidX + 1,  // Full pixeloid width
+        minY: pixeloidY,
+        maxY: pixeloidY + 1   // Full pixeloid height
       }
     }
   }
@@ -314,15 +319,16 @@ export class GeometryHelper {
 
   /**
    * Calculate metadata for a geometric circle
+   * Uses pixeloid-perfect bounds with Math.floor/ceil
    */
   static calculateCircleMetadata(circle: { centerX: number; centerY: number; radius: number }): GeometricMetadata {
     return {
       center: { __brand: 'pixeloid', x: circle.centerX, y: circle.centerY },
       bounds: {
-        minX: circle.centerX - circle.radius,
-        maxX: circle.centerX + circle.radius,
-        minY: circle.centerY - circle.radius,
-        maxY: circle.centerY + circle.radius
+        minX: Math.floor(circle.centerX - circle.radius),
+        maxX: Math.ceil(circle.centerX + circle.radius),
+        minY: Math.floor(circle.centerY - circle.radius),
+        maxY: Math.ceil(circle.centerY + circle.radius)
       }
     }
   }

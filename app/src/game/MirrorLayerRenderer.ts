@@ -291,6 +291,44 @@ export class MirrorLayerRenderer {
   }
 
   /**
+   * Get texture cache for external access (used by filter renderers)
+   * Returns a copy to prevent external modification
+   */
+  public getTextureCache(): Map<string, {
+    texture: RenderTexture
+    visualVersion: number
+    scale: number
+  }> {
+    return new Map(this.textureCache)
+  }
+
+  /**
+   * Get current sprite positions for alignment with filtered versions
+   */
+  public getSpritePositions(): Map<string, { x: number, y: number }> {
+    const positions = new Map()
+    for (const [id, sprite] of this.mirrorSprites) {
+      positions.set(id, { x: sprite.x, y: sprite.y })
+    }
+    return positions
+  }
+
+  /**
+   * Get a specific cached texture by object ID
+   */
+  public getCachedTexture(objectId: string): RenderTexture | null {
+    const cache = this.textureCache.get(objectId)
+    return cache?.texture || null
+  }
+
+  /**
+   * Check if a texture is cached for an object
+   */
+  public hasTextureCache(objectId: string): boolean {
+    return this.textureCache.has(objectId)
+  }
+
+  /**
    * Get container for adding to scene
    */
   public getContainer(): Container {
