@@ -4,7 +4,6 @@ import { GeometryHelper } from './GeometryHelper'
 import { CoordinateCalculations } from './CoordinateCalculations'
 import { subscribe } from 'valtio'
 import type {
-  ViewportCorners,
   GeometricObject,
   GeometricRectangle,
   GeometricCircle,
@@ -49,7 +48,7 @@ export class GeometryRenderer {
    * Simple render system - always renders when called by LayeredInfiniteCanvas
    * No memoization, no optimization - just reliable rendering every time
    */
-  public render(corners: ViewportCorners, pixeloidScale: number): void {
+  public render(pixeloidScale: number): void {
     console.log('🎨 GeometryRenderer: Always rendering (no memoization)', {
       offset: { ...gameStore.mesh.vertex_to_pixeloid_offset },
       scale: pixeloidScale,
@@ -208,80 +207,6 @@ export class GeometryRenderer {
     
     // Fallback - return original object
     return obj
-  }
-
-  /**
-   * Check if object is within or near the viewport for culling
-   */
-  private isObjectInViewport(obj: GeometricObject, corners: ViewportCorners): boolean {
-    // Add padding to viewport for objects that might partially be visible
-    const padding = 50 // pixeloids
-    const viewportLeft = corners.topLeft.x - padding
-    const viewportRight = corners.bottomRight.x + padding
-    const viewportTop = corners.topLeft.y - padding
-    const viewportBottom = corners.bottomRight.y + padding
-
-    // Check bounds based on object type
-    if ('anchorX' in obj && 'anchorY' in obj) {
-      // Diamond object - use GeometryHelper to get vertices and calculate bounds
-      const diamond = obj as GeometricDiamond
-      const vertices = GeometryHelper.calculateDiamondVertices(diamond)
-      const bounds = {
-        left: Math.min(vertices.west.x, vertices.east.x, vertices.north.x, vertices.south.x),
-        right: Math.max(vertices.west.x, vertices.east.x, vertices.north.x, vertices.south.x),
-        top: Math.min(vertices.west.y, vertices.east.y, vertices.north.y, vertices.south.y),
-        bottom: Math.max(vertices.west.y, vertices.east.y, vertices.north.y, vertices.south.y)
-      }
-      return !(
-        bounds.right < viewportLeft ||
-        bounds.left > viewportRight ||
-        bounds.bottom < viewportTop ||
-        bounds.top > viewportBottom
-      )
-    } else if ('width' in obj && 'height' in obj) {
-      // Rectangle object
-      const rect = obj as GeometricRectangle
-      return !(
-        rect.x + rect.width < viewportLeft ||
-        rect.x > viewportRight ||
-        rect.y + rect.height < viewportTop ||
-        rect.y > viewportBottom
-      )
-    } else if ('radius' in obj) {
-      // Circle object
-      const circle = obj as GeometricCircle
-      return !(
-        circle.centerX + circle.radius < viewportLeft ||
-        circle.centerX - circle.radius > viewportRight ||
-        circle.centerY + circle.radius < viewportTop ||
-        circle.centerY - circle.radius > viewportBottom
-      )
-    } else if ('startX' in obj && 'endX' in obj) {
-      // Line object
-      const line = obj as GeometricLine
-      const minX = Math.min(line.startX, line.endX)
-      const maxX = Math.max(line.startX, line.endX)
-      const minY = Math.min(line.startY, line.endY)
-      const maxY = Math.max(line.startY, line.endY)
-      return !(
-        maxX < viewportLeft ||
-        minX > viewportRight ||
-        maxY < viewportTop ||
-        minY > viewportBottom
-      )
-    } else if ('x' in obj && 'y' in obj) {
-      // Point object
-      const point = obj as GeometricPoint
-      return !(
-        point.x < viewportLeft ||
-        point.x > viewportRight ||
-        point.y < viewportTop ||
-        point.y > viewportBottom
-      )
-    }
-
-    // Default to visible if we can't determine bounds
-    return true
   }
 
   /**
