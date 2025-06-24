@@ -196,14 +196,26 @@ export class InfiniteCanvas {
     
     // Calculate the offset that keeps the locked pixeloid at the mouse position
     // offset = pixeloid - vertex (at mouse position)
-    const targetOffset = createPixeloidCoordinate(
+    const rawTargetOffset = createPixeloidCoordinate(
       this.lockedZoomPixeloid.x - mouseVertexX,
       this.lockedZoomPixeloid.y - mouseVertexY
     )
     
+    // ✅ FIX: Apply integer snapping to prevent misalignment (same as WASD movement)
+    // This ensures zoom operations produce pixel-perfect coordinates like WASD movement
+    const targetOffset = createPixeloidCoordinate(
+      Math.round(rawTargetOffset.x),
+      Math.round(rawTargetOffset.y)
+    )
+    
+    // TODO: Future enhancement - implement full coordinate snapping consistency
+    // - Create shared snapping utility in CoordinateCalculations
+    // - Apply consistent rounding logic across all coordinate operations (zoom, WASD, teleport)
+    // - Add coordinate validation to prevent fractional coordinates in critical paths
+    
     updateGameStore.setVertexToPixeloidOffset(targetOffset)
     
-    console.log(`Zoom-to-Mouse: Pixeloid (${this.lockedZoomPixeloid.x.toFixed(1)}, ${this.lockedZoomPixeloid.y.toFixed(1)}) stays at screen (${mouseScreenX}, ${mouseScreenY})`)
+    console.log(`Zoom-to-Mouse: Pixeloid (${this.lockedZoomPixeloid.x.toFixed(1)}, ${this.lockedZoomPixeloid.y.toFixed(1)}) stays at screen (${mouseScreenX}, ${mouseScreenY}) - offset snapped to integers`)
   }
 
   /**
