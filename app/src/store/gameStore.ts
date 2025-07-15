@@ -1,5 +1,8 @@
 import { proxy } from 'valtio'
-import type { GameState, GeometricObject, ObjectTextureData, GeometricPoint, GeometricLine, GeometricCircle, GeometricRectangle, GeometricDiamond, PixeloidMeshData, StaticMeshData, PixeloidVertexMapping, PixeloidCoordinate, VertexCoordinate, ScreenCoordinate, ViewportBounds } from '../types'
+import type { GameState, GeometricObject, ObjectTextureData, GeometricPoint, GeometricLine, GeometricCircle, GeometricRectangle, GeometricDiamond, PixeloidMeshData, StaticMeshData, PixeloidVertexMapping, PixeloidCoordinate, VertexCoordinate, ScreenCoordinate, ViewportBounds } from '../types/index'
+import type { ECSDataLayer, CreateGeometricObjectParams, SamplingResult } from '../types/ecs-data-layer'
+import { createECSDataLayer } from '../types/ecs-data-layer'
+import { createECSMirrorLayerStore, ECSMirrorLayerStore } from './ecs-mirror-layer-store'
 import { GeometryHelper } from '../game/GeometryHelper'
 import { CoordinateCalculations } from '../game/CoordinateCalculations'
 import type { InfiniteCanvas } from '../game/InfiniteCanvas'
@@ -41,6 +44,19 @@ export const gameStore = proxy<GameState>({
   currentScene: 'menu',
   windowWidth: window.innerWidth,
   windowHeight: window.innerHeight,
+  
+  // ================================
+  // ECS DATA LAYER (Phase 2A Implementation)
+  // ================================
+  
+  ecsDataLayer: createECSDataLayer(),
+  
+  // ================================
+  // ECS MIRROR LAYER (Phase 2B Implementation)
+  // ================================
+  
+  // Store the ECS Mirror Layer Store instance
+  _ecsMirrorLayerStore: null as ECSMirrorLayerStore | null,
   
   // ================================
   // ECS CAMERA VIEWPORT ARCHITECTURE
@@ -222,8 +238,240 @@ export const updateGameStore = {
   },
 
   // ================================
-  // ATOMIC COORDINATE UPDATES (Infinite Loop Prevention)
+  // ECS DATA LAYER ACTIONS (Phase 2A)
   // ================================
+  
+  // Create geometric object in ECS Data Layer
+  createECSGeometricObject: (params: CreateGeometricObjectParams) => {
+    const ecsDataLayer = gameStore.ecsDataLayer
+    const actions = ecsDataLayer.actions
+    
+    // Create the object using ECS Data Layer
+    const objectId = actions.createGeometricObject(params)
+    
+    // Update state metrics
+    ecsDataLayer.state.objectCount = ecsDataLayer.state.objects.size
+    ecsDataLayer.state.lastUpdate = Date.now()
+    
+    console.log(`Store: Created ECS geometric object ${objectId}`)
+    return objectId
+  },
+  
+  // Update geometric object in ECS Data Layer
+  updateECSGeometricObject: (objectId: string, updates: Partial<CreateGeometricObjectParams>) => {
+    const ecsDataLayer = gameStore.ecsDataLayer
+    const actions = ecsDataLayer.actions
+    
+    const success = actions.updateGeometricObject(objectId, updates)
+    
+    if (success) {
+      ecsDataLayer.state.lastUpdate = Date.now()
+      console.log(`Store: Updated ECS geometric object ${objectId}`)
+    }
+    
+    return success
+  },
+  
+  // Remove geometric object from ECS Data Layer
+  removeECSGeometricObject: (objectId: string) => {
+    const ecsDataLayer = gameStore.ecsDataLayer
+    const actions = ecsDataLayer.actions
+    
+    const success = actions.removeGeometricObject(objectId)
+    
+    if (success) {
+      ecsDataLayer.state.objectCount = ecsDataLayer.state.objects.size
+      ecsDataLayer.state.lastUpdate = Date.now()
+      console.log(`Store: Removed ECS geometric object ${objectId}`)
+    }
+    
+    return success
+  },
+  
+  // Sample ECS Data Layer viewport
+  sampleECSDataLayerViewport: (viewportBounds: any) => {
+    const ecsDataLayer = gameStore.ecsDataLayer
+    const actions = ecsDataLayer.actions
+    
+    const result = actions.sampleViewport(viewportBounds)
+    
+    // Update sampling metrics
+    ecsDataLayer.state.lastSampleTime = Date.now()
+    ecsDataLayer.state.lastSampleCount = result.objectCount
+    
+    return result
+  },
+  
+  // Get ECS Data Layer object by ID
+  getECSGeometricObject: (objectId: string) => {
+    const ecsDataLayer = gameStore.ecsDataLayer
+    const actions = ecsDataLayer.actions
+    
+    return actions.getGeometricObject(objectId)
+  },
+  
+  // Clear all ECS Data Layer objects
+  clearECSDataLayer: () => {
+    const ecsDataLayer = gameStore.ecsDataLayer
+    const actions = ecsDataLayer.actions
+    
+    actions.clearAll()
+    
+    // Reset state
+    ecsDataLayer.state.objectCount = 0
+    ecsDataLayer.state.lastUpdate = Date.now()
+    ecsDataLayer.state.lastSampleTime = 0
+    ecsDataLayer.state.lastSampleCount = 0
+    
+    console.log('Store: Cleared ECS Data Layer')
+  },
+  
+  // Update ECS Data Layer sampling window
+  updateECSDataLayerSamplingWindow: (position: any, size: any) => {
+    const ecsDataLayer = gameStore.ecsDataLayer
+    
+    // Update sampling window in state
+    ecsDataLayer.state.samplingWindow = {
+      position,
+      size,
+      lastUpdate: Date.now()
+    }
+    
+    console.log(`Store: Updated ECS Data Layer sampling window to position (${position.x}, ${position.y}) size (${size.width}x${size.height})`)
+  },
+  
+  // Get ECS Data Layer statistics
+  getECSDataLayerStats: () => {
+    const ecsDataLayer = gameStore.ecsDataLayer
+    return {
+      objectCount: ecsDataLayer.state.objectCount,
+      lastUpdate: ecsDataLayer.state.lastUpdate,
+      lastSampleTime: ecsDataLayer.state.lastSampleTime,
+      lastSampleCount: ecsDataLayer.state.lastSampleCount,
+      isInitialized: ecsDataLayer.state.isInitialized
+    }
+  },
+
+ // ================================
+ // ECS MIRROR LAYER STORE ACTIONS (Phase 2B)
+ // ================================
+ 
+ // Initialize ECS Mirror Layer Store
+ initializeECSMirrorLayerStore: () => {
+   if (!gameStore._ecsMirrorLayerStore) {
+     gameStore._ecsMirrorLayerStore = createECSMirrorLayerStore()
+     console.log('Store: Initialized ECS Mirror Layer Store')
+   }
+   return gameStore._ecsMirrorLayerStore
+ },
+ 
+ // Get ECS Mirror Layer Store
+ getECSMirrorLayerStore: () => {
+   if (!gameStore._ecsMirrorLayerStore) {
+     updateGameStore.initializeECSMirrorLayerStore()
+   }
+   return gameStore._ecsMirrorLayerStore!
+ },
+ 
+ // ECS Mirror Layer camera viewport actions
+ updateECSMirrorLayerCameraViewport: (position: { x: number; y: number }) => {
+   const store = updateGameStore.getECSMirrorLayerStore()
+   const actions = store.getActions()
+   actions.updateCameraViewport(position)
+   console.log(`Store: Updated ECS Mirror Layer camera viewport to (${position.x}, ${position.y})`)
+ },
+ 
+ // ECS Mirror Layer zoom actions
+ setECSMirrorLayerZoom: (level: number) => {
+   const store = updateGameStore.getECSMirrorLayerStore()
+   const actions = store.getActions()
+   actions.setZoomLevel(level as any)
+   console.log(`Store: Set ECS Mirror Layer zoom to level ${level}`)
+ },
+ 
+ // ECS Mirror Layer camera panning actions
+ startECSMirrorLayerPanning: (startPos: { x: number; y: number }) => {
+   const store = updateGameStore.getECSMirrorLayerStore()
+   const actions = store.getActions()
+   actions.startPanning(startPos)
+   console.log(`Store: Started ECS Mirror Layer panning from (${startPos.x}, ${startPos.y})`)
+ },
+ 
+ updateECSMirrorLayerPanning: (currentPos: { x: number; y: number }) => {
+   const store = updateGameStore.getECSMirrorLayerStore()
+   const actions = store.getActions()
+   actions.updatePanning(currentPos)
+ },
+ 
+ stopECSMirrorLayerPanning: () => {
+   const store = updateGameStore.getECSMirrorLayerStore()
+   const actions = store.getActions()
+   actions.stopPanning()
+   console.log('Store: Stopped ECS Mirror Layer panning')
+ },
+ 
+ // ECS Mirror Layer texture cache actions
+ cacheECSMirrorLayerTexture: (objectId: string, texture: any, bounds: any) => {
+   const store = updateGameStore.getECSMirrorLayerStore()
+   const actions = store.getActions()
+   actions.cacheTexture(objectId, texture, bounds)
+   console.log(`Store: Cached ECS Mirror Layer texture for object ${objectId}`)
+ },
+ 
+ evictECSMirrorLayerTexture: (objectId: string) => {
+   const store = updateGameStore.getECSMirrorLayerStore()
+   const actions = store.getActions()
+   actions.evictTexture(objectId)
+   console.log(`Store: Evicted ECS Mirror Layer texture for object ${objectId}`)
+ },
+ 
+ clearECSMirrorLayerTextureCache: () => {
+   const store = updateGameStore.getECSMirrorLayerStore()
+   const actions = store.getActions()
+   actions.clearTextureCache()
+   console.log('Store: Cleared ECS Mirror Layer texture cache')
+ },
+ 
+ // ECS Mirror Layer display actions
+ setECSMirrorLayerVisibility: (visible: boolean) => {
+   const store = updateGameStore.getECSMirrorLayerStore()
+   const actions = store.getActions()
+   actions.setVisibility(visible)
+   console.log(`Store: Set ECS Mirror Layer visibility to ${visible}`)
+ },
+ 
+ setECSMirrorLayerOpacity: (opacity: number) => {
+   const store = updateGameStore.getECSMirrorLayerStore()
+   const actions = store.getActions()
+   actions.setOpacity(opacity)
+   console.log(`Store: Set ECS Mirror Layer opacity to ${opacity}`)
+ },
+ 
+ // ECS Mirror Layer optimization actions
+ optimizeECSMirrorLayer: () => {
+   const store = updateGameStore.getECSMirrorLayerStore()
+   const actions = store.getActions()
+   actions.optimizeMirrorLayer()
+   console.log('Store: Optimized ECS Mirror Layer')
+ },
+ 
+ validateECSMirrorLayerIntegrity: () => {
+   const store = updateGameStore.getECSMirrorLayerStore()
+   const actions = store.getActions()
+   const isValid = actions.validateMirrorIntegrity()
+   console.log(`Store: ECS Mirror Layer integrity validation: ${isValid ? 'PASS' : 'FAIL'}`)
+   return isValid
+ },
+ 
+ // Get ECS Mirror Layer statistics
+ getECSMirrorLayerStats: () => {
+   const store = updateGameStore.getECSMirrorLayerStore()
+   return store.getStats()
+ },
+
+ // ================================
+ // ATOMIC COORDINATE UPDATES (Infinite Loop Prevention)
+ // ================================
 
   // ECS Camera Viewport Methods
   setCameraViewportPosition: (position: PixeloidCoordinate) => {
