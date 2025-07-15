@@ -220,8 +220,8 @@ export class BackgroundGridRenderer {
 
     // ✅ FIXED: Always use screen bounds for static mesh
     const level = currentResolution.level
-    const screenVertexWidth = Math.ceil(gameStore.windowWidth / gameStore.camera.pixeloid_scale)
-    const screenVertexHeight = Math.ceil(gameStore.windowHeight / gameStore.camera.pixeloid_scale)
+    const screenVertexWidth = Math.ceil(gameStore.windowWidth / gameStore.cameraViewport.zoom_factor)
+    const screenVertexHeight = Math.ceil(gameStore.windowHeight / gameStore.cameraViewport.zoom_factor)
     
     // Filter vertices to screen area and create grid quads
     const visibleVertices: number[] = []

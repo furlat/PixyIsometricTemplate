@@ -6,6 +6,7 @@ import type {
   MeshVertexCoordinate
 } from '../types'
 import { gameStore, updateGameStore, createPixeloidCoordinate, createVertexCoordinate } from '../store/gameStore'
+import { CoordinateHelper } from './CoordinateHelper'
 import { subscribe } from 'valtio'
 
 /**
@@ -49,10 +50,10 @@ export class StaticMeshManager {
    * Subscribe to pixeloid scale changes to update mesh resolution
    */
   private setupViewportSubscription(): void {
-    subscribe(gameStore.camera, () => {
-      // Update mesh when pixeloid scale changes
+    subscribe(gameStore.cameraViewport, () => {
+      // Update mesh when zoom factor changes
       if (gameStore.staticMesh.activeMesh) {
-        const currentPixeloidScale = gameStore.camera.pixeloid_scale
+        const currentPixeloidScale = gameStore.cameraViewport.zoom_factor
         
         // Prevent subscription loop by checking if scale actually changed
         if (currentPixeloidScale === this.lastProcessedScale) {
@@ -227,10 +228,11 @@ export class StaticMeshManager {
         // Mesh vertex coordinate
         const meshVertex: MeshVertexCoordinate = createVertexCoordinate(vx, vy)
         
-        // SIMPLE CONVERSION: pixeloid = vertex + vertex_to_pixeloid_offset
+        // ECS: SIMPLE CONVERSION: pixeloid = vertex + offset
+        const offset = CoordinateHelper.getCurrentOffset()
         const pixeloidCoord: PixeloidCoordinate = createPixeloidCoordinate(
-          vx + gameStore.mesh.vertex_to_pixeloid_offset.x,
-          vy + gameStore.mesh.vertex_to_pixeloid_offset.y
+          vx + offset.x,
+          vy + offset.y
         )
 
         // Create bidirectional mapping
@@ -254,7 +256,7 @@ export class StaticMeshManager {
       pixeloidToMesh,
       currentResolution: resolution,
       viewportBounds,
-      viewportOffset: gameStore.mesh.vertex_to_pixeloid_offset,  // Simple offset
+      viewportOffset: CoordinateHelper.getCurrentOffset(),  // Simple offset
       vertexBounds
     }
 
@@ -265,7 +267,7 @@ export class StaticMeshManager {
     gameStore.staticMesh.stats.coordinateMappingUpdates++
 
     console.log(`StaticMeshManager: Updated coordinate mapping for ${meshToPixeloid.size} vertices at level ${level}`)
-    console.log(`StaticMeshManager: Vertex to pixeloid offset: (${gameStore.mesh.vertex_to_pixeloid_offset.x.toFixed(2)}, ${gameStore.mesh.vertex_to_pixeloid_offset.y.toFixed(2)})`)
+    console.log(`StaticMeshManager: Vertex to pixeloid offset: (${CoordinateHelper.getCurrentOffset().x.toFixed(2)}, ${CoordinateHelper.getCurrentOffset().y.toFixed(2)})`)
   }
 
   /**

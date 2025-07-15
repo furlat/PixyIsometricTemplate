@@ -1,6 +1,7 @@
 import { Graphics } from 'pixi.js'
 import { gameStore } from '../store/gameStore'
 import { CoordinateCalculations } from './CoordinateCalculations'
+import { CoordinateHelper } from './CoordinateHelper'
 import type { ViewportCorners, GeometricObject } from '../types'
 
 /**
@@ -52,7 +53,7 @@ export class BoundingBoxRenderer {
    * This ensures perfect alignment between bbox rectangles and geometry objects
    */
   private convertObjectToVertexCoordinates(obj: GeometricObject): GeometricObject {
-    const offset = gameStore.mesh.vertex_to_pixeloid_offset
+    const offset = CoordinateHelper.getCurrentOffset()
     
     // Convert object coordinates to vertex space using EXACT conversion (no rounding)
     if ('centerX' in obj && 'centerY' in obj) {
@@ -142,7 +143,7 @@ export class BoundingBoxRenderer {
     }
     
     // Apply coordinate conversion to bounds
-    const offset = gameStore.mesh.vertex_to_pixeloid_offset
+    const offset = CoordinateHelper.getCurrentOffset()
     
     const vertexX = boundsToRender.minX - offset.x
     const vertexY = boundsToRender.minY - offset.y

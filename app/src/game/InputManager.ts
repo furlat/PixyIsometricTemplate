@@ -205,7 +205,7 @@ export class InputManager {
     
     // Use the current pixeloid scale for correct vertex-to-screen conversion
     // The mesh resolution level is for internal optimization, not coordinate conversion
-    const pixeloidScale = gameStore.camera.pixeloid_scale
+    const pixeloidScale = gameStore.cameraViewport.zoom_factor
     const screenX = vertexX * pixeloidScale
     const screenY = vertexY * pixeloidScale
     
@@ -633,25 +633,19 @@ export class InputManager {
     if (keys.a) deltaX -= baseDistance  // Move left = decrease offset X
     if (keys.d) deltaX += baseDistance  // Move right = increase offset X
 
-    // Apply smooth movement if any keys are pressed
+    // ECS: Apply movement based on zoom level
     if (deltaX !== 0 || deltaY !== 0) {
-      const currentOffset = gameStore.mesh.vertex_to_pixeloid_offset
-      const newOffset = createPixeloidCoordinate(
-        currentOffset.x + deltaX,
-        currentOffset.y + deltaY
-      )
-      
-      console.log(`🎮 InputManager.updateMovement: About to update offset`, {
-        currentOffset: { ...currentOffset },
+      console.log(`🎮 InputManager.updateMovement: ECS movement routing`, {
         delta: { x: deltaX, y: deltaY },
-        newOffset: { ...newOffset },
+        zoomFactor: gameStore.cameraViewport.zoom_factor,
         keysPressed: { w: keys.w, a: keys.a, s: keys.s, d: keys.d },
         timestamp: Date.now()
       })
       
-      updateGameStore.setVertexToPixeloidOffset(newOffset)
+      // Use ECS movement router
+      updateGameStore.updateMovementECS(deltaX, deltaY)
       
-      console.log(`✅ InputManager.updateMovement: Offset update completed`)
+      console.log(`✅ InputManager.updateMovement: ECS movement completed`)
     }
     
     // ✅ SNAP TO INTEGER: Check for key releases and snap to perfect pixeloid alignment
@@ -665,15 +659,28 @@ export class InputManager {
     const noMovementKeys = !keys.w && !keys.s && !keys.a && !keys.d
     
     if (anyKeyReleased && noMovementKeys) {
-      // Snap to nearest integer pixeloid for perfect alignment
-      const currentOffset = gameStore.mesh.vertex_to_pixeloid_offset
-      const snappedOffset = createPixeloidCoordinate(
-        Math.round(currentOffset.x),
-        Math.round(currentOffset.y)
-      )
+      // ECS: Snap appropriate position based on zoom level
+      const zoomFactor = gameStore.cameraViewport.zoom_factor
       
-      updateGameStore.setVertexToPixeloidOffset(snappedOffset)
-      console.log(`WASD: Snapped to integer alignment (${snappedOffset.x}, ${snappedOffset.y})`)
+      if (zoomFactor === 1) {
+        // Snap geometry sampling position
+        const currentPos = gameStore.cameraViewport.geometry_sampling_position
+        const snappedPos = createPixeloidCoordinate(
+          Math.round(currentPos.x),
+          Math.round(currentPos.y)
+        )
+        updateGameStore.setGeometrySamplingPosition(snappedPos)
+        console.log(`WASD: Snapped geometry sampling position (${snappedPos.x}, ${snappedPos.y})`)
+      } else {
+        // Snap viewport position
+        const currentPos = gameStore.cameraViewport.viewport_position
+        const snappedPos = createPixeloidCoordinate(
+          Math.round(currentPos.x),
+          Math.round(currentPos.y)
+        )
+        updateGameStore.setCameraViewportPosition(snappedPos)
+        console.log(`WASD: Snapped viewport position (${snappedPos.x}, ${snappedPos.y})`)
+      }
     }
 
     // Update last key states for next frame
@@ -687,19 +694,33 @@ export class InputManager {
         // Center selected object at screen center
         const selectedObject = gameStore.geometry.objects.find(obj => obj.id === selectedObjectId)
         if (selectedObject && selectedObject.metadata) {
-          const screenCenterX = gameStore.windowWidth / 2 / gameStore.camera.pixeloid_scale
-          const screenCenterY = gameStore.windowHeight / 2 / gameStore.camera.pixeloid_scale
-          const targetOffset = createPixeloidCoordinate(
+          const zoomFactor = gameStore.cameraViewport.zoom_factor
+          const screenCenterX = gameStore.windowWidth / 2 / zoomFactor
+          const screenCenterY = gameStore.windowHeight / 2 / zoomFactor
+          const targetPos = createPixeloidCoordinate(
             selectedObject.metadata.center.x - screenCenterX,
             selectedObject.metadata.center.y - screenCenterY
           )
-          updateGameStore.setVertexToPixeloidOffset(targetOffset)
-          console.log(`InputManager: Centered object ${selectedObjectId} at screen center, offset: (${targetOffset.x.toFixed(1)}, ${targetOffset.y.toFixed(1)})`)
+          
+          // Use appropriate position based on zoom level
+          if (zoomFactor === 1) {
+            updateGameStore.setGeometrySamplingPosition(targetPos)
+          } else {
+            updateGameStore.setCameraViewportPosition(targetPos)
+          }
+          console.log(`InputManager: Centered object ${selectedObjectId} at zoom ${zoomFactor}`)
         }
       } else {
-        // Reset offset to (0,0) - pixeloid (0,0) appears at screen (0,0)
-        updateGameStore.setVertexToPixeloidOffset(createPixeloidCoordinate(0, 0))
-        console.log(`InputManager: Reset offset to (0,0) - pixeloid (0,0) now at screen (0,0)`)
+        // ECS: Reset position to (0,0) based on zoom level
+        const zoomFactor = gameStore.cameraViewport.zoom_factor
+        const resetPos = createPixeloidCoordinate(0, 0)
+        
+        if (zoomFactor === 1) {
+          updateGameStore.setGeometrySamplingPosition(resetPos)
+        } else {
+          updateGameStore.setCameraViewportPosition(resetPos)
+        }
+        console.log(`InputManager: Reset position to (0,0) at zoom ${zoomFactor}`)
       }
       
       // Reset space key to prevent continuous recentering

@@ -1,5 +1,6 @@
 import { subscribe } from 'valtio';
 import { gameStore, updateGameStore } from '../store/gameStore';
+import { CoordinateHelper } from '../game/CoordinateHelper';
 import {
   updateElement,
   formatCoordinates,
@@ -102,14 +103,19 @@ export class StorePanel {
     
     updateElement(this.elements, 'game-scene', gameStore.currentScene, STATUS_COLORS.system);
     
-    // Simple Coordinate System - Show actual camera world position
+    // ECS Camera Viewport System
+    const zoomFactor = gameStore.cameraViewport.zoom_factor
+    const currentPos = zoomFactor === 1 
+      ? gameStore.cameraViewport.geometry_sampling_position
+      : gameStore.cameraViewport.viewport_position
+    
     updateElement(this.elements, 'camera-position',
-      formatCoordinates(gameStore.camera.world_position.x, gameStore.camera.world_position.y),
+      formatCoordinates(currentPos.x, currentPos.y),
       STATUS_COLORS.camera
     );
     
     updateElement(this.elements, 'pixeloid-scale',
-      gameStore.camera.pixeloid_scale.toString(),
+      gameStore.cameraViewport.zoom_factor.toString(),
       'text-primary'
     );
     
@@ -206,13 +212,13 @@ export class StorePanel {
     // Viewport corners in vertex coordinates (from stored vertexBounds)
     // Get current coordinate mapping for the active pixeloid scale
     const coordinateMapping = updateGameStore.getCurrentCoordinateMapping();
-    const currentScale = gameStore.camera.pixeloid_scale;
+    const currentScale = gameStore.cameraViewport.zoom_factor;
     
     if (coordinateMapping) {
       const { currentResolution } = coordinateMapping;
       
       // ✅ Calculate screen mesh dimensions once for reuse
-      const scale = gameStore.camera.pixeloid_scale;
+      const scale = gameStore.cameraViewport.zoom_factor;
       const screenVertexWidth = Math.ceil(gameStore.windowWidth / scale);
       const screenVertexHeight = Math.ceil(gameStore.windowHeight / scale);
       
@@ -222,8 +228,8 @@ export class StorePanel {
         'text-green-400'
       );
 
-      // ✅ FIXED: Always show real offset from store (not from coordinateMapping)
-      const actualOffset = gameStore.mesh.vertex_to_pixeloid_offset;
+      // ECS: Always show real offset from coordinate helper
+      const actualOffset = CoordinateHelper.getCurrentOffset();
       updateElement(this.elements, 'viewport-offset',
         `Vertex→Pixeloid Offset:(${actualOffset.x.toFixed(2)},${actualOffset.y.toFixed(2)})`,
         'text-purple-400'
@@ -237,10 +243,10 @@ export class StorePanel {
     } else {
       // ✅ FIXED: Show real data even when mapping is missing
       const totalMappings = gameStore.staticMesh.coordinateMappings.size;
-      const actualOffset = gameStore.mesh.vertex_to_pixeloid_offset;
+      const actualOffset = CoordinateHelper.getCurrentOffset();
       
       // Calculate screen mesh dimensions even without coordinate mapping
-      const scale = gameStore.camera.pixeloid_scale;
+      const scale = gameStore.cameraViewport.zoom_factor;
       const screenVertexWidth = Math.ceil(gameStore.windowWidth / scale);
       const screenVertexHeight = Math.ceil(gameStore.windowHeight / scale);
       

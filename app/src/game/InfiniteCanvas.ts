@@ -16,7 +16,7 @@ export class InfiniteCanvas {
   // Zoom batching to prevent rapid scroll events from causing multiple re-renders
   private zoomBatchTimeout: number | null = null
   private pendingZoomDelta: number = 0
-  private readonly ZOOM_BATCH_DELAY = 50 // ms
+  private readonly ZOOM_BATCH_DELAY = 5 // ms - faster zoom response
   
   // Mouse-centered zooming
   private zoomTargetScreen: { x: number, y: number } | null = null
@@ -52,10 +52,16 @@ export class InfiniteCanvas {
    * Called only when we need to read from store, not during rendering
    */
   private syncFromStore(): void {
-    // Use new coordinate system
-    this.localCameraPosition.x = gameStore.camera.world_position.x
-    this.localCameraPosition.y = gameStore.camera.world_position.y
-    this.localPixeloidScale = gameStore.camera.pixeloid_scale
+    // ECS: Use appropriate position based on zoom level
+    const zoomFactor = gameStore.cameraViewport.zoom_factor
+    if (zoomFactor === 1) {
+      this.localCameraPosition.x = gameStore.cameraViewport.geometry_sampling_position.x
+      this.localCameraPosition.y = gameStore.cameraViewport.geometry_sampling_position.y
+    } else {
+      this.localCameraPosition.x = gameStore.cameraViewport.viewport_position.x
+      this.localCameraPosition.y = gameStore.cameraViewport.viewport_position.y
+    }
+    this.localPixeloidScale = gameStore.cameraViewport.zoom_factor
     this.localViewportSize.width = gameStore.windowWidth
     this.localViewportSize.height = gameStore.windowHeight
   }
@@ -92,8 +98,15 @@ export class InfiniteCanvas {
    * Called only when local state changes, not during rendering
    */
   private syncToStore(): void {
-    // Update camera position using new coordinate system
-    updateGameStore.setCameraPosition(createPixeloidCoordinate(this.localCameraPosition.x, this.localCameraPosition.y))
+    // ECS: Update appropriate position based on zoom level
+    const zoomFactor = gameStore.cameraViewport.zoom_factor
+    const position = createPixeloidCoordinate(this.localCameraPosition.x, this.localCameraPosition.y)
+    
+    if (zoomFactor === 1) {
+      updateGameStore.setGeometrySamplingPosition(position)
+    } else {
+      updateGameStore.setCameraViewportPosition(position)
+    }
   }
 
   // calculateViewportCorners method removed - use CoordinateHelper.getCurrentViewportBounds() directly
@@ -161,26 +174,21 @@ export class InfiniteCanvas {
     // Clamp zoom levels to integers between 1 and 100 (unlocked full zoom out)
     const clampedScale = Math.max(1, Math.min(100, newScale))
     
-    // Check if zoom is allowed based on scale tracking
-    const zoomCheck = updateGameStore.canZoomToScale(clampedScale)
-    if (!zoomCheck.allowed) {
-      console.warn(`InfiniteCanvas: ${zoomCheck.reason}`)
-      // Reset zoom delta without applying
-      this.pendingZoomDelta = 0
-      this.zoomTargetScreen = null
-      // TODO: Show dialog to user about zoom restriction
-      return
-    }
+    // For ECS, validate integer zoom factors
+    const validZooms = [1, 2, 4, 8, 16, 32, 64, 128]
+    const finalZoom = validZooms.reduce((prev, curr) => 
+      Math.abs(curr - clampedScale) < Math.abs(prev - clampedScale) ? curr : prev
+    )
     
-    this.localPixeloidScale = clampedScale
+    this.localPixeloidScale = finalZoom
     
     // Reset zoom delta
     this.pendingZoomDelta = 0
     
-    // ✅ UPDATE SCALE IN STORE FIRST (before offset calculation)
-    updateGameStore.setPixeloidScale(this.localPixeloidScale)
+    // ECS: UPDATE ZOOM IN STORE FIRST
+    updateGameStore.setCameraViewportZoom(this.localPixeloidScale)
     
-    // ✅ THEN apply mouse-centered zoom (which needs the new scale in store)
+    // ECS: THEN apply mouse-centered zoom (which needs the new zoom factor in store)
     // Apply for both zoom in and zoom out to keep pixeloid under mouse
     if (this.lockedZoomPixeloid && oldScale !== this.localPixeloidScale) {
       this.applyMouseCenteredZoom(oldScale, this.localPixeloidScale)
@@ -207,28 +215,27 @@ export class InfiniteCanvas {
     const mouseVertexX = mouseScreenX / newScale
     const mouseVertexY = mouseScreenY / newScale
     
-    // Calculate the offset that keeps the locked pixeloid at the mouse position
-    // offset = pixeloid - vertex (at mouse position)
-    const rawTargetOffset = createPixeloidCoordinate(
+    // ECS: Calculate the position that keeps the locked pixeloid at the mouse position
+    const rawTargetPos = createPixeloidCoordinate(
       this.lockedZoomPixeloid.x - mouseVertexX,
       this.lockedZoomPixeloid.y - mouseVertexY
     )
     
-    // ✅ FIX: Apply integer snapping to prevent misalignment (same as WASD movement)
-    // This ensures zoom operations produce pixel-perfect coordinates like WASD movement
-    const targetOffset = createPixeloidCoordinate(
-      Math.round(rawTargetOffset.x),
-      Math.round(rawTargetOffset.y)
+    // Apply integer snapping for pixel-perfect alignment
+    const targetPos = createPixeloidCoordinate(
+      Math.round(rawTargetPos.x),
+      Math.round(rawTargetPos.y)
     )
     
-    // TODO: Future enhancement - implement full coordinate snapping consistency
-    // - Create shared snapping utility in CoordinateCalculations
-    // - Apply consistent rounding logic across all coordinate operations (zoom, WASD, teleport)
-    // - Add coordinate validation to prevent fractional coordinates in critical paths
+    // ECS: Use appropriate position based on zoom level
+    const zoomFactor = gameStore.cameraViewport.zoom_factor
+    if (zoomFactor === 1) {
+      updateGameStore.setGeometrySamplingPosition(targetPos)
+    } else {
+      updateGameStore.setCameraViewportPosition(targetPos)
+    }
     
-    updateGameStore.setVertexToPixeloidOffset(targetOffset)
-    
-    console.log(`Zoom-to-Mouse: Pixeloid (${this.lockedZoomPixeloid.x.toFixed(1)}, ${this.lockedZoomPixeloid.y.toFixed(1)}) stays at screen (${mouseScreenX}, ${mouseScreenY}) - offset snapped to integers`)
+    console.log(`ECS Zoom-to-Mouse: Pixeloid (${this.lockedZoomPixeloid.x.toFixed(1)}, ${this.lockedZoomPixeloid.y.toFixed(1)}) stays at screen (${mouseScreenX}, ${mouseScreenY}) at zoom ${zoomFactor}`)
   }
 
   /**

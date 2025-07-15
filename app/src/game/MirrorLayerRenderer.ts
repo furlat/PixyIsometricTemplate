@@ -1,6 +1,7 @@
 import { Container, Sprite, RenderTexture, Matrix, Renderer, Texture, Rectangle } from 'pixi.js'
 import { gameStore } from '../store/gameStore'
 import { CoordinateCalculations } from './CoordinateCalculations'
+import { CoordinateHelper } from './CoordinateHelper'
 import { GeometryHelper } from './GeometryHelper'
 import type { ViewportCorners, GeometricObject } from '../types'
 import type { GeometryRenderer } from './GeometryRenderer'
@@ -254,8 +255,7 @@ export class MirrorLayerRenderer {
   ): RenderTexture | null {
     if (!this.renderer) return null
 
-    // Get the offset used by GeometryRenderer
-    const offset = gameStore.mesh.vertex_to_pixeloid_offset
+    const offset = CoordinateHelper.getCurrentOffset()
 
     // Calculate bounds in vertex space first
     const vertexBounds = {
@@ -374,7 +374,11 @@ export class MirrorLayerRenderer {
       return
     }
     
-    const offset = gameStore.mesh.vertex_to_pixeloid_offset
+    // ECS: Get appropriate offset
+    const zoomFactor = gameStore.cameraViewport.zoom_factor
+    const offset = zoomFactor === 1 
+      ? gameStore.cameraViewport.geometry_sampling_position
+      : gameStore.cameraViewport.viewport_position
     const vertexPos = {
       x: currentBounds.minX - offset.x,  // Use current position!
       y: currentBounds.minY - offset.y
@@ -491,6 +495,42 @@ export class MirrorLayerRenderer {
     }
   }
 
+  /**
+   * ECS: Render complete geometry mirror (for zoom 1)
+   */
+  public renderComplete(geometryRenderer: GeometryRenderer): void {
+    // Show complete geometry texture
+    this.container.scale.set(1)
+    this.container.position.set(0, 0)
+    
+    // Use existing render method with full viewport
+    const corners = {
+      topLeft: { __brand: 'pixeloid' as const, x: -1000, y: -1000 },
+      topRight: { __brand: 'pixeloid' as const, x: 1000, y: -1000 },
+      bottomLeft: { __brand: 'pixeloid' as const, x: -1000, y: 1000 },
+      bottomRight: { __brand: 'pixeloid' as const, x: 1000, y: 1000 }
+    }
+    this.render(corners, 1, geometryRenderer)
+  }
+  
+  /**
+   * ECS: Render camera viewport of geometry (for zoom 2+)
+   */
+  public renderViewport(viewportPos: any, zoomFactor: number, geometryRenderer: GeometryRenderer): void {
+    // Show camera viewport of geometry
+    this.container.scale.set(zoomFactor)
+    this.container.position.set(-viewportPos.x * zoomFactor, -viewportPos.y * zoomFactor)
+    
+    // Calculate viewport corners
+    const corners = {
+      topLeft: viewportPos,
+      topRight: { __brand: 'pixeloid' as const, x: viewportPos.x + gameStore.windowWidth / zoomFactor, y: viewportPos.y },
+      bottomLeft: { __brand: 'pixeloid' as const, x: viewportPos.x, y: viewportPos.y + gameStore.windowHeight / zoomFactor },
+      bottomRight: { __brand: 'pixeloid' as const, x: viewportPos.x + gameStore.windowWidth / zoomFactor, y: viewportPos.y + gameStore.windowHeight / zoomFactor }
+    }
+    this.render(corners, zoomFactor, geometryRenderer)
+  }
+  
   /**
    * Destroy and clean up resources
    */

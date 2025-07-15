@@ -48,10 +48,13 @@ export class GeometryRenderer {
    * Simple render system - always renders when called by LayeredInfiniteCanvas
    * No memoization, no optimization - just reliable rendering every time
    */
-  public render(pixeloidScale: number): void {
-    console.log('🎨 GeometryRenderer: Always rendering (no memoization)', {
-      offset: { ...gameStore.mesh.vertex_to_pixeloid_offset },
-      scale: pixeloidScale,
+  public render(): void {  // Remove pixeloidScale parameter
+    const zoomFactor = gameStore.cameraViewport.zoom_factor
+    const samplingPos = gameStore.cameraViewport.geometry_sampling_position
+    
+    console.log('🎨 GeometryRenderer: ECS viewport sampling', {
+      samplingPos: { ...samplingPos },
+      zoomFactor: zoomFactor,
       objectCount: gameStore.geometry.objects.length,
       timestamp: Date.now()
     })
@@ -59,29 +62,17 @@ export class GeometryRenderer {
     // Get all objects from store
     const objects = gameStore.geometry.objects
     
-    // Filter objects using pre-computed visibility state
+    // ECS viewport sampling: only render objects within sampling bounds
+    const viewportBounds = {
+      minX: samplingPos.x,
+      maxX: samplingPos.x + (gameStore.windowWidth / zoomFactor),
+      minY: samplingPos.y,
+      maxY: samplingPos.y + (gameStore.windowHeight / zoomFactor)
+    }
+    
     const visibleObjects = objects.filter(obj => {
       if (!obj.isVisible || !obj.metadata) return false
-      
-      // Get visibility from scale-indexed cache
-      const visibilityData = obj.metadata.visibilityCache?.get(pixeloidScale)
-      
-      if (!visibilityData) {
-        // Calculate and cache if not present
-        if (!obj.metadata.visibilityCache) {
-          obj.metadata.visibilityCache = new Map()
-        }
-        
-        const visibilityInfo = GeometryHelper.calculateVisibilityState(obj, pixeloidScale)
-        obj.metadata.visibilityCache.set(pixeloidScale, {
-          visibility: visibilityInfo.visibility,
-          onScreenBounds: visibilityInfo.onScreenBounds
-        })
-        
-        return visibilityInfo.visibility !== 'offscreen'
-      }
-      
-      return visibilityData.visibility !== 'offscreen'
+      return this.isObjectInViewportBounds(obj, viewportBounds)
     })
     
     const currentObjectIds = new Set(visibleObjects.map(obj => obj.id))
@@ -98,13 +89,13 @@ export class GeometryRenderer {
       }
     }
 
-    // Update visible objects (convert to vertex coordinates for rendering)
+    // Render objects at fixed scale 1 (ECS data sampling)
     for (const obj of visibleObjects) {
-      this.updateGeometricObjectWithCoordinateConversion(obj, pixeloidScale)
+      this.renderObjectDirectly(obj)
     }
 
-    // Always render preview for active drawing (also with coordinate conversion)
-    this.renderPreviewWithCoordinateConversion(pixeloidScale)
+    // Always render preview for active drawing
+    this.renderPreviewDirectly()
     
     console.log('✅ GeometryRenderer: Render completed - always renders every call')
   }
@@ -179,53 +170,42 @@ export class GeometryRenderer {
   }
 
   /**
-   * Convert object from pixeloid coordinates to vertex coordinates using EXACT conversion (no rounding)
-   * This prevents geometry anchoring drift during zoom operations
+   * Check if object is within ECS viewport bounds for culling
    */
-  private convertObjectToVertexCoordinates(obj: GeometricObject): GeometricObject {
-    const offset = gameStore.mesh.vertex_to_pixeloid_offset
+  private isObjectInViewportBounds(obj: GeometricObject, viewportBounds: any): boolean {
+    if (!obj.metadata) return false
     
-    if ('anchorX' in obj && 'anchorY' in obj) {
-      // Diamond object - use exact coordinate conversion
-      return {
-        ...obj,
-        anchorX: obj.anchorX - offset.x,  // EXACT conversion, no rounding
-        anchorY: obj.anchorY - offset.y
-      }
-    } else if ('x' in obj && 'width' in obj && 'height' in obj) {
-      // Rectangle object - use exact coordinate conversion
-      return {
-        ...obj,
-        x: obj.x - offset.x,  // EXACT conversion, no rounding
-        y: obj.y - offset.y
-      }
-    } else if ('centerX' in obj && 'centerY' in obj) {
-      // Circle object - use exact coordinate conversion
-      return {
-        ...obj,
-        centerX: obj.centerX - offset.x,  // EXACT conversion, no rounding
-        centerY: obj.centerY - offset.y
-      }
-    } else if ('startX' in obj && 'endX' in obj) {
-      // Line object - convert both points using exact conversion
-      return {
-        ...obj,
-        startX: obj.startX - offset.x,  // EXACT conversion, no rounding
-        startY: obj.startY - offset.y,
-        endX: obj.endX - offset.x,
-        endY: obj.endY - offset.y
-      }
-    } else if ('x' in obj && 'y' in obj) {
-      // Point object - use exact coordinate conversion
-      return {
-        ...obj,
-        x: obj.x - offset.x,  // EXACT conversion, no rounding
-        y: obj.y - offset.y
-      }
+    const objBounds = obj.metadata.bounds
+    return !(objBounds.maxX < viewportBounds.minX || 
+            objBounds.minX > viewportBounds.maxX ||
+            objBounds.maxY < viewportBounds.minY ||
+            objBounds.minY > viewportBounds.maxY)
+  }
+  
+  /**
+   * Render object directly at fixed scale 1 (no coordinate conversion)
+   */
+  private renderObjectDirectly(obj: GeometricObject): void {
+    let objectContainer = this.objectContainers.get(obj.id)
+    let graphics = this.objectGraphics.get(obj.id)
+    
+    if (!objectContainer) {
+      objectContainer = new Container()
+      graphics = new Graphics()
+      objectContainer.addChild(graphics)
+      
+      this.objectContainers.set(obj.id, objectContainer)
+      this.objectGraphics.set(obj.id, graphics)
     }
+
+    graphics!.clear()
+    graphics!.position.set(0, 0)
     
-    // Fallback - return original object
-    return obj
+    // Render at fixed scale 1 with ECS sampling position offset
+    const samplingPos = gameStore.cameraViewport.geometry_sampling_position
+    this.renderGeometricObjectToGraphicsECS(obj, graphics!, samplingPos)
+    
+    this.assignObjectToFilterContainer(obj.id, objectContainer)
   }
 
   /**
@@ -233,41 +213,36 @@ export class GeometryRenderer {
    */
  
   /**
-   * Render a single geometric object to specific graphics context
+   * Render a single geometric object to specific graphics context for ECS
    */
-  private renderGeometricObjectToGraphics(obj: GeometricObject, pixeloidScale: number, graphics: Graphics): void {
-    // Type narrowing based on object properties
+  private renderGeometricObjectToGraphicsECS(obj: GeometricObject, graphics: Graphics, samplingPos: any): void {
+    const zoomFactor = gameStore.cameraViewport.zoom_factor
+    
+    // Type narrowing and direct rendering at scale 1
     if ('anchorX' in obj && 'anchorY' in obj) {
-      this.renderDiamondToGraphics(obj as GeometricDiamond, pixeloidScale, graphics)
+      this.renderDiamondECS(obj as GeometricDiamond, graphics, samplingPos, zoomFactor)
     } else if ('width' in obj && 'height' in obj) {
-      this.renderRectangleToGraphics(obj as GeometricRectangle, pixeloidScale, graphics)
+      this.renderRectangleECS(obj as GeometricRectangle, graphics, samplingPos, zoomFactor)
     } else if ('radius' in obj) {
-      this.renderCircleToGraphics(obj as GeometricCircle, pixeloidScale, graphics)
+      this.renderCircleECS(obj as GeometricCircle, graphics, samplingPos, zoomFactor)
     } else if ('startX' in obj && 'endX' in obj) {
-      this.renderLineToGraphics(obj as GeometricLine, pixeloidScale, graphics)
+      this.renderLineECS(obj as GeometricLine, graphics, samplingPos, zoomFactor)
     } else if ('x' in obj && 'y' in obj && !('width' in obj)) {
-      this.renderPointToGraphics(obj as GeometricPoint, pixeloidScale, graphics)
+      this.renderPointECS(obj as GeometricPoint, graphics, samplingPos, zoomFactor)
     }
   }
 
   /**
-   * Render a rectangle shape to specific graphics
+   * Render a rectangle shape for ECS at fixed scale 1
    */
-  private renderRectangleToGraphics(rect: GeometricRectangle, pixeloidScale: number, graphics: Graphics): void {
-    // Convert vertex coordinates to screen coordinates
-    const topLeft = CoordinateCalculations.vertexToScreen(
-      { __brand: 'vertex' as const, x: rect.x, y: rect.y },
-      pixeloidScale
-    )
-    const x = topLeft.x
-    const y = topLeft.y
-    const width = rect.width * pixeloidScale
-    const height = rect.height * pixeloidScale
+  private renderRectangleECS(rect: GeometricRectangle, graphics: Graphics, samplingPos: any, zoomFactor: number): void {
+    const x = (rect.x - samplingPos.x) * zoomFactor
+    const y = (rect.y - samplingPos.y) * zoomFactor
+    const width = rect.width * zoomFactor
+    const height = rect.height * zoomFactor
 
-    // Draw rectangle at screen coordinates
     graphics.rect(x, y, width, height)
 
-    // Apply fill if specified
     if (rect.fillColor !== undefined) {
       graphics.fill({
         color: rect.fillColor,
@@ -275,31 +250,23 @@ export class GeometryRenderer {
       })
     }
 
-    // Apply stroke (strokeWidth is in pixeloids, multiply by scale)
     graphics.stroke({
-      width: (rect.strokeWidth || gameStore.geometry.drawing.settings.defaultStrokeWidth) * pixeloidScale,
+      width: (rect.strokeWidth || gameStore.geometry.drawing.settings.defaultStrokeWidth) * zoomFactor,
       color: rect.color,
       alpha: rect.strokeAlpha
     })
   }
 
   /**
-   * Render a circle shape to specific graphics
+   * Render a circle shape for ECS at fixed scale 1
    */
-  private renderCircleToGraphics(circle: GeometricCircle, pixeloidScale: number, graphics: Graphics): void {
-    // Convert center vertex to screen coordinates
-    const center = CoordinateCalculations.vertexToScreen(
-      { __brand: 'vertex' as const, x: circle.centerX, y: circle.centerY },
-      pixeloidScale
-    )
-    const centerX = center.x
-    const centerY = center.y
-    const radius = circle.radius * pixeloidScale
+  private renderCircleECS(circle: GeometricCircle, graphics: Graphics, samplingPos: any, zoomFactor: number): void {
+    const centerX = (circle.centerX - samplingPos.x) * zoomFactor
+    const centerY = (circle.centerY - samplingPos.y) * zoomFactor
+    const radius = circle.radius * zoomFactor
 
-    // Draw circle at screen coordinates
     graphics.circle(centerX, centerY, radius)
 
-    // Apply fill if specified
     if (circle.fillColor !== undefined) {
       graphics.fill({
         color: circle.fillColor,
@@ -307,53 +274,41 @@ export class GeometryRenderer {
       })
     }
 
-    // Apply stroke (strokeWidth is in pixeloids, multiply by scale)
     graphics.stroke({
-      width: (circle.strokeWidth || gameStore.geometry.drawing.settings.defaultStrokeWidth) * pixeloidScale,
+      width: (circle.strokeWidth || gameStore.geometry.drawing.settings.defaultStrokeWidth) * zoomFactor,
       color: circle.color,
       alpha: circle.strokeAlpha
     })
   }
 
   /**
-   * Render a line shape to specific graphics
+   * Render a line shape for ECS at fixed scale 1
    */
-  private renderLineToGraphics(line: GeometricLine, pixeloidScale: number, graphics: Graphics): void {
-    // Convert both endpoints to screen coordinates
-    const start = CoordinateCalculations.vertexToScreen(
-      { __brand: 'vertex' as const, x: line.startX, y: line.startY },
-      pixeloidScale
-    )
-    const end = CoordinateCalculations.vertexToScreen(
-      { __brand: 'vertex' as const, x: line.endX, y: line.endY },
-      pixeloidScale
-    )
+  private renderLineECS(line: GeometricLine, graphics: Graphics, samplingPos: any, zoomFactor: number): void {
+    const startX = (line.startX - samplingPos.x) * zoomFactor
+    const startY = (line.startY - samplingPos.y) * zoomFactor
+    const endX = (line.endX - samplingPos.x) * zoomFactor
+    const endY = (line.endY - samplingPos.y) * zoomFactor
 
-    // Draw line at screen coordinates
-    graphics.moveTo(start.x, start.y)
-    graphics.lineTo(end.x, end.y)
+    graphics.moveTo(startX, startY)
+    graphics.lineTo(endX, endY)
 
-    // Apply stroke (strokeWidth is in pixeloids, multiply by scale)
     graphics.stroke({
-      width: (line.strokeWidth || gameStore.geometry.drawing.settings.defaultStrokeWidth) * pixeloidScale,
+      width: (line.strokeWidth || gameStore.geometry.drawing.settings.defaultStrokeWidth) * zoomFactor,
       color: line.color,
       alpha: line.strokeAlpha
     })
   }
 
   /**
-   * Render a point shape to specific graphics
+   * Render a point shape for ECS at fixed scale 1
    */
-  private renderPointToGraphics(point: GeometricPoint, pixeloidScale: number, graphics: Graphics): void {
-    // Convert vertex position to screen coordinates
-    const pos = CoordinateCalculations.vertexToScreen(
-      { __brand: 'vertex' as const, x: point.x, y: point.y },
-      pixeloidScale
-    )
+  private renderPointECS(point: GeometricPoint, graphics: Graphics, samplingPos: any, zoomFactor: number): void {
+    const x = (point.x - samplingPos.x) * zoomFactor
+    const y = (point.y - samplingPos.y) * zoomFactor
     
-    // Draw point as small circle with fixed pixel size
-    const pointRadius = 2  // Fixed pixel size, no scaling needed
-    graphics.circle(pos.x, pos.y, pointRadius)
+    const pointRadius = 2 * zoomFactor
+    graphics.circle(x, y, pointRadius)
     graphics.fill({
       color: point.color,
       alpha: point.strokeAlpha
@@ -361,38 +316,34 @@ export class GeometryRenderer {
   }
 
   /**
-   * Render an isometric diamond shape to specific graphics
+   * Render an isometric diamond shape for ECS at fixed scale 1
    */
-  private renderDiamondToGraphics(diamond: GeometricDiamond, pixeloidScale: number, graphics: Graphics): void {
-    // Use centralized geometry calculations (already in vertex coordinates)
+  private renderDiamondECS(diamond: GeometricDiamond, graphics: Graphics, samplingPos: any, zoomFactor: number): void {
     const vertices = GeometryHelper.calculateDiamondVertices(diamond)
     
-    // Convert each vertex to screen coordinates
-    const west = CoordinateCalculations.vertexToScreen(
-      { __brand: 'vertex' as const, x: vertices.west.x, y: vertices.west.y },
-      pixeloidScale
-    )
-    const north = CoordinateCalculations.vertexToScreen(
-      { __brand: 'vertex' as const, x: vertices.north.x, y: vertices.north.y },
-      pixeloidScale
-    )
-    const east = CoordinateCalculations.vertexToScreen(
-      { __brand: 'vertex' as const, x: vertices.east.x, y: vertices.east.y },
-      pixeloidScale
-    )
-    const south = CoordinateCalculations.vertexToScreen(
-      { __brand: 'vertex' as const, x: vertices.south.x, y: vertices.south.y },
-      pixeloidScale
-    )
+    const west = {
+      x: (vertices.west.x - samplingPos.x) * zoomFactor,
+      y: (vertices.west.y - samplingPos.y) * zoomFactor
+    }
+    const north = {
+      x: (vertices.north.x - samplingPos.x) * zoomFactor,
+      y: (vertices.north.y - samplingPos.y) * zoomFactor
+    }
+    const east = {
+      x: (vertices.east.x - samplingPos.x) * zoomFactor,
+      y: (vertices.east.y - samplingPos.y) * zoomFactor
+    }
+    const south = {
+      x: (vertices.south.x - samplingPos.x) * zoomFactor,
+      y: (vertices.south.y - samplingPos.y) * zoomFactor
+    }
     
-    // Draw diamond shape using screen coordinates
-    graphics.moveTo(west.x, west.y)    // West
-    graphics.lineTo(north.x, north.y)  // North
-    graphics.lineTo(east.x, east.y)    // East
-    graphics.lineTo(south.x, south.y)  // South
-    graphics.lineTo(west.x, west.y)    // Back to West (close)
+    graphics.moveTo(west.x, west.y)
+    graphics.lineTo(north.x, north.y)
+    graphics.lineTo(east.x, east.y)
+    graphics.lineTo(south.x, south.y)
+    graphics.lineTo(west.x, west.y)
 
-    // Apply fill if specified
     if (diamond.fillColor !== undefined) {
       graphics.fill({
         color: diamond.fillColor,
@@ -400,9 +351,8 @@ export class GeometryRenderer {
       })
     }
 
-    // Apply stroke (strokeWidth is in pixeloids, multiply by scale)
     graphics.stroke({
-      width: (diamond.strokeWidth || gameStore.geometry.drawing.settings.defaultStrokeWidth) * pixeloidScale,
+      width: (diamond.strokeWidth || gameStore.geometry.drawing.settings.defaultStrokeWidth) * zoomFactor,
       color: diamond.color,
       alpha: diamond.strokeAlpha
     })
@@ -441,35 +391,27 @@ export class GeometryRenderer {
 
 
   /**
-   * Render preview for active drawing operations - NEW: uses unified preview system
+   * Render preview for active drawing operations using ECS
    */
-  private renderPreviewWithCoordinateConversion(pixeloidScale: number): void {
+  private renderPreviewDirectly(): void {
     this.previewGraphics.clear()
     
     const preview = gameStore.geometry.drawing.preview
+    if (!preview) return
+
+    const samplingPos = gameStore.cameraViewport.geometry_sampling_position
+    const zoomFactor = gameStore.cameraViewport.zoom_factor
     
-    if (!preview) {
-      return
-    }
-
-    // ✅ COORDINATE CONVERSION: Convert preview vertices from pixeloid to vertex
-    const offset = gameStore.mesh.vertex_to_pixeloid_offset
-    const vertexVertices = preview.vertices.map(vertex => ({
-      x: vertex.x - offset.x,  // pixeloid to vertex
-      y: vertex.y - offset.y
-    }))
-
-    // Then convert from vertex to screen coordinates
-    const renderVertices = vertexVertices.map(vertex =>
-      CoordinateCalculations.vertexToScreen(
-        { __brand: 'vertex' as const, x: vertex.x, y: vertex.y },
-        pixeloidScale
-      )
-    )
+    // Convert preview vertices to screen coordinates for ECS
+    const renderVertices = preview.vertices.map(vertex => {
+      const relativeX = (vertex.x - samplingPos.x) * zoomFactor
+      const relativeY = (vertex.y - samplingPos.y) * zoomFactor
+      return { x: relativeX, y: relativeY }
+    })
 
     const previewAlpha = 0.6
 
-    // Render based on geometry type using screen coordinates
+    // Render based on geometry type
     switch (preview.type) {
       case 'point':
         if (renderVertices[0]) {
@@ -486,7 +428,7 @@ export class GeometryRenderer {
           this.previewGraphics.moveTo(renderVertices[0].x, renderVertices[0].y)
           this.previewGraphics.lineTo(renderVertices[1].x, renderVertices[1].y)
           this.previewGraphics.stroke({
-            width: preview.style.strokeWidth * pixeloidScale,
+            width: preview.style.strokeWidth * zoomFactor,
             color: preview.style.color,
             alpha: previewAlpha * preview.style.strokeAlpha
           })
@@ -500,7 +442,6 @@ export class GeometryRenderer {
           if (radius > 0) {
             this.previewGraphics.circle(center.x, center.y, radius)
             
-            // Apply fill if enabled
             if (preview.style.fillColor !== undefined) {
               this.previewGraphics.fill({
                 color: preview.style.fillColor,
@@ -509,7 +450,7 @@ export class GeometryRenderer {
             }
             
             this.previewGraphics.stroke({
-              width: preview.style.strokeWidth * pixeloidScale,
+              width: preview.style.strokeWidth * zoomFactor,
               color: preview.style.color,
               alpha: previewAlpha * preview.style.strokeAlpha
             })
@@ -526,7 +467,6 @@ export class GeometryRenderer {
           if (width >= 1 && height >= 1) {
             this.previewGraphics.rect(topLeft.x, topLeft.y, width, height)
             
-            // Apply fill if enabled
             if (preview.style.fillColor !== undefined) {
               this.previewGraphics.fill({
                 color: preview.style.fillColor,
@@ -535,7 +475,7 @@ export class GeometryRenderer {
             }
             
             this.previewGraphics.stroke({
-              width: preview.style.strokeWidth * pixeloidScale,
+              width: preview.style.strokeWidth * zoomFactor,
               color: preview.style.color,
               alpha: previewAlpha * preview.style.strokeAlpha
             })
@@ -550,9 +490,8 @@ export class GeometryRenderer {
           this.previewGraphics.lineTo(north.x, north.y)
           this.previewGraphics.lineTo(east.x, east.y)
           this.previewGraphics.lineTo(south.x, south.y)
-          this.previewGraphics.lineTo(west.x, west.y) // Close path
+          this.previewGraphics.lineTo(west.x, west.y)
           
-          // Apply fill if enabled
           if (preview.style.fillColor !== undefined) {
             this.previewGraphics.fill({
               color: preview.style.fillColor,
@@ -561,7 +500,7 @@ export class GeometryRenderer {
           }
           
           this.previewGraphics.stroke({
-            width: preview.style.strokeWidth * pixeloidScale,
+            width: preview.style.strokeWidth * zoomFactor,
             color: preview.style.color,
             alpha: previewAlpha * preview.style.strokeAlpha
           })

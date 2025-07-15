@@ -130,15 +130,19 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
       this.gridGraphics.parent.removeChild(this.gridGraphics)
     }
 
-    // Only background layer goes under camera transform (needs scaling)
+    // ECS Layer 1 (Geometry) stays independent of camera (pure data sampling)
+    this.getContainer().addChild(this.geometryLayer)    // NO camera transforms
+    
+    // Background goes under camera transform too
     this.cameraTransform.addChild(this.backgroundLayer)    // Grid and background elements
     
-    // All other layers go directly to container (no scaling - they draw at screen coordinates)
+    // Mirror layer goes under camera transform for proper scaling
+    this.cameraTransform.addChild(this.mirrorLayer)              // Mirror needs camera viewport
+    
+    // Other layers go directly to container (no scaling)
     const mainContainer = this.getContainer()
-    mainContainer.addChild(this.geometryLayer)            // Geometric shapes at screen coords
     mainContainer.addChild(this.selectionLayer)           // Selection highlights at screen coords
     mainContainer.addChild(this.pixelateLayer)            // Pixelate effects at screen coords
-    mainContainer.addChild(this.mirrorLayer)              // Mirror layer at screen coords
     mainContainer.addChild(this.raycastLayer)             // Raycast lines at screen coords
     mainContainer.addChild(this.bboxLayer)                // Bbox layer at screen coords
     
@@ -162,10 +166,10 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
    * Initialize the static mesh system with current camera state
    */
   private initializeStaticMeshSystem(): void {
-    const initialPixeloidScale = this.localPixeloidScale || gameStore.camera.pixeloid_scale
-    this.staticMeshManager.initialize(initialPixeloidScale)
+    const initialZoomFactor = this.localPixeloidScale || gameStore.cameraViewport.zoom_factor
+    this.staticMeshManager.initialize(initialZoomFactor)
     
-    console.log(`LayeredInfiniteCanvas: Initialized static mesh system with scale ${initialPixeloidScale}`)
+    console.log(`LayeredInfiniteCanvas: Initialized static mesh system with zoom factor ${initialZoomFactor}`)
   }
 
   /**
@@ -196,44 +200,47 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
       bottomLeft: createPixeloidCoordinate(viewportBounds.world.top_left.x, viewportBounds.world.bottom_right.y),
       bottomRight: viewportBounds.world.bottom_right
     }
-    const pixeloidScale = this.localPixeloidScale
+    const zoomFactor = gameStore.cameraViewport.zoom_factor
     
     // Use much larger viewport with padding to avoid constant re-renders during navigation
     const paddedCorners = this.calculatePaddedViewport(corners)
     
     // Check if background needs re-rendering (only on zoom or major movement)
-    if (this.backgroundDirty || pixeloidScale !== this.lastPixeloidScale) {
+    if (this.backgroundDirty || zoomFactor !== this.lastPixeloidScale) {
       this.isBackgroundRendering = true
-      this.renderBackgroundLayer(paddedCorners, pixeloidScale)
+      this.renderBackgroundLayer(paddedCorners, zoomFactor)
       this.backgroundDirty = false
       this.isBackgroundRendering = false
     }
 
-    // Always render geometry every frame at 60fps (full redraw ensures old positions cleared)
-    this.renderGeometryLayer(pixeloidScale)
+    // Always render geometry every frame at 60fps (ECS: No scale parameter)
+    this.renderGeometryLayer()
+    
+    // Automatic zoom-based layer visibility (ECS)
+    this.updateLayerVisibilityECS(zoomFactor)
     
     // Render selection highlights (reactive, always updates based on store state)
-    this.renderSelectionLayer(paddedCorners, pixeloidScale)
+    this.renderSelectionLayer(paddedCorners, zoomFactor)
     
     // Render pixelate effects (independent, GPU-accelerated)
-    this.renderPixelateLayer(paddedCorners, pixeloidScale)
+    this.renderPixelateLayer(paddedCorners, zoomFactor)
     
     // Render mirror layer (cached texture sprites)
-    this.renderMirrorLayer(paddedCorners, pixeloidScale)
+    this.renderMirrorLayer(paddedCorners, zoomFactor)
     
     // Render bbox layer (comparison overlay)
-    this.renderBboxLayer(paddedCorners, pixeloidScale)
+    this.renderBboxLayer(paddedCorners, zoomFactor)
     
     // Render UI overlay layer
-    this.renderUIOverlayLayer(paddedCorners, pixeloidScale)
+    this.renderUIOverlayLayer(paddedCorners, zoomFactor)
     
     // Handle static mesh zoom changes with smart caching
-    if (pixeloidScale !== this.lastPixeloidScale) {
-      this.staticMeshManager.handleScaleChange(pixeloidScale)
+    if (zoomFactor !== this.lastPixeloidScale) {
+      this.staticMeshManager.handleScaleChange(zoomFactor)
     }
     
     // Update tracking variables
-    this.lastPixeloidScale = pixeloidScale
+    this.lastPixeloidScale = zoomFactor
     
     // Update mouse visualization (only when background is not rendering and mouse layer is visible)
     if (!this.isBackgroundRendering) {
@@ -262,19 +269,21 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
   }
   
   /**
-   * Render geometry layer with store-driven offset positioning
+   * Render geometry layer with ECS viewport sampling
    * ALWAYS renders to maintain object containers for mirror layer
    */
-  private renderGeometryLayer(pixeloidScale: number): void {
-    // ALWAYS render to maintain object containers (required for mirror layer)
-    this.geometryRenderer.render(pixeloidScale)
+  private renderGeometryLayer(): void {
+    // ECS: No scale parameter needed
+    this.geometryRenderer.render()
     
     // Clear and re-add to ensure fresh state
     this.geometryLayer.removeChildren()
     this.geometryLayer.addChild(this.geometryRenderer.getContainer())
     
-    // Control visibility instead of conditional rendering
-    this.geometryLayer.visible = gameStore.geometry.layerVisibility.geometry
+    // ECS: Control visibility based on zoom level and manual override
+    const zoomFactor = gameStore.cameraViewport.zoom_factor
+    const autoShowGeometry = (zoomFactor === 1)
+    this.geometryLayer.visible = autoShowGeometry && gameStore.geometry.layerVisibility.geometry
     
     // ✅ NO LAYER POSITIONING: Keep layer at (0,0) and let GeometryRenderer handle coordinates
     this.geometryLayer.position.set(0, 0)
@@ -314,26 +323,29 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
   }
 
   /**
-   * Render mirror layer - cached texture sprites that mirror the geometry layer
+   * Render mirror layer - ECS zoom-dependent behavior
    * ALWAYS renders to maintain texture cache for filter layers
    */
-  private renderMirrorLayer(corners: ViewportCorners, pixeloidScale: number): void {
-    // ALWAYS render to maintain texture cache (required for pixelate and other filters)
-    this.mirrorLayerRenderer.render(
-      corners,
-      pixeloidScale,
-      this.geometryRenderer
-    )
+  private renderMirrorLayer(_corners: ViewportCorners, zoomFactor: number): void {
+    // ECS: Zoom-dependent mirror behavior
+    if (zoomFactor === 1) {
+      // Show complete geometry mirror
+      this.mirrorLayerRenderer.renderComplete(this.geometryRenderer)
+    } else {
+      // Show camera viewport of geometry
+      this.mirrorLayerRenderer.renderViewport(
+        gameStore.cameraViewport.viewport_position,
+        zoomFactor,
+        this.geometryRenderer
+      )
+    }
     
     // Always update the container content
     this.mirrorLayer.removeChildren()
     this.mirrorLayer.addChild(this.mirrorLayerRenderer.getContainer())
     
-    // Control visibility separately (allows filters to work even when mirror is hidden)
-    this.mirrorLayer.visible = gameStore.geometry.layerVisibility.mirror
-    
     if (gameStore.geometry.layerVisibility.mirror) {
-      console.log('🎯 LayeredInfiniteCanvas: Rendered mirror layer with cached texture sprites')
+      console.log(`🎯 LayeredInfiniteCanvas: Rendered mirror layer for zoom ${zoomFactor}`)
     }
   }
   
@@ -362,6 +374,18 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
   }
   
   /**
+   * Update automatic layer visibility based on ECS zoom level
+   */
+  private updateLayerVisibilityECS(zoomFactor: number): void {
+    // Automatic zoom-based + manual override
+    const autoShowGeometry = (zoomFactor === 1)
+    const autoShowMirror = true  // Mirror always available
+    
+    this.geometryLayer.visible = autoShowGeometry && gameStore.geometry.layerVisibility.geometry
+    this.mirrorLayer.visible = autoShowMirror && gameStore.geometry.layerVisibility.mirror
+  }
+  
+  /**
    * Render mouse layer - controls mouse visualization
    */
   private renderMouseLayer(): void {
@@ -387,12 +411,12 @@ export class LayeredInfiniteCanvas extends InfiniteCanvas {
       this.backgroundDirty = true
     })
 
-    // Subscribe to camera changes for background re-rendering (less aggressive)
-    subscribe(gameStore.camera, () => {
+    // Subscribe to camera viewport changes for background re-rendering (less aggressive)
+    subscribe(gameStore.cameraViewport, () => {
       // Only mark background dirty on significant changes (zoom, not position)
-      if (gameStore.camera.pixeloid_scale !== this.lastPixeloidScale) {
+      if (gameStore.cameraViewport.zoom_factor !== this.lastPixeloidScale) {
         this.backgroundDirty = true
-        this.lastPixeloidScale = gameStore.camera.pixeloid_scale
+        this.lastPixeloidScale = gameStore.cameraViewport.zoom_factor
       }
     })
 

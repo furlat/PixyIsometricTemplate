@@ -15,6 +15,7 @@ import type {
   AnchorSnapPoint,
 } from '../types'
 import { gameStore } from '../store/gameStore'
+import { CoordinateHelper } from './CoordinateHelper'
 
 export class GeometryHelper {
 
@@ -297,7 +298,8 @@ export class GeometryHelper {
         minY: pixeloidY,
         maxY: pixeloidY + 1   // Full pixeloid height
       },
-      visibilityCache: new Map()
+      visibilityCache: new Map(),
+      createdAtScale: gameStore.cameraViewport.zoom_factor
     }
   }
 
@@ -316,7 +318,8 @@ export class GeometryHelper {
         minY: Math.min(line.startY, line.endY),
         maxY: Math.max(line.startY, line.endY)
       },
-      visibilityCache: new Map()
+      visibilityCache: new Map(),
+      createdAtScale: gameStore.cameraViewport.zoom_factor
     }
   }
 
@@ -333,7 +336,8 @@ export class GeometryHelper {
         minY: Math.floor(circle.centerY - circle.radius),
         maxY: Math.ceil(circle.centerY + circle.radius)
       },
-      visibilityCache: new Map()
+      visibilityCache: new Map(),
+      createdAtScale: gameStore.cameraViewport.zoom_factor
     }
   }
 
@@ -352,7 +356,8 @@ export class GeometryHelper {
         minY: rectangle.y,
         maxY: rectangle.y + rectangle.height
       },
-      visibilityCache: new Map()
+      visibilityCache: new Map(),
+      createdAtScale: gameStore.cameraViewport.zoom_factor
     }
   }
 
@@ -371,7 +376,8 @@ export class GeometryHelper {
         minY: Math.floor(diamond.anchorY - diamond.height), // ✅ Round DOWN - include full pixeloid containing north vertex
         maxY: Math.ceil(diamond.anchorY + diamond.height)   // ✅ Round UP - include full pixeloid containing south vertex
       },
-      visibilityCache: new Map()
+      visibilityCache: new Map(),
+      createdAtScale: gameStore.cameraViewport.zoom_factor
     }
   }
 
@@ -527,7 +533,7 @@ export class GeometryHelper {
     }
     
     const bounds = obj.metadata.bounds
-    const offset = gameStore.mesh.vertex_to_pixeloid_offset
+    const offset = CoordinateHelper.getCurrentOffset()
     
     // Convert pixeloid bounds to screen coordinates
     const screenBounds = {

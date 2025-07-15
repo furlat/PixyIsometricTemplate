@@ -3,6 +3,7 @@ import { OutlineFilter } from 'pixi-filters'
 import { gameStore } from '../store/gameStore'
 import { GeometryHelper } from './GeometryHelper'
 import { CoordinateCalculations } from './CoordinateCalculations'
+import { CoordinateHelper } from './CoordinateHelper'
 import type { ViewportCorners, GeometricObject, GeometricRectangle, GeometricCircle, GeometricLine, GeometricPoint, GeometricDiamond } from '../types'
 
 /**
@@ -100,7 +101,7 @@ export class SelectionFilterRenderer {
    * Convert object from pixeloid coordinates to vertex coordinates using SAME logic as GeometryRenderer
    */
   private convertObjectToVertexCoordinates(obj: GeometricObject): GeometricObject {
-    const offset = gameStore.mesh.vertex_to_pixeloid_offset
+    const offset = CoordinateHelper.getCurrentOffset()
     
     if ('anchorX' in obj && 'anchorY' in obj) {
       // Diamond object - use EXACT same conversion as GeometryRenderer

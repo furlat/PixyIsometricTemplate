@@ -43,24 +43,35 @@ export const gameStore = proxy<GameState>({
   windowHeight: window.innerHeight,
   
   // ================================
-  // CLEAN COORDINATE STATE
+  // ECS CAMERA VIEWPORT ARCHITECTURE
   // ================================
   
-  camera: {
-    world_position: createPixeloidCoordinate(0, 0),
-    screen_center: { x: window.innerWidth / 2, y: window.innerHeight / 2 },
-    pixeloid_scale: 10,
-    viewport_bounds: createEmptyViewportBounds()
-  },
-  
-  mesh: {
-    vertex_to_pixeloid_offset: createPixeloidCoordinate(0, 0),
-    active_resolution: 1,
-    vertex_bounds: {
-      width: 100,
-      height: 100
+  cameraViewport: {
+    // Mirror layer camera viewport position (for zoom 2+)
+    viewport_position: createPixeloidCoordinate(0, 0),
+    
+    // Geometry layer sampling window position (for zoom 1)
+    geometry_sampling_position: createPixeloidCoordinate(0, 0),
+    
+    // Integer zoom factors for pixel-perfect alignment
+    zoom_factor: 10,  // Start at 10 to match current behavior
+    
+    // Fixed geometry layer bounds (expands as needed)
+    geometry_layer_bounds: {
+      width: 200,
+      height: 200,
+      minX: -100,
+      maxX: 100,
+      minY: -100,
+      maxY: 100
     },
-    screen_to_vertex_scale: 10
+    
+    // Geometry layer always renders at scale 1
+    geometry_layer_scale: 1,
+    
+    // Camera movement state
+    is_panning: false,
+    pan_start_position: createPixeloidCoordinate(0, 0)
   },
   
   mouse: {
@@ -214,219 +225,75 @@ export const updateGameStore = {
   // ATOMIC COORDINATE UPDATES (Infinite Loop Prevention)
   // ================================
 
-  // ATOMIC CAMERA UPDATE - Updates all related values in one action
-  setCameraPosition: (worldPos: PixeloidCoordinate) => {
-    if (isUpdatingCoordinates) return // Prevent infinite loops
+  // ECS Camera Viewport Methods
+  setCameraViewportPosition: (position: PixeloidCoordinate) => {
+    gameStore.cameraViewport.viewport_position = position
+  },
+  
+  setGeometrySamplingPosition: (position: PixeloidCoordinate) => {
+    gameStore.cameraViewport.geometry_sampling_position = position
+  },
+  
+  setCameraViewportZoom: (zoomFactor: number) => {
+    // Validate integer zoom factors
+    const validZooms = [1, 2, 4, 8, 16, 32, 64, 128]
+    const clampedZoom = validZooms.reduce((prev, curr) => 
+      Math.abs(curr - zoomFactor) < Math.abs(prev - zoomFactor) ? curr : prev
+    )
+    gameStore.cameraViewport.zoom_factor = clampedZoom
+  },
+  
+  // WASD movement router based on zoom
+  updateMovementECS: (deltaX: number, deltaY: number) => {
+    const zoomFactor = gameStore.cameraViewport.zoom_factor
     
-    isUpdatingCoordinates = true
-    try {
-      // Update primary value
-      gameStore.camera.world_position = worldPos
-      
-      // Batch update all derived values in one transaction
-      const scale = gameStore.camera.pixeloid_scale
-      const offset = gameStore.mesh.vertex_to_pixeloid_offset
-      const screenSize = { width: gameStore.windowWidth, height: gameStore.windowHeight }
-      
-      // Recalculate derived values using pure functions (no store dependencies)
-      const updatedBounds = CoordinateCalculations.calculateViewportBounds(
-        screenSize, scale, worldPos, offset
+    if (zoomFactor === 1) {
+      // Zoom 1: Move geometry sampling window
+      const currentPos = gameStore.cameraViewport.geometry_sampling_position
+      updateGameStore.setGeometrySamplingPosition(
+        createPixeloidCoordinate(currentPos.x + deltaX, currentPos.y + deltaY)
       )
-      const updatedScreenCenter = CoordinateCalculations.pixeloidToScreen(
-        worldPos, scale, offset
+    } else {
+      // Zoom 2+: Move mirror viewport
+      const currentPos = gameStore.cameraViewport.viewport_position
+      updateGameStore.setCameraViewportPosition(
+        createPixeloidCoordinate(currentPos.x + deltaX, currentPos.y + deltaY)
       )
-      
-      // Apply all updates atomically
-      gameStore.camera.screen_center = { x: updatedScreenCenter.x, y: updatedScreenCenter.y }
-      gameStore.camera.viewport_bounds = updatedBounds
-      gameStore.mesh.screen_to_vertex_scale = scale
-      
-    } finally {
-      isUpdatingCoordinates = false
     }
   },
   
-  // ATOMIC SCALE UPDATE - Updates all scale-dependent values
-  setPixeloidScale: (scale: number) => {
-    if (isUpdatingCoordinates) return // Prevent infinite loops
-    
-    // Clamp scale between reasonable values (minimum 1 pixeloid - full zoom out unlocked)
-    const clampedScale = Math.max(1, Math.min(100, scale))
-    
-    // Check if zoom is allowed based on scale tracking
-    const zoomCheck = updateGameStore.canZoomToScale(clampedScale)
-    if (!zoomCheck.allowed) {
-      console.warn(`Zoom blocked: ${zoomCheck.reason}`)
-      // TODO: Show dialog to user
-      return
-    }
-    
-    isUpdatingCoordinates = true
-    try {
-      // Update primary value
-      gameStore.camera.pixeloid_scale = clampedScale
-      
-      // Batch update all derived values
-      const worldPos = gameStore.camera.world_position
-      const offset = gameStore.mesh.vertex_to_pixeloid_offset
-      const screenSize = { width: gameStore.windowWidth, height: gameStore.windowHeight }
-      
-      // Recalculate everything that depends on scale
-      const updatedBounds = CoordinateCalculations.calculateViewportBounds(
-        screenSize, clampedScale, worldPos, offset
-      )
-      const updatedScreenCenter = CoordinateCalculations.pixeloidToScreen(
-        worldPos, clampedScale, offset
-      )
-      
-      // Apply atomically
-      gameStore.camera.screen_center = { x: updatedScreenCenter.x, y: updatedScreenCenter.y }
-      gameStore.camera.viewport_bounds = updatedBounds
-      gameStore.mesh.screen_to_vertex_scale = clampedScale
-      
-      // Update visibility for all objects after zoom
-      for (const obj of gameStore.geometry.objects) {
-        if (!obj.metadata) continue
-        
-        // Initialize visibility cache if needed
-        if (!obj.metadata.visibilityCache) {
-          obj.metadata.visibilityCache = new Map()
-        }
-        
-        const visibilityInfo = GeometryHelper.calculateVisibilityState(obj, clampedScale)
-        
-        // Store in scale-indexed cache
-        obj.metadata.visibilityCache.set(clampedScale, {
-          visibility: visibilityInfo.visibility,
-          onScreenBounds: visibilityInfo.onScreenBounds
-        })
-        
-        // Clean up old scales (keep current ±1)
-        cleanupVisibilityCache(obj.metadata.visibilityCache, clampedScale)
-      }
-      
-    } finally {
-      isUpdatingCoordinates = false
-    }
-  },
   
-  // ATOMIC OFFSET UPDATE - Updates all offset-dependent values
-  setVertexToPixeloidOffset: (offset: PixeloidCoordinate) => {
-    if (isUpdatingCoordinates) return // Prevent infinite loops
-    
-    isUpdatingCoordinates = true
-    try {
-      // Update primary value
-      gameStore.mesh.vertex_to_pixeloid_offset = offset
-      
-      // Batch update all derived values
-      const worldPos = gameStore.camera.world_position
-      const scale = gameStore.camera.pixeloid_scale
-      const screenSize = { width: gameStore.windowWidth, height: gameStore.windowHeight }
-      
-      // Recalculate everything that depends on offset
-      const updatedBounds = CoordinateCalculations.calculateViewportBounds(
-        screenSize, scale, worldPos, offset
-      )
-      
-      // Apply atomically
-      gameStore.camera.viewport_bounds = updatedBounds
-      
-      // Update visibility for all objects after camera movement
-      for (const obj of gameStore.geometry.objects) {
-        if (!obj.metadata) continue
-        
-        // Initialize visibility cache if needed
-        if (!obj.metadata.visibilityCache) {
-          obj.metadata.visibilityCache = new Map()
-        }
-        
-        const visibilityInfo = GeometryHelper.calculateVisibilityState(obj, scale)
-        
-        // Store in scale-indexed cache
-        obj.metadata.visibilityCache.set(scale, {
-          visibility: visibilityInfo.visibility,
-          onScreenBounds: visibilityInfo.onScreenBounds
-        })
-        
-        // Clean up old scales (keep current ±1)
-        cleanupVisibilityCache(obj.metadata.visibilityCache, scale)
-      }
-      
-    } finally {
-      isUpdatingCoordinates = false
-    }
-  },
   
-  // ATOMIC MOUSE UPDATE - Updates all mouse coordinate systems
+  // ECS Mouse position update
   updateMousePositions: (screenPos: { x: number, y: number }) => {
-    if (isUpdatingCoordinates) return // Prevent infinite loops
-    
-    // This is safe because it only updates mouse state, no cascading effects
-    const scale = gameStore.camera.pixeloid_scale
-    const offset = gameStore.mesh.vertex_to_pixeloid_offset
+    const scale = gameStore.cameraViewport.zoom_factor
     
     const vertexPos = CoordinateCalculations.screenToVertex(
       createScreenCoordinate(screenPos.x, screenPos.y),
       scale
     )
-    const pixeloidPos = CoordinateCalculations.screenToPixeloid(
-      createScreenCoordinate(screenPos.x, screenPos.y),
-      scale,
-      offset
-    )
     
-    // Update all mouse positions atomically
+    // For ECS, pixeloid position depends on which layer we're sampling
+    let pixeloidPos: PixeloidCoordinate
+    if (scale === 1) {
+      // Zoom 1: Use geometry sampling position as offset
+      const offset = gameStore.cameraViewport.geometry_sampling_position
+      pixeloidPos = CoordinateCalculations.vertexToPixeloid(vertexPos, offset)
+    } else {
+      // Zoom 2+: Use viewport position as offset
+      const offset = gameStore.cameraViewport.viewport_position
+      pixeloidPos = CoordinateCalculations.vertexToPixeloid(vertexPos, offset)
+    }
+    
     gameStore.mouse.screen_position = screenPos
     gameStore.mouse.vertex_position = { x: vertexPos.x, y: vertexPos.y }
-    gameStore.mouse.pixeloid_position = { __brand: 'pixeloid', x: pixeloidPos.x, y: pixeloidPos.y }
+    gameStore.mouse.pixeloid_position = pixeloidPos
   },
   
-  // WINDOW RESIZE - Recalculates viewport bounds
+  // ECS Window resize
   updateWindowSize: (width: number, height: number) => {
-    if (isUpdatingCoordinates) return // Prevent infinite loops
-    
-    isUpdatingCoordinates = true
-    try {
-      // Update window size
-      gameStore.windowWidth = width
-      gameStore.windowHeight = height
-      
-      // Recalculate viewport bounds with new screen size
-      const worldPos = gameStore.camera.world_position
-      const scale = gameStore.camera.pixeloid_scale
-      const offset = gameStore.mesh.vertex_to_pixeloid_offset
-      
-      const updatedBounds = CoordinateCalculations.calculateViewportBounds(
-        { width, height }, scale, worldPos, offset
-      )
-      
-      gameStore.camera.viewport_bounds = updatedBounds
-      
-      // Update visibility for all objects after window resize
-      for (const obj of gameStore.geometry.objects) {
-        if (!obj.metadata) continue
-        
-        // Initialize visibility cache if needed
-        if (!obj.metadata.visibilityCache) {
-          obj.metadata.visibilityCache = new Map()
-        }
-        
-        const visibilityInfo = GeometryHelper.calculateVisibilityState(obj, scale)
-        
-        // Store in scale-indexed cache
-        obj.metadata.visibilityCache.set(scale, {
-          visibility: visibilityInfo.visibility,
-          onScreenBounds: visibilityInfo.onScreenBounds
-        })
-        
-        // Clean up old scales (keep current ±1)
-        cleanupVisibilityCache(obj.metadata.visibilityCache, scale)
-      }
-      
-    } finally {
-      isUpdatingCoordinates = false
-    }
+    gameStore.windowWidth = width
+    gameStore.windowHeight = height
   },
 
   // Input controls
@@ -434,32 +301,6 @@ export const updateGameStore = {
     gameStore.input.keys[key] = pressed
   },
 
-  // Legacy compatibility methods (will be removed after migration)
-  updateMousePosition: (x: number, y: number) => {
-    updateGameStore.updateMousePositions({ x, y })
-  },
-
-  updateMousePixeloidPosition: (pixeloidX: number, pixeloidY: number) => {
-    // Delegate to the new system
-    gameStore.mouse.pixeloid_position = createPixeloidCoordinate(pixeloidX, pixeloidY)
-  },
-
-  updateMouseVertexPosition: (vertexX: number, vertexY: number) => {
-    // Delegate to the new system
-    gameStore.mouse.vertex_position = { x: vertexX, y: vertexY }
-  },
-
-  // Legacy methods for backward compatibility during migration
-  setViewportOffset: (x: number, y: number) => {
-    updateGameStore.setVertexToPixeloidOffset(createPixeloidCoordinate(x, y))
-  },
-
-  updateViewportOffset: (deltaX: number, deltaY: number) => {
-    const currentOffset = gameStore.mesh.vertex_to_pixeloid_offset
-    updateGameStore.setVertexToPixeloidOffset(
-      createPixeloidCoordinate(currentOffset.x + deltaX, currentOffset.y + deltaY)
-    )
-  },
 
   // Geometry controls (Phase 1: Multi-Layer System)
   setDrawingMode: (mode: 'none' | 'point' | 'line' | 'circle' | 'rectangle' | 'diamond') => {
@@ -495,7 +336,7 @@ export const updateGameStore = {
     
     // Initialize visibility cache if not present
     if (ensuredObject.metadata && !ensuredObject.metadata.visibilityCache) {
-      const currentScale = gameStore.camera.pixeloid_scale
+      const currentScale = gameStore.cameraViewport.zoom_factor
       const visibilityInfo = GeometryHelper.calculateVisibilityState(ensuredObject, currentScale)
       
       ensuredObject.metadata.visibilityCache = new Map()
@@ -622,7 +463,7 @@ export const updateGameStore = {
 
   // Factory methods for creating objects with proper metadata
   createPoint: (x: number, y: number) => {
-    const currentScale = gameStore.camera.pixeloid_scale
+    const currentScale = gameStore.cameraViewport.zoom_factor
     const metadata = GeometryHelper.calculatePointMetadata({ x, y })
     metadata.createdAtScale = currentScale
     
@@ -655,7 +496,7 @@ export const updateGameStore = {
   },
 
   createLine: (startX: number, startY: number, endX: number, endY: number) => {
-    const currentScale = gameStore.camera.pixeloid_scale
+    const currentScale = gameStore.cameraViewport.zoom_factor
     const metadata = GeometryHelper.calculateLineMetadata({ startX, startY, endX, endY })
     metadata.createdAtScale = currentScale
     
@@ -691,7 +532,7 @@ export const updateGameStore = {
   },
 
   createCircle: (centerX: number, centerY: number, radius: number) => {
-    const currentScale = gameStore.camera.pixeloid_scale
+    const currentScale = gameStore.cameraViewport.zoom_factor
     const metadata = GeometryHelper.calculateCircleMetadata({ centerX, centerY, radius })
     metadata.createdAtScale = currentScale
     
@@ -730,7 +571,7 @@ export const updateGameStore = {
   },
 
   createRectangle: (x: number, y: number, width: number, height: number) => {
-    const currentScale = gameStore.camera.pixeloid_scale
+    const currentScale = gameStore.cameraViewport.zoom_factor
     const metadata = GeometryHelper.calculateRectangleMetadata({ x, y, width, height })
     metadata.createdAtScale = currentScale
     
@@ -770,7 +611,7 @@ export const updateGameStore = {
   },
 
   createDiamond: (anchorX: number, anchorY: number, width: number, height: number) => {
-    const currentScale = gameStore.camera.pixeloid_scale
+    const currentScale = gameStore.cameraViewport.zoom_factor
     const metadata = GeometryHelper.calculateDiamondMetadata({ anchorX, anchorY, width, height })
     metadata.createdAtScale = currentScale
     
@@ -1096,9 +937,16 @@ export const updateGameStore = {
   centerCameraOnObject: (objectId: string) => {
     const object = gameStore.geometry.objects.find(obj => obj.id === objectId)
     if (object && object.metadata) {
-      // Set camera position to center on object
-      updateGameStore.setCameraPosition(createPixeloidCoordinate(object.metadata.center.x, object.metadata.center.y))
-      console.log(`Store: Centered camera on object ${objectId} at position (${object.metadata.center.x.toFixed(1)}, ${object.metadata.center.y.toFixed(1)})`)
+      const targetPos = createPixeloidCoordinate(object.metadata.center.x, object.metadata.center.y)
+      const zoomFactor = gameStore.cameraViewport.zoom_factor
+      
+      // Use appropriate position based on zoom level
+      if (zoomFactor === 1) {
+        updateGameStore.setGeometrySamplingPosition(targetPos)
+      } else {
+        updateGameStore.setCameraViewportPosition(targetPos)
+      }
+      console.log(`Store: Centered camera on object ${objectId} at zoom ${zoomFactor}`)
     } else {
       console.warn(`Store: Cannot center on object ${objectId} - object not found or missing metadata`)
     }
@@ -1107,15 +955,21 @@ export const updateGameStore = {
   centerViewportOnObject: (objectId: string) => {
     const object = gameStore.geometry.objects.find(obj => obj.id === objectId)
     if (object && object.metadata) {
-      // Calculate offset to center object at screen center (compatible with WASD movement)
-      const screenCenterX = gameStore.windowWidth / 2 / gameStore.camera.pixeloid_scale
-      const screenCenterY = gameStore.windowHeight / 2 / gameStore.camera.pixeloid_scale
-      const targetOffset = createPixeloidCoordinate(
+      const zoomFactor = gameStore.cameraViewport.zoom_factor
+      const screenCenterX = gameStore.windowWidth / 2 / zoomFactor
+      const screenCenterY = gameStore.windowHeight / 2 / zoomFactor
+      const targetPos = createPixeloidCoordinate(
         object.metadata.center.x - screenCenterX,
         object.metadata.center.y - screenCenterY
       )
-      updateGameStore.setVertexToPixeloidOffset(targetOffset)
-      console.log(`Store: Centered viewport on object ${objectId} with offset (${targetOffset.x.toFixed(1)}, ${targetOffset.y.toFixed(1)})`)
+      
+      // Use appropriate position based on zoom level
+      if (zoomFactor === 1) {
+        updateGameStore.setGeometrySamplingPosition(targetPos)
+      } else {
+        updateGameStore.setCameraViewportPosition(targetPos)
+      }
+      console.log(`Store: Centered viewport on object ${objectId} at zoom ${zoomFactor}`)
     } else {
       console.warn(`Store: Cannot center viewport on object ${objectId} - object not found or missing metadata`)
     }
@@ -1244,7 +1098,7 @@ export const updateGameStore = {
   },
 
   getCurrentCoordinateMapping: (): PixeloidVertexMapping | null => {
-    return gameStore.staticMesh.coordinateMappings.get(gameStore.camera.pixeloid_scale) || null
+    return gameStore.staticMesh.coordinateMappings.get(gameStore.cameraViewport.zoom_factor) || null
   },
 
   getCoordinateMappingForScale: (pixeloidScale: number): PixeloidVertexMapping | null => {
@@ -1305,7 +1159,7 @@ export const updateGameStore = {
     }
     
     // Initialize visibility cache
-    const currentScale = gameStore.camera.pixeloid_scale
+    const currentScale = gameStore.cameraViewport.zoom_factor
     const visibilityInfo = GeometryHelper.calculateVisibilityState(point, currentScale)
     
     point.metadata!.visibilityCache = new Map()
@@ -1341,7 +1195,7 @@ export const updateGameStore = {
     }
     
     // Initialize visibility cache
-    const currentScale = gameStore.camera.pixeloid_scale
+    const currentScale = gameStore.cameraViewport.zoom_factor
     const visibilityInfo = GeometryHelper.calculateVisibilityState(line, currentScale)
     
     line.metadata!.visibilityCache = new Map()
@@ -1385,7 +1239,7 @@ export const updateGameStore = {
     }
     
     // Initialize visibility cache
-    const currentScale = gameStore.camera.pixeloid_scale
+    const currentScale = gameStore.cameraViewport.zoom_factor
     const visibilityInfo = GeometryHelper.calculateVisibilityState(circle, currentScale)
     
     circle.metadata!.visibilityCache = new Map()
@@ -1427,7 +1281,7 @@ export const updateGameStore = {
     }
     
     // Initialize visibility cache
-    const currentScale = gameStore.camera.pixeloid_scale
+    const currentScale = gameStore.cameraViewport.zoom_factor
     const visibilityInfo = GeometryHelper.calculateVisibilityState(rectangle, currentScale)
     
     rectangle.metadata!.visibilityCache = new Map()
@@ -1474,7 +1328,7 @@ export const updateGameStore = {
     }
     
     // Initialize visibility cache
-    const currentScale = gameStore.camera.pixeloid_scale
+    const currentScale = gameStore.cameraViewport.zoom_factor
     const visibilityInfo = GeometryHelper.calculateVisibilityState(diamond, currentScale)
     
     diamond.metadata!.visibilityCache = new Map()

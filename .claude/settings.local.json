@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rg:*)",
+      "Bash(cp:*)",
+      "Bash(grep:*)"
+    ],
+    "deny": []
+  }
+}

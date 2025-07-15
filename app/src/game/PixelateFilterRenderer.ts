@@ -2,6 +2,7 @@ import { Container, Sprite, Rectangle, Texture } from 'pixi.js'
 import { PixelateFilter } from 'pixi-filters'
 import { gameStore } from '../store/gameStore'
 import { CoordinateCalculations } from './CoordinateCalculations'
+import { CoordinateHelper } from './CoordinateHelper'
 import { GeometryHelper } from './GeometryHelper'
 import type { ViewportCorners } from '../types'
 import type { MirrorLayerRenderer } from './MirrorLayerRenderer'
@@ -185,8 +186,7 @@ export class PixelateFilterRenderer {
         continue
       }
       
-      // Step 2: Convert to vertex coordinates by subtracting offset
-      const offset = gameStore.mesh.vertex_to_pixeloid_offset
+      const offset = CoordinateHelper.getCurrentOffset()
       const vertexPos = {
         x: currentBounds.minX - offset.x,
         y: currentBounds.minY - offset.y

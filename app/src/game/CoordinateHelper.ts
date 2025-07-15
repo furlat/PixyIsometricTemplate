@@ -36,15 +36,27 @@ export class CoordinateHelper {
   // ================================
   
   static getCurrentOffset(): PixeloidCoordinate {
-    return gameStore.mesh.vertex_to_pixeloid_offset
+    const zoomFactor = gameStore.cameraViewport.zoom_factor
+    if (zoomFactor === 1) {
+      return gameStore.cameraViewport.geometry_sampling_position
+    } else {
+      return gameStore.cameraViewport.viewport_position
+    }
   }
   
   static getCurrentPixeloidScale(): number {
-    return gameStore.camera.pixeloid_scale
+    return gameStore.cameraViewport.zoom_factor
   }
   
   static getCurrentViewportBounds(): ViewportBounds {
-    return gameStore.camera.viewport_bounds
+    // For ECS, calculate viewport bounds dynamically
+    const zoomFactor = gameStore.cameraViewport.zoom_factor
+    const offset = this.getCurrentOffset()
+    const screenSize = { width: gameStore.windowWidth, height: gameStore.windowHeight }
+    
+    return CoordinateCalculations.calculateViewportBounds(
+      screenSize, zoomFactor, offset, offset
+    )
   }
   
   static getMousePixeloidPosition(): PixeloidCoordinate {
@@ -60,11 +72,16 @@ export class CoordinateHelper {
   }
 
   static getCameraWorldPosition(): PixeloidCoordinate {
-    return gameStore.camera.world_position
+    const zoomFactor = gameStore.cameraViewport.zoom_factor
+    if (zoomFactor === 1) {
+      return gameStore.cameraViewport.geometry_sampling_position
+    } else {
+      return gameStore.cameraViewport.viewport_position
+    }
   }
 
   static getCameraScreenCenter(): { x: number, y: number } {
-    return gameStore.camera.screen_center
+    return { x: gameStore.windowWidth / 2, y: gameStore.windowHeight / 2 }
   }
 
   // ================================
