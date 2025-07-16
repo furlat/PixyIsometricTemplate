@@ -181,8 +181,8 @@ export class GeometryRenderer_3b {
   private renderGeometricObjectToGraphics3B(obj: GeometricObject, graphics: Graphics, samplingPos: any): void {
     const zoomFactor = 1  // Fixed for Phase 3B
     
-    // Apply style settings
-    const style = obj.style || gameStore_3b.style
+    // Use obj.style directly - no fallbacks
+    const style = obj.style
     
     // Type-based rendering
     switch (obj.type) {
@@ -359,7 +359,7 @@ export class GeometryRenderer_3b {
       return { x: relativeX, y: relativeY }
     })
 
-    const previewAlpha = 0.6
+    const previewAlpha = gameStore_3b.drawing.settings.previewOpacity
     const style = preview.style
 
     // Render based on geometry type
@@ -421,7 +421,7 @@ export class GeometryRenderer_3b {
           const width = Math.abs(renderVertices[1].x - renderVertices[0].x)
           const height = Math.abs(renderVertices[1].y - renderVertices[0].y)
           
-          if (width >= 1 && height >= 1) {
+          if (width >= 0 && height >= 0) {  // Allow 0 width/height for preview
             this.previewGraphics.rect(x, y, width, height)
             
             if (style.fillColor !== undefined) {

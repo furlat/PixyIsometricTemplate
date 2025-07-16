@@ -12,7 +12,7 @@ import type {
 } from '../types'
 import { gameStore_3b, gameStore_3b_methods } from '../store/gameStore_3b'
 import { CoordinateHelper } from './CoordinateHelper_3b'
-import type { DrawingMode, StyleSettings, PreviewObject, AnchorPoint } from '../types/geometry-drawing'
+import type { DrawingMode, StyleSettings, PreviewObject } from '../types/geometry-drawing'
 import type { ECSDataLayer } from '../types/ecs-data-layer'
 
 export class GeometryHelper_3b {
@@ -21,72 +21,8 @@ export class GeometryHelper_3b {
   // CORE COORDINATE FUNCTIONS (MESH AUTHORITY)
   // ================================
 
-  /**
-   * Snap to pixeloid anchor point (mesh authority)
-   */
-  static snapToPixeloidAnchor(
-    clickPosition: PixeloidCoordinate,
-    snapPoint: 'topLeft' | 'topRight' | 'bottomLeft' | 'bottomRight' | 'center'
-  ): PixeloidCoordinate {
-    const gridX = Math.floor(clickPosition.x)
-    const gridY = Math.floor(clickPosition.y)
-    
-    switch (snapPoint) {
-      case 'topLeft': return { x: gridX, y: gridY }
-      case 'topRight': return { x: gridX + 1, y: gridY }
-      case 'bottomLeft': return { x: gridX, y: gridY + 1 }
-      case 'bottomRight': return { x: gridX + 1, y: gridY + 1 }
-      case 'center': return { x: gridX + 0.5, y: gridY + 0.5 }
-      default: return { x: gridX + 0.5, y: gridY + 0.5 }
-    }
-  }
 
-  /**
-   * Snap coordinate to pixeloid center (mesh authority)
-   */
-  static snapToPixeloidCenter(coordinate: number): number {
-    return Math.floor(coordinate) + 0.5
-  }
 
-  /**
-   * Snap point to pixeloid center (mesh authority)
-   */
-  static snapPointToPixeloidCenter(point: PixeloidCoordinate): PixeloidCoordinate {
-    return {
-      x: this.snapToPixeloidCenter(point.x),
-      y: this.snapToPixeloidCenter(point.y)
-    }
-  }
-
-  /**
-   * Calculate pixeloid anchor points for mouse interaction
-   */
-  static calculatePixeloidAnchorPoints(pixeloidX: number, pixeloidY: number): {
-    topLeft: PixeloidCoordinate
-    topRight: PixeloidCoordinate
-    bottomLeft: PixeloidCoordinate
-    bottomRight: PixeloidCoordinate
-    topMid: PixeloidCoordinate
-    rightMid: PixeloidCoordinate
-    bottomMid: PixeloidCoordinate
-    leftMid: PixeloidCoordinate
-    center: PixeloidCoordinate
-  } {
-    const gridX = Math.floor(pixeloidX)
-    const gridY = Math.floor(pixeloidY)
-    
-    return {
-      topLeft: { x: gridX, y: gridY },
-      topRight: { x: gridX + 1, y: gridY },
-      bottomLeft: { x: gridX, y: gridY + 1 },
-      bottomRight: { x: gridX + 1, y: gridY + 1 },
-      topMid: { x: gridX + 0.5, y: gridY },
-      rightMid: { x: gridX + 1, y: gridY + 0.5 },
-      bottomMid: { x: gridX + 0.5, y: gridY + 1 },
-      leftMid: { x: gridX, y: gridY + 0.5 },
-      center: { x: gridX + 0.5, y: gridY + 0.5 }
-    }
-  }
 
   // ================================
   // DRAWING CALCULATIONS (MESH AUTHORITY)
@@ -112,52 +48,91 @@ export class GeometryHelper_3b {
   }
 
   /**
-   * Calculate rectangle preview for drawing
+   * Calculate rectangle preview for drawing (simple 2-vertex approach)
+   * firstPos = one corner, secondPos = opposite corner
+   * Returns only 2 vertices to match renderer expectations
    */
   static calculateRectanglePreview(
-    startPoint: PixeloidCoordinate,
-    currentPoint: PixeloidCoordinate
+    firstPos: PixeloidCoordinate,
+    secondPos: PixeloidCoordinate
   ): PreviewObject {
     const style = gameStore_3b.style
+    
+    // Return only 2 vertices (start and end corners) to match renderer expectations
     const vertices = [
-      startPoint,
-      { x: currentPoint.x, y: startPoint.y },
-      currentPoint,
-      { x: startPoint.x, y: currentPoint.y }
+      { x: firstPos.x, y: firstPos.y },     // First corner
+      { x: secondPos.x, y: secondPos.y }    // Opposite corner
     ]
+    
+    const minX = Math.min(firstPos.x, secondPos.x)
+    const maxX = Math.max(firstPos.x, secondPos.x)
+    const minY = Math.min(firstPos.y, secondPos.y)
+    const maxY = Math.max(firstPos.y, secondPos.y)
+    
+    const width = maxX - minX
+    const height = maxY - minY
     
     return {
       type: 'rectangle',
       vertices: vertices,
-      style: style,
-      isValid: true,
-      bounds: this.calculateBoundsFromVertices(vertices)
+      style: {
+        color: style.color,
+        strokeWidth: style.strokeWidth,
+        strokeAlpha: style.strokeAlpha,
+        fillColor: style.fillEnabled ? style.fillColor : undefined,
+        fillAlpha: style.fillAlpha
+      },
+      isValid: width > 0 && height > 0,
+      bounds: {
+        minX,
+        minY,
+        maxX,
+        maxY,
+        width,
+        height
+      }
     }
   }
 
   /**
-   * Calculate circle preview for drawing
+   * Calculate circle preview for drawing (simple vertex to vertex)
+   * startPoint and currentPoint are the two vertices
+   * Center = halfway between the two points, radius = distance/2
    */
   static calculateCirclePreview(
     startPoint: PixeloidCoordinate,
     currentPoint: PixeloidCoordinate
   ): PreviewObject {
     const style = gameStore_3b.style
-    const radius = Math.sqrt(
-      Math.pow(currentPoint.x - startPoint.x, 2) + 
-      Math.pow(currentPoint.y - startPoint.y, 2)
-    )
+    
+    // Center is halfway between start and current point
+    const centerX = (startPoint.x + currentPoint.x) / 2
+    const centerY = (startPoint.y + currentPoint.y) / 2
+    
+    // Radius is distance between the two points divided by 2
+    const dx = currentPoint.x - startPoint.x
+    const dy = currentPoint.y - startPoint.y
+    const radius = Math.sqrt(dx * dx + dy * dy) / 2
     
     return {
       type: 'circle',
-      vertices: [startPoint, currentPoint],
-      style: style,
+      vertices: [
+        { x: centerX, y: centerY },              // Center point
+        { x: centerX + radius, y: centerY }      // Radius point for drawing
+      ],
+      style: {
+        color: style.color,
+        strokeWidth: style.strokeWidth,
+        strokeAlpha: style.strokeAlpha,
+        fillColor: style.fillEnabled ? style.fillColor : undefined,
+        fillAlpha: style.fillAlpha
+      },
       isValid: radius > 0,
       bounds: {
-        minX: startPoint.x - radius,
-        minY: startPoint.y - radius,
-        maxX: startPoint.x + radius,
-        maxY: startPoint.y + radius,
+        minX: centerX - radius,
+        minY: centerY - radius,
+        maxX: centerX + radius,
+        maxY: centerY + radius,
         width: radius * 2,
         height: radius * 2
       }
@@ -240,7 +215,13 @@ export class GeometryHelper_3b {
         vertices.east,
         vertices.south
       ],
-      style: style,
+      style: {
+        color: style.color,
+        strokeWidth: style.strokeWidth,
+        strokeAlpha: style.strokeAlpha,
+        fillColor: style.fillEnabled ? style.fillColor : undefined,
+        fillAlpha: style.fillAlpha
+      },
       isValid: properties.width > 0,
       bounds: {
         minX: properties.anchorX,
@@ -266,7 +247,13 @@ export class GeometryHelper_3b {
     return {
       type: 'point',
       vertices: [point],
-      style: style,
+      style: {
+        color: style.color,
+        strokeWidth: style.strokeWidth,
+        strokeAlpha: style.strokeAlpha,
+        fillColor: style.fillEnabled ? style.fillColor : undefined,
+        fillAlpha: style.fillAlpha
+      },
       isValid: true,
       bounds: {
         minX: pixeloidX,

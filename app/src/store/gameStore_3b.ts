@@ -15,7 +15,6 @@ import {
   createDefaultSelectionState,
   createDefaultGeometryPanelState,
   createDefaultPreviewState,
-  createDefaultAnchorConfiguration,
   calculateGeometryStats
 } from '../types/geometry-drawing'
 import { dataLayerIntegration } from './ecs-data-layer-integration'
@@ -56,6 +55,19 @@ export interface GameState3b {
   
   // ✅ NEW: Selection System
   selection: SelectionState
+  
+  // ✅ NEW: Per-object style overrides
+  objectStyles: {
+    [objectId: string]: {
+      [key: string]: any
+      color?: number
+      strokeWidth?: number
+      strokeAlpha?: number
+      fillColor?: number
+      fillAlpha?: number
+      isVisible?: boolean
+    }
+  }
   
   // ✅ EXTENDED: UI State with geometry features
   ui: {
@@ -111,7 +123,6 @@ export const gameStore_3b = proxy<GameState3b>({
     mode: 'none',
     preview: createDefaultPreviewState(),
     settings: createDefaultDrawingSettings(),
-    anchors: createDefaultAnchorConfiguration(),
     isDrawing: false,
     startPoint: null,
     currentStroke: []
@@ -122,6 +133,9 @@ export const gameStore_3b = proxy<GameState3b>({
   
   // ✅ NEW: Selection System
   selection: createDefaultSelectionState(),
+  
+  // ✅ NEW: Per-object style overrides
+  objectStyles: {},
   
   // ✅ EXTENDED: UI State with geometry features
   ui: {
@@ -449,11 +463,17 @@ export const gameStore_3b_methods = {
         metadata = { createdAt: Date.now() }
     }
     
-    // Create the actual geometry object
+    // Create the actual geometry object with style copied from defaults
     const geometryParams: CreateGeometricObjectParams = {
       type: previewObj.type,
       vertices: previewObj.vertices,
-      style: previewObj.style
+      style: {
+        color: gameStore_3b.style.color,
+        strokeWidth: gameStore_3b.style.strokeWidth,
+        strokeAlpha: gameStore_3b.style.strokeAlpha,
+        fillColor: gameStore_3b.style.fillEnabled ? gameStore_3b.style.fillColor : undefined,
+        fillAlpha: gameStore_3b.style.fillAlpha
+      }
     }
     
     const objectId = gameStore_3b_methods.addGeometryObject(geometryParams)
@@ -486,19 +506,19 @@ export const gameStore_3b_methods = {
   // Set stroke color
   setStrokeColor: (color: number) => {
     console.log('gameStore_3b: Setting stroke color to', color.toString(16))
-    gameStore_3b.style.defaultColor = color
+    gameStore_3b.style.color = color
   },
 
   // Set fill color
   setFillColor: (color: number) => {
     console.log('gameStore_3b: Setting fill color to', color.toString(16))
-    gameStore_3b.style.defaultFillColor = color
+    gameStore_3b.style.fillColor = color
   },
 
   // Set stroke width
   setStrokeWidth: (width: number) => {
     console.log('gameStore_3b: Setting stroke width to', width)
-    gameStore_3b.style.defaultStrokeWidth = Math.max(1, width)
+    gameStore_3b.style.strokeWidth = Math.max(1, width)
   },
 
   // Toggle fill enabled
@@ -517,6 +537,90 @@ export const gameStore_3b_methods = {
   setFillAlpha: (alpha: number) => {
     console.log('gameStore_3b: Setting fill alpha to', alpha)
     gameStore_3b.style.fillAlpha = Math.max(0, Math.min(1, alpha))
+  },
+
+  // ================================
+  // ✅ NEW: PER-OBJECT STYLE SYSTEM
+  // ================================
+  
+  // Get effective style (object override OR global default)
+  getEffectiveStyle: (objectId: string, property: keyof StyleSettings) => {
+    const objectOverride = gameStore_3b.objectStyles[objectId]?.[property]
+    if (objectOverride !== undefined) return objectOverride
+    
+    const globalDefault = gameStore_3b.style[property]
+    if (globalDefault !== undefined) return globalDefault
+    
+    // Hardcoded fallbacks
+    const fallbacks = {
+      color: 0x0066cc,
+      strokeWidth: 2,
+      strokeAlpha: 1.0,
+      fillColor: 0x0066cc,
+      fillAlpha: 0.3,
+      defaultColor: 0x0066cc,
+      defaultStrokeWidth: 2,
+      defaultFillColor: 0x0066cc,
+      fillEnabled: false,
+      highlightColor: 0xff6600,
+      selectionColor: 0xff0000
+    }
+    
+    return fallbacks[property]
+  },
+  
+  // Set per-object style override
+  setObjectStyle: (objectId: string, property: string, value: any) => {
+    if (!gameStore_3b.objectStyles[objectId]) {
+      gameStore_3b.objectStyles[objectId] = {}
+    }
+    gameStore_3b.objectStyles[objectId][property] = value
+    console.log(`Set ${property} to ${value} for object ${objectId}`)
+  },
+  
+  // Clear per-object style override
+  clearObjectStyle: (objectId: string, property: string) => {
+    if (gameStore_3b.objectStyles[objectId]) {
+      delete gameStore_3b.objectStyles[objectId][property]
+      console.log(`Cleared ${property} for object ${objectId}`)
+    }
+  },
+  
+  // Get per-object style override
+  getObjectStyle: (objectId: string, property: string) => {
+    return gameStore_3b.objectStyles[objectId]?.[property]
+  },
+  
+  // Reset object style to global defaults
+  resetObjectStyleToDefault: (objectId: string) => {
+    delete gameStore_3b.objectStyles[objectId]
+    console.log(`Reset style to default for object ${objectId}`)
+  },
+  
+  // ================================
+  // ✅ NEW: FILL SYSTEM CONTROLS
+  // ================================
+  
+  // Enable fill for specific object
+  enableFillForObject: (objectId: string, color?: number, alpha?: number) => {
+    const fillColor = color || gameStore_3b.style.fillColor
+    const fillAlpha = alpha || gameStore_3b.style.fillAlpha
+    
+    gameStore_3b_methods.setObjectStyle(objectId, 'fillColor', fillColor)
+    gameStore_3b_methods.setObjectStyle(objectId, 'fillAlpha', fillAlpha)
+    console.log(`Enabled fill for object ${objectId}`)
+  },
+  
+  // Remove fill from specific object
+  removeFillFromObject: (objectId: string) => {
+    gameStore_3b_methods.clearObjectStyle(objectId, 'fillColor')
+    gameStore_3b_methods.clearObjectStyle(objectId, 'fillAlpha')
+    console.log(`Removed fill from object ${objectId}`)
+  },
+  
+  // Check if object has fill
+  hasObjectFill: (objectId: string): boolean => {
+    return gameStore_3b_methods.getObjectStyle(objectId, 'fillColor') !== undefined
   },
 
   // ================================
@@ -567,20 +671,41 @@ export const gameStore_3b_methods = {
     const params: CreateGeometricObjectParams = {
       type,
       vertices,
-      style: gameStore_3b.style
+      style: {
+        color: gameStore_3b.style.color,
+        strokeWidth: gameStore_3b.style.strokeWidth,
+        strokeAlpha: gameStore_3b.style.strokeAlpha,
+        fillColor: gameStore_3b.style.fillEnabled ? gameStore_3b.style.fillColor : undefined,
+        fillAlpha: gameStore_3b.style.fillAlpha
+      }
     }
     
     return gameStore_3b_methods.addGeometryObject(params)
   },
 
-  // Clear all geometry
-  clearAllGeometry: () => {
-    console.log('gameStore_3b: Clearing all geometry')
+  // Clear all objects (enhanced)
+  clearAllObjects: () => {
+    console.log('gameStore_3b: Clearing all objects')
     
+    // Clear local store
     gameStore_3b.geometry.objects = []
     gameStore_3b.ecsDataLayer.allObjects = []
     gameStore_3b.ecsDataLayer.visibleObjects = []
+    gameStore_3b.objectStyles = {}  // Clear all per-object styles
     gameStore_3b_methods.clearSelectionEnhanced()
+    
+    // ✅ NEW: Clear dataLayerIntegration as well
+    try {
+      dataLayerIntegration.clearAllObjects()
+      console.log('gameStore_3b: Cleared dataLayerIntegration objects')
+    } catch (error) {
+      console.warn('gameStore_3b: Failed to clear dataLayerIntegration:', error)
+    }
+  },
+  
+  // Legacy alias for compatibility
+  clearAllGeometry: () => {
+    gameStore_3b_methods.clearAllObjects()
   },
 
   // Get geometry statistics

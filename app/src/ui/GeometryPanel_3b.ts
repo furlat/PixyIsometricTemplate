@@ -4,6 +4,7 @@ import { gameStore_3b, gameStore_3b_methods } from '../store/gameStore_3b'
 export class GeometryPanel_3b {
   private panel: HTMLElement | null = null
   private isVisible: boolean = false
+  private activeColorPickers: Set<string> = new Set()
 
   constructor() {
     this.panel = document.getElementById('geometry-panel')
@@ -37,29 +38,155 @@ export class GeometryPanel_3b {
       }
     })
 
-    // Stroke width input
+    // ✅ NEW: Complete event handler setup
+    this.setupDrawingSettingsHandlers()
+    this.setupDrawingOptionsHandlers()
+    this.setupActionsHandlers()
+  }
+
+  private setupDrawingSettingsHandlers(): void {
+    // Stroke color
+    const strokeColorInput = document.getElementById('geometry-default-color') as HTMLInputElement
+    if (strokeColorInput) {
+      strokeColorInput.addEventListener('focus', () => {
+        this.activeColorPickers.add('geometry-default-color')
+      })
+      strokeColorInput.addEventListener('change', (e) => {
+        const color = parseInt((e.target as HTMLInputElement).value.replace('#', ''), 16)
+        gameStore_3b_methods.setStrokeColor(color)
+        this.activeColorPickers.delete('geometry-default-color')
+        console.log('Set stroke color to:', color.toString(16))
+      })
+      // Remove blur event that was interfering with click-away behavior
+    }
+    
+    // Stroke width
     const strokeWidthInput = document.getElementById('geometry-default-stroke-width') as HTMLInputElement
     if (strokeWidthInput) {
-      strokeWidthInput.addEventListener('input', (event) => {
-        const target = event.target as HTMLInputElement
-        const newValue = Math.max(0.1, parseFloat(target.value) || 0.1)
-        gameStore_3b_methods.setStrokeWidth(newValue)
-        console.log(`GeometryPanel: Updated stroke width to ${newValue}`)
+      strokeWidthInput.addEventListener('input', (e) => {
+        const width = parseFloat((e.target as HTMLInputElement).value)
+        gameStore_3b_methods.setStrokeWidth(width)
+        console.log('Set stroke width to:', width)
       })
     }
-
-    // Clear all button
-    const clearButton = document.getElementById('geometry-clear-all')
-    if (clearButton) {
-      clearButton.addEventListener('click', () => {
-        gameStore_3b_methods.clearAllGeometry()
-        console.log('GeometryPanel: Cleared all geometry objects')
+    
+    // Fill color
+    const fillColorInput = document.getElementById('geometry-default-fill-color') as HTMLInputElement
+    if (fillColorInput) {
+      fillColorInput.addEventListener('focus', () => {
+        this.activeColorPickers.add('geometry-default-fill-color')
+      })
+      fillColorInput.addEventListener('change', (e) => {
+        const color = parseInt((e.target as HTMLInputElement).value.replace('#', ''), 16)
+        gameStore_3b_methods.setFillColor(color)
+        this.activeColorPickers.delete('geometry-default-fill-color')
+        console.log('Set fill color to:', color.toString(16))
+      })
+      // Remove blur event that was interfering with click-away behavior
+    }
+    
+    // Fill enabled
+    const fillEnabledInput = document.getElementById('geometry-fill-enabled') as HTMLInputElement
+    if (fillEnabledInput) {
+      fillEnabledInput.addEventListener('change', (e) => {
+        const enabled = (e.target as HTMLInputElement).checked
+        gameStore_3b_methods.setFillEnabled(enabled)
+        console.log('Set fill enabled to:', enabled)
+      })
+    }
+    
+    // Fill alpha with live update
+    const fillAlphaInput = document.getElementById('geometry-fill-alpha') as HTMLInputElement
+    const fillAlphaValue = document.getElementById('geometry-fill-alpha-value')
+    if (fillAlphaInput && fillAlphaValue) {
+      fillAlphaInput.addEventListener('input', (e) => {
+        const alpha = parseFloat((e.target as HTMLInputElement).value)
+        gameStore_3b_methods.setFillAlpha(alpha)
+        fillAlphaValue.textContent = alpha.toFixed(1)
+        console.log('Set fill alpha to:', alpha)
+      })
+    }
+    
+    // Stroke alpha with live update
+    const strokeAlphaInput = document.getElementById('geometry-stroke-alpha') as HTMLInputElement
+    const strokeAlphaValue = document.getElementById('geometry-stroke-alpha-value')
+    if (strokeAlphaInput && strokeAlphaValue) {
+      strokeAlphaInput.addEventListener('input', (e) => {
+        const alpha = parseFloat((e.target as HTMLInputElement).value)
+        gameStore_3b_methods.setStrokeAlpha(alpha)
+        strokeAlphaValue.textContent = alpha.toFixed(1)
+        console.log('Set stroke alpha to:', alpha)
+      })
+    }
+  }
+  
+  private setupDrawingOptionsHandlers(): void {
+    // Preview opacity with live update - ONLY functional option remaining
+    const previewOpacityInput = document.getElementById('drawing-preview-opacity') as HTMLInputElement
+    const previewOpacityValue = document.getElementById('drawing-preview-opacity-value')
+    if (previewOpacityInput && previewOpacityValue) {
+      previewOpacityInput.addEventListener('input', (e) => {
+        const opacity = parseFloat((e.target as HTMLInputElement).value)
+        gameStore_3b.drawing.settings.previewOpacity = opacity
+        previewOpacityValue.textContent = opacity.toFixed(1)
+        console.log('Preview opacity:', opacity)
+      })
+    }
+  }
+  
+  private setupActionsHandlers(): void {
+    // Clear all objects
+    const clearAllBtn = document.getElementById('geometry-clear-all')
+    if (clearAllBtn) {
+      clearAllBtn.addEventListener('click', () => {
+        if (confirm('Are you sure you want to clear all objects?')) {
+          gameStore_3b_methods.clearAllObjects()
+          console.log('Cleared all objects')
+        }
+      })
+    }
+    
+    // Reset all styles
+    const resetStylesBtn = document.getElementById('geometry-reset-styles')
+    if (resetStylesBtn) {
+      resetStylesBtn.addEventListener('click', () => {
+        if (confirm('Are you sure you want to reset all styles to defaults?')) {
+          // Reset global styles
+          gameStore_3b_methods.setStrokeColor(0x0066cc)
+          gameStore_3b_methods.setStrokeWidth(2)
+          gameStore_3b_methods.setFillColor(0x0066cc)
+          gameStore_3b_methods.setFillEnabled(false)
+          gameStore_3b_methods.setStrokeAlpha(1.0)
+          gameStore_3b_methods.setFillAlpha(0.3)
+          
+          // Clear all per-object style overrides
+          gameStore_3b.objectStyles = {}
+          
+          // Update UI elements
+          this.updateUIFromStore()
+          
+          console.log('Reset all styles to defaults')
+        }
       })
     }
   }
 
   private setupReactivity(): void {
-    subscribe(gameStore_3b, () => {
+    // ✅ PRECISE SUBSCRIPTIONS - Following StorePanel_3b pattern
+    
+    // Style-specific subscription for Reset All Styles functionality
+    subscribe(gameStore_3b.style, () => {
+      this.updateUIFromStore()
+      console.log('🔧 Style subscription triggered - UI updated')
+    })
+    
+    // Drawing mode subscription for mode button updates
+    subscribe(gameStore_3b.drawing, () => {
+      this.updateValues()
+    })
+    
+    // Geometry subscription for object count updates
+    subscribe(gameStore_3b.geometry, () => {
       this.updateValues()
     })
     
@@ -93,19 +220,73 @@ export class GeometryPanel_3b {
     // Update stroke width input
     const strokeWidthInput = document.getElementById('geometry-default-stroke-width') as HTMLInputElement
     if (strokeWidthInput) {
-      strokeWidthInput.value = gameStore_3b.style.defaultStrokeWidth.toString()
+      strokeWidthInput.value = gameStore_3b.style.strokeWidth.toString()
     }
 
     // Update stroke color display
     const colorElement = document.getElementById('geometry-default-color')
     if (colorElement) {
-      const colorHex = `#${gameStore_3b.style.defaultColor.toString(16).padStart(6, '0')}`
+      const colorHex = `#${gameStore_3b.style.color.toString(16).padStart(6, '0')}`
       colorElement.textContent = colorHex
       colorElement.style.color = colorHex
     }
 
     // Update drawing mode button states
     this.updateModeButtons()
+    
+    // Update new UI elements
+    this.updateUIFromStore()
+  }
+
+  // ✅ NEW: Update UI elements from store values
+  private updateUIFromStore(): void {
+    // Update stroke color (only if not currently active)
+    const strokeColorInput = document.getElementById('geometry-default-color') as HTMLInputElement
+    if (strokeColorInput && !this.activeColorPickers.has('geometry-default-color')) {
+      strokeColorInput.value = '#' + gameStore_3b.style.color.toString(16).padStart(6, '0')
+    }
+    
+    // Update stroke width
+    const strokeWidthInput = document.getElementById('geometry-default-stroke-width') as HTMLInputElement
+    if (strokeWidthInput) {
+      strokeWidthInput.value = gameStore_3b.style.strokeWidth.toString()
+    }
+    
+    // Update fill color (only if not currently active)
+    const fillColorInput = document.getElementById('geometry-default-fill-color') as HTMLInputElement
+    if (fillColorInput && !this.activeColorPickers.has('geometry-default-fill-color')) {
+      fillColorInput.value = '#' + gameStore_3b.style.fillColor.toString(16).padStart(6, '0')
+    }
+    
+    // Update fill enabled
+    const fillEnabledInput = document.getElementById('geometry-fill-enabled') as HTMLInputElement
+    if (fillEnabledInput) {
+      fillEnabledInput.checked = gameStore_3b.style.fillEnabled
+    }
+    
+    // Update fill alpha
+    const fillAlphaInput = document.getElementById('geometry-fill-alpha') as HTMLInputElement
+    const fillAlphaValue = document.getElementById('geometry-fill-alpha-value')
+    if (fillAlphaInput && fillAlphaValue) {
+      fillAlphaInput.value = gameStore_3b.style.fillAlpha.toString()
+      fillAlphaValue.textContent = gameStore_3b.style.fillAlpha.toFixed(1)
+    }
+    
+    // Update stroke alpha
+    const strokeAlphaInput = document.getElementById('geometry-stroke-alpha') as HTMLInputElement
+    const strokeAlphaValue = document.getElementById('geometry-stroke-alpha-value')
+    if (strokeAlphaInput && strokeAlphaValue) {
+      strokeAlphaInput.value = gameStore_3b.style.strokeAlpha.toString()
+      strokeAlphaValue.textContent = gameStore_3b.style.strokeAlpha.toFixed(1)
+    }
+    
+    // Update drawing options - only Preview Opacity remains functional
+    const previewOpacityInput = document.getElementById('drawing-preview-opacity') as HTMLInputElement
+    const previewOpacityValue = document.getElementById('drawing-preview-opacity-value')
+    if (previewOpacityInput && previewOpacityValue) {
+      previewOpacityInput.value = gameStore_3b.drawing.settings.previewOpacity.toString()
+      previewOpacityValue.textContent = gameStore_3b.drawing.settings.previewOpacity.toFixed(1)
+    }
   }
 
   private updateModeButtons(): void {

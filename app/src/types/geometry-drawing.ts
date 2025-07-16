@@ -52,40 +52,9 @@ export interface PreviewState {
 export interface DrawingSettings {
   snapToGrid: boolean
   showPreview: boolean
-  enableAnchors: boolean
   previewOpacity: number
   minDistance: number
   maxDistance: number
-}
-
-// ================================
-// ANCHOR SYSTEM
-// ================================
-
-/**
- * Anchor point types for precision drawing
- */
-export type AnchorType = 'corner' | 'midpoint' | 'center'
-
-/**
- * Individual anchor point
- */
-export interface AnchorPoint {
-  position: PixeloidCoordinate
-  type: AnchorType
-  isActive: boolean
-  isHighlighted: boolean
-}
-
-/**
- * Anchor configuration for each geometry type
- */
-export interface AnchorConfiguration {
-  point: AnchorPoint[]
-  line: AnchorPoint[]
-  circle: AnchorPoint[]
-  rectangle: AnchorPoint[]
-  diamond: AnchorPoint[]
 }
 
 // ================================
@@ -99,7 +68,6 @@ export interface DrawingState {
   mode: DrawingMode
   preview: PreviewState
   settings: DrawingSettings
-  anchors: AnchorConfiguration
   isDrawing: boolean
   startPoint: PixeloidCoordinate | null
   currentStroke: PixeloidCoordinate[]
@@ -111,20 +79,17 @@ export interface DrawingState {
 
 /**
  * Style configuration for geometry objects
+ * CURRENT DRAWING STYLE - store authority pattern
  */
 export interface StyleSettings {
-  defaultColor: number
-  defaultStrokeWidth: number
-  defaultFillColor: number
+  color: number
+  strokeWidth: number
+  fillColor: number
   fillEnabled: boolean
   strokeAlpha: number
   fillAlpha: number
   highlightColor: number
   selectionColor: number
-  // Compatible with GeometricObject style format
-  color: number
-  strokeWidth: number
-  fillColor?: number
 }
 
 // ================================
@@ -184,7 +149,6 @@ export interface GeometryStats {
 export const createDefaultDrawingSettings = (): DrawingSettings => ({
   snapToGrid: true,
   showPreview: true,
-  enableAnchors: true,
   previewOpacity: 0.7,
   minDistance: 1,
   maxDistance: 1000
@@ -194,18 +158,14 @@ export const createDefaultDrawingSettings = (): DrawingSettings => ({
  * Create default style settings
  */
 export const createDefaultStyleSettings = (): StyleSettings => ({
-  defaultColor: 0x0066cc,
-  defaultStrokeWidth: 2,
-  defaultFillColor: 0x0066cc,
+  color: 0x0066cc,
+  strokeWidth: 2,
+  fillColor: 0x0066cc,
   fillEnabled: false,
   strokeAlpha: 1.0,
   fillAlpha: 0.3,
   highlightColor: 0xff6600,
-  selectionColor: 0xff0000,
-  // Compatible with GeometricObject style format
-  color: 0x0066cc,
-  strokeWidth: 2,
-  fillColor: 0x0066cc
+  selectionColor: 0xff0000
 })
 
 /**
@@ -242,16 +202,6 @@ export const createDefaultPreviewState = (): PreviewState => ({
   opacity: 0.7
 })
 
-/**
- * Create default anchor configuration
- */
-export const createDefaultAnchorConfiguration = (): AnchorConfiguration => ({
-  point: [],
-  line: [],
-  circle: [],
-  rectangle: [],
-  diamond: []
-})
 
 // ================================
 // TYPE GUARDS
@@ -277,19 +227,6 @@ export const isPreviewObject = (obj: any): obj is PreviewObject => {
          obj.bounds
 }
 
-/**
- * Type guard for anchor point
- */
-export const isAnchorPoint = (point: any): point is AnchorPoint => {
-  return point &&
-         typeof point === 'object' &&
-         point.position &&
-         typeof point.position.x === 'number' &&
-         typeof point.position.y === 'number' &&
-         typeof point.type === 'string' &&
-         typeof point.isActive === 'boolean' &&
-         typeof point.isHighlighted === 'boolean'
-}
 
 // ================================
 // UTILITY FUNCTIONS
@@ -341,7 +278,7 @@ export const validateDrawingSettings = (settings: DrawingSettings): boolean => {
  * Validate style settings
  */
 export const validateStyleSettings = (settings: StyleSettings): boolean => {
-  return settings.defaultStrokeWidth > 0 &&
+  return settings.strokeWidth > 0 &&
          settings.strokeAlpha >= 0 && settings.strokeAlpha <= 1 &&
          settings.fillAlpha >= 0 && settings.fillAlpha <= 1
 }
