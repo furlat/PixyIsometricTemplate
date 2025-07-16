@@ -1,9 +1,13 @@
 import type {
   PixeloidCoordinate,
-  ViewportBounds
+  VertexCoordinate,
+  ECSViewportBounds
 } from '../types'
-import { CoordinateCalculations } from './CoordinateCalculations'
-import { gameStore } from '../store/gameStore'
+import { CoordinateCalculations } from './CoordinateCalculations_3b'
+import { gameStore_3b, gameStore_3b_methods } from '../store/gameStore_3b'
+import type { ECSDataLayer } from '../types/ecs-data-layer'
+import type { DrawingMode, StyleSettings, PreviewObject } from '../types/geometry-drawing'
+import type { GeometricObject } from '../types/ecs-data-layer'
 
 /**
  * Unified coordinate computation helper
@@ -22,8 +26,7 @@ export class CoordinateHelper {
   static pixeloidToVertex = CoordinateCalculations.pixeloidToVertex
   static screenToPixeloid = CoordinateCalculations.screenToPixeloid
   static pixeloidToScreen = CoordinateCalculations.pixeloidToScreen
-  static calculateViewportBounds = CoordinateCalculations.calculateViewportBounds
-  static calculateViewportCorners = CoordinateCalculations.calculateViewportCorners
+  static calculateECSViewportBounds = CoordinateCalculations.calculateECSViewportBounds
   static calculateVisibleGridBounds = CoordinateCalculations.calculateVisibleGridBounds
   static calculateCameraTransformPosition = CoordinateCalculations.calculateCameraTransformPosition
   static calculateInitialCameraPosition = CoordinateCalculations.calculateInitialCameraPosition
@@ -36,56 +39,107 @@ export class CoordinateHelper {
   // ================================
   
   static getCurrentOffset(): PixeloidCoordinate {
-    const zoomFactor = gameStore.cameraViewport.zoom_factor
-    if (zoomFactor === 1) {
-      return gameStore.cameraViewport.geometry_sampling_position
-    } else {
-      return gameStore.cameraViewport.viewport_position
-    }
+    return gameStore_3b.navigation.offset
   }
   
-  static getCurrentPixeloidScale(): number {
-    return gameStore.cameraViewport.zoom_factor
+  static getCurrentCellSize(): number {
+    return gameStore_3b.mesh.cellSize
   }
   
-  static getCurrentViewportBounds(): ViewportBounds {
-    // For ECS, calculate viewport bounds dynamically
-    const zoomFactor = gameStore.cameraViewport.zoom_factor
+  static getCurrentViewportBounds(): ECSViewportBounds {
     const offset = this.getCurrentOffset()
-    const screenSize = { width: gameStore.windowWidth, height: gameStore.windowHeight }
+    const screenSize = { width: gameStore_3b.mesh.dimensions.width, height: gameStore_3b.mesh.dimensions.height }
+    const cellSize = this.getCurrentCellSize()
     
-    return CoordinateCalculations.calculateViewportBounds(
-      screenSize, zoomFactor, offset, offset
-    )
+    return {
+      topLeft: offset,
+      bottomRight: {
+        x: offset.x + screenSize.width / cellSize,
+        y: offset.y + screenSize.height / cellSize
+      },
+      width: screenSize.width / cellSize,
+      height: screenSize.height / cellSize
+    }
   }
   
   static getMousePixeloidPosition(): PixeloidCoordinate {
-    return gameStore.mouse.pixeloid_position
+    return gameStore_3b.mouse.world  // World coordinates in pixeloid space
   }
 
-  static getMouseVertexPosition(): { x: number, y: number } {
-    return gameStore.mouse.vertex_position
+  static getMouseVertexPosition(): VertexCoordinate {
+    return gameStore_3b.mouse.vertex
   }
 
-  static getMouseScreenPosition(): { x: number, y: number } {
-    return gameStore.mouse.screen_position
+  static getMouseScreenPosition(): PixeloidCoordinate {
+    return gameStore_3b.mouse.screen
   }
 
   static getCameraWorldPosition(): PixeloidCoordinate {
-    const zoomFactor = gameStore.cameraViewport.zoom_factor
-    if (zoomFactor === 1) {
-      return gameStore.cameraViewport.geometry_sampling_position
-    } else {
-      return gameStore.cameraViewport.viewport_position
-    }
+    return gameStore_3b.navigation.offset
   }
 
   static getCameraScreenCenter(): { x: number, y: number } {
-    return { x: gameStore.windowWidth / 2, y: gameStore.windowHeight / 2 }
+    return {
+      x: gameStore_3b.mesh.dimensions.width / 2,
+      y: gameStore_3b.mesh.dimensions.height / 2
+    }
   }
 
   // ================================
-  // LEGACY COMPATIBILITY (will be removed after migration)
+  // MESH AUTHORITY INTEGRATION
+  // ================================
+
+  /**
+   * Get ECS data layer from store
+   */
+  static getECSDataLayer(): ECSDataLayer {
+    return gameStore_3b.ecsDataLayer
+  }
+
+  /**
+   * Get visible geometry objects
+   */
+  static getVisibleObjects(): GeometricObject[] {
+    return gameStore_3b.ecsDataLayer.visibleObjects
+  }
+
+  /**
+   * Get all geometry objects
+   */
+  static getAllObjects(): GeometricObject[] {
+    return gameStore_3b.ecsDataLayer.allObjects
+  }
+
+  /**
+   * Get current drawing mode
+   */
+  static getDrawingMode(): DrawingMode {
+    return gameStore_3b.drawing.mode
+  }
+
+  /**
+   * Get current drawing preview
+   */
+  static getDrawingPreview(): PreviewObject | null {
+    return gameStore_3b.drawing.preview.object
+  }
+
+  /**
+   * Get selected object ID
+   */
+  static getSelectedObjectId(): string | null {
+    return gameStore_3b.selection.selectedObjectId
+  }
+
+  /**
+   * Get current style settings
+   */
+  static getStyleSettings(): StyleSettings {
+    return gameStore_3b.style
+  }
+
+  // ================================
+  // LEGACY COMPATIBILITY (updated for mesh authority)
   // ================================
 
   /**
@@ -95,7 +149,7 @@ export class CoordinateHelper {
   static meshVertexToPixeloid(vertex: { x: number, y: number }): PixeloidCoordinate {
     const offset = this.getCurrentOffset()
     return this.vertexToPixeloid(
-      { __brand: 'vertex', x: vertex.x, y: vertex.y },
+      { x: vertex.x, y: vertex.y },
       offset
     )
   }

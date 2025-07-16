@@ -83,43 +83,14 @@ async function initPhase3B(): Promise<void> {
 
 /**
  * Setup Phase 3B specific UI event listeners
- * Note: UIControlBar_3b handles store panel and layers buttons + F1/F2 shortcuts
+ * Note: UI components handle their own buttons (LayerToggleBar_3b, UIControlBar_3b)
+ * Note: F1/F2 shortcuts are handled by UIControlBar_3b
  */
 function setupPhase3BUIListeners(): void {
-  // Grid layer toggle (specific to layer toggle bar)
-  const gridButton = document.getElementById('toggle-layer-grid')
-  if (gridButton) {
-    gridButton.addEventListener('click', () => {
-      gameStore_3b_methods.toggleGrid()
-      updateLayerButtonState(gridButton, gameStore_3b.ui.showGrid)
-    })
-  }
-  
-  // Mouse layer toggle (specific to layer toggle bar)
-  const mouseButton = document.getElementById('toggle-layer-mouse')
-  if (mouseButton) {
-    mouseButton.addEventListener('click', () => {
-      gameStore_3b_methods.toggleMouse()
-      updateLayerButtonState(mouseButton, gameStore_3b.ui.showMouse)
-    })
-  }
-  
+  // NOTE: Layer toggle buttons are handled by LayerToggleBar_3b
   // NOTE: Store panel and layers buttons are handled by UIControlBar_3b
-  // NOTE: F1/F2 shortcuts are handled by UIControlBar_3b
-  console.log('Phase 3B: UI event listeners setup (layer toggles only)')
-}
-
-/**
- * Update layer button visual state
- */
-function updateLayerButtonState(button: HTMLElement, isActive: boolean): void {
-  if (isActive) {
-    button.classList.add('btn-success')
-    button.classList.remove('btn-outline')
-  } else {
-    button.classList.add('btn-outline')
-    button.classList.remove('btn-success')
-  }
+  // NOTE: No global handlers needed - components handle their own events
+  console.log('Phase 3B: UI components handle their own event listeners')
 }
 
 /**

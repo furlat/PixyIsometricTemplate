@@ -1,24 +1,25 @@
+import { subscribeKey } from 'valtio/utils'
 import { gameStore_3b, gameStore_3b_methods } from '../store/gameStore_3b'
 
 /**
- * Phase 3A Layer Toggle Bar
- * 
- * Simplified layer controls for Phase 3A foundation:
- * - Grid layer toggle
- * - Mouse layer toggle
- * 
- * Complete isolation from old system - only uses gameStore_3b
+ * Phase 3B Layer Toggle Bar
+ *
+ * Reactive layer controls following StorePanel_3b pattern:
+ * - Store-driven visibility (no independent state)
+ * - Fine-grained subscriptions to logical chunks
+ * - Automatic synchronization with store changes
+ *
+ * Complete integration with gameStore_3b reactive architecture
  */
 export class LayerToggleBar_3b {
   private panel: HTMLElement | null = null
-  private _isVisible: boolean = false
+  private unsubscribers: (() => void)[] = []
   
   constructor() {
     this.panel = document.getElementById('layer-toggle-bar')
     this.setupEventHandlers()
-    this.updateButtonStates()
-    this.updateVisibility()
-    console.log('LayerToggleBar_3b: Initialized Phase 3A layer toggle bar')
+    this.setupReactivity()
+    console.log('LayerToggleBar_3b: Initialized Phase 3B reactive layer toggle bar')
   }
   
   /**
@@ -28,16 +29,6 @@ export class LayerToggleBar_3b {
     if (!this.panel) {
       console.warn('LayerToggleBar_3b: Panel element not found')
       return
-    }
-    
-    // Grid layer toggle
-    const gridToggle = document.getElementById('toggle-layer-grid')
-    if (gridToggle) {
-      gridToggle.addEventListener('click', () => {
-        this.toggleGrid()
-      })
-    } else {
-      console.warn('LayerToggleBar_3b: Grid toggle button not found')
     }
     
     // Mouse layer toggle
@@ -62,27 +53,43 @@ export class LayerToggleBar_3b {
   }
   
   /**
-   * Toggle grid layer visibility
+   * Setup reactive subscriptions following StorePanel_3b pattern
    */
-  private toggleGrid(): void {
-    gameStore_3b_methods.toggleGrid()
-    this.updateGridButtonState()
+  private setupReactivity(): void {
+    // Initial state sync
+    this.updateVisibility()
+    this.updateButtonStates()
     
-    // Dispatch event for canvas layer updates
-    const event = new CustomEvent('phase3b-layer-changed', {
-      detail: { layer: 'grid', visible: gameStore_3b.ui.showGrid }
-    })
-    document.dispatchEvent(event)
+    // ✅ Fine-grained subscription to UI state changes
+    this.unsubscribers.push(
+      subscribeKey(gameStore_3b.ui, 'showLayerToggle', () => {
+        this.updateVisibility()
+      })
+    )
     
-    console.log(`LayerToggleBar_3b: Grid layer ${gameStore_3b.ui.showGrid ? 'shown' : 'hidden'}`)
+    this.unsubscribers.push(
+      subscribeKey(gameStore_3b.ui, 'showMouse', () => {
+        this.updateMouseButtonState()
+      })
+    )
+    
+    this.unsubscribers.push(
+      subscribeKey(gameStore_3b.ui, 'enableCheckboard', () => {
+        this.updateCheckboardButtonState()
+      })
+    )
+    
+    
+    console.log('LayerToggleBar_3b: Reactive subscriptions setup complete')
   }
   
   /**
    * Toggle mouse layer visibility
    */
   private toggleMouse(): void {
+    console.log('LayerToggleBar_3b: toggleMouse() called - before:', gameStore_3b.ui.showMouse)
     gameStore_3b_methods.toggleMouse()
-    this.updateMouseButtonState()
+    console.log('LayerToggleBar_3b: toggleMouse() called - after:', gameStore_3b.ui.showMouse)
     
     // Dispatch event for canvas layer updates
     const event = new CustomEvent('phase3b-layer-changed', {
@@ -97,8 +104,9 @@ export class LayerToggleBar_3b {
    * Toggle checkboard visibility
    */
   private toggleCheckboard(): void {
+    console.log('LayerToggleBar_3b: toggleCheckboard() called - before:', gameStore_3b.ui.enableCheckboard)
     gameStore_3b_methods.toggleCheckboard()
-    this.updateCheckboardButtonState()
+    console.log('LayerToggleBar_3b: toggleCheckboard() called - after:', gameStore_3b.ui.enableCheckboard)
     
     // Dispatch event for canvas layer updates
     const event = new CustomEvent('phase3b-layer-changed', {
@@ -107,35 +115,6 @@ export class LayerToggleBar_3b {
     document.dispatchEvent(event)
     
     console.log(`LayerToggleBar_3b: Checkboard ${gameStore_3b.ui.enableCheckboard ? 'enabled' : 'disabled'}`)
-  }
-  
-  /**
-   * Update grid button visual state
-   */
-  private updateGridButtonState(): void {
-    const button = document.getElementById('toggle-layer-grid')
-    if (!button) return
-    
-    const isActive = gameStore_3b.ui.showGrid
-    const baseClasses = ['btn', 'btn-sm', 'rounded-full']
-    
-    // Reset button classes
-    button.className = baseClasses.join(' ')
-    
-    if (isActive) {
-      button.classList.add('btn-success')
-    } else {
-      button.classList.add('btn-outline')
-    }
-    
-    // Update button text
-    const buttonText = button.querySelector('.button-text')
-    if (buttonText) {
-      buttonText.textContent = 'Grid'
-    }
-    
-    // Update tooltip
-    button.title = `${isActive ? 'Hide' : 'Show'} Grid Layer`
   }
   
   /**
@@ -200,57 +179,55 @@ export class LayerToggleBar_3b {
    * Update all button states
    */
   private updateButtonStates(): void {
-    this.updateGridButtonState()
     this.updateMouseButtonState()
     this.updateCheckboardButtonState()
   }
   
   /**
-   * Update panel visibility
+   * Update panel visibility (reactive to store state)
    */
   private updateVisibility(): void {
+    const isVisible = gameStore_3b.ui.showLayerToggle
     if (this.panel) {
-      this.panel.style.display = this._isVisible ? 'flex' : 'none'
+      this.panel.style.display = isVisible ? 'flex' : 'none'
     }
   }
   
   /**
-   * Toggle panel visibility
+   * Toggle panel visibility (use store methods)
    */
   public toggle(): void {
-    this._isVisible = !this._isVisible
-    this.updateVisibility()
-    console.log(`LayerToggleBar_3b: Panel ${this._isVisible ? 'shown' : 'hidden'}`)
+    gameStore_3b_methods.toggleLayerToggle()
+    console.log(`LayerToggleBar_3b: Panel ${gameStore_3b.ui.showLayerToggle ? 'shown' : 'hidden'}`)
   }
   
   /**
-   * Set panel visibility
+   * Set panel visibility (use store state)
    */
   public setVisible(visible: boolean): void {
-    this._isVisible = visible
-    this.updateVisibility()
+    gameStore_3b.ui.showLayerToggle = visible
+    console.log('LayerToggleBar_3b: Set visibility to', visible)
   }
   
   /**
-   * Get panel visibility
+   * Get panel visibility (from store state)
    */
   public getVisible(): boolean {
-    return this._isVisible
+    return gameStore_3b.ui.showLayerToggle
   }
   
   /**
-   * Check if panel is visible
+   * Check if panel is visible (from store state)
    */
   public isVisible(): boolean {
-    return this._isVisible
+    return gameStore_3b.ui.showLayerToggle
   }
   
   /**
    * Get current layer states
    */
-  public getLayerStates(): { grid: boolean; mouse: boolean; checkboard: boolean } {
+  public getLayerStates(): { mouse: boolean; checkboard: boolean } {
     return {
-      grid: gameStore_3b.ui.showGrid,
       mouse: gameStore_3b.ui.showMouse,
       checkboard: gameStore_3b.ui.enableCheckboard
     }
@@ -259,12 +236,8 @@ export class LayerToggleBar_3b {
   /**
    * Set layer state programmatically
    */
-  public setLayerState(layer: 'grid' | 'mouse' | 'checkboard', visible: boolean): void {
-    if (layer === 'grid') {
-      if (gameStore_3b.ui.showGrid !== visible) {
-        this.toggleGrid()
-      }
-    } else if (layer === 'mouse') {
+  public setLayerState(layer: 'mouse' | 'checkboard', visible: boolean): void {
+    if (layer === 'mouse') {
       if (gameStore_3b.ui.showMouse !== visible) {
         this.toggleMouse()
       }
@@ -282,13 +255,9 @@ export class LayerToggleBar_3b {
     return {
       panel: {
         found: this.panel !== null,
-        visible: this._isVisible
+        visible: gameStore_3b.ui.showLayerToggle
       },
       buttons: {
-        grid: {
-          found: document.getElementById('toggle-layer-grid') !== null,
-          active: gameStore_3b.ui.showGrid
-        },
         mouse: {
           found: document.getElementById('toggle-layer-mouse') !== null,
           active: gameStore_3b.ui.showMouse
@@ -299,7 +268,6 @@ export class LayerToggleBar_3b {
         }
       },
       store: {
-        showGrid: gameStore_3b.ui.showGrid,
         showMouse: gameStore_3b.ui.showMouse,
         enableCheckboard: gameStore_3b.ui.enableCheckboard,
         showLayerToggle: gameStore_3b.ui.showLayerToggle
@@ -311,7 +279,10 @@ export class LayerToggleBar_3b {
    * Cleanup method
    */
   public destroy(): void {
-    // Clean up event listeners if needed
-    console.log('LayerToggleBar_3b: Destroyed')
+    // Clean up subscriptions to prevent memory leaks
+    this.unsubscribers.forEach(unsubscribe => unsubscribe())
+    this.unsubscribers = []
+    
+    console.log('LayerToggleBar_3b: Destroyed with proper subscription cleanup')
   }
 }

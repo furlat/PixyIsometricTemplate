@@ -1,10 +1,12 @@
-import type { 
-  ViewportCorners, 
-  PixeloidCoordinate, 
-  VertexCoordinate, 
-  ScreenCoordinate, 
-  ViewportBounds 
+import type {
+  PixeloidCoordinate,
+  VertexCoordinate,
+  ScreenCoordinate,
+  ECSViewportBounds,
+  ECSBoundingBox
 } from '../types'
+import { gameStore_3b } from '../store/gameStore_3b'
+import type { DrawingMode, PreviewObject } from '../types/geometry-drawing'
 
 /**
  * Pure coordinate calculation functions
@@ -18,27 +20,21 @@ export class CoordinateCalculations {
   // ================================
   
   /**
-   * Screen ↔ Vertex (vertex (0,0) always at screen (0,0))
+   * Screen ↔ Vertex (mesh authority - no hardcoded scale)
    */
-  static screenToVertex(
-    screen: ScreenCoordinate, 
-    pixeloidScale: number
-  ): VertexCoordinate {
+  static screenToVertex(screen: ScreenCoordinate): VertexCoordinate {
+    const cellSize = gameStore_3b.mesh.cellSize
     return {
-      __brand: 'vertex',
-      x: screen.x / pixeloidScale,
-      y: screen.y / pixeloidScale
+      x: screen.x / cellSize,
+      y: screen.y / cellSize
     }
   }
   
-  static vertexToScreen(
-    vertex: VertexCoordinate,
-    pixeloidScale: number
-  ): ScreenCoordinate {
+  static vertexToScreen(vertex: VertexCoordinate): ScreenCoordinate {
+    const cellSize = gameStore_3b.mesh.cellSize
     return {
-      __brand: 'screen', 
-      x: vertex.x * pixeloidScale,
-      y: vertex.y * pixeloidScale
+      x: vertex.x * cellSize,
+      y: vertex.y * cellSize
     }
   }
   
@@ -50,139 +46,69 @@ export class CoordinateCalculations {
     offset: PixeloidCoordinate
   ): PixeloidCoordinate {
     return {
-      __brand: 'pixeloid',
       x: vertex.x + offset.x,
       y: vertex.y + offset.y
     }
   }
   
   static pixeloidToVertex(
-    pixeloid: PixeloidCoordinate, 
+    pixeloid: PixeloidCoordinate,
     offset: PixeloidCoordinate
   ): VertexCoordinate {
     return {
-      __brand: 'vertex',
       x: pixeloid.x - offset.x,
       y: pixeloid.y - offset.y
     }
   }
   
   /**
-   * Screen ↔ Pixeloid (derived from above)
+   * Screen ↔ Pixeloid (mesh authority - no hardcoded scale)
    */
   static screenToPixeloid(
     screen: ScreenCoordinate,
-    pixeloidScale: number,
     offset: PixeloidCoordinate
   ): PixeloidCoordinate {
-    const vertex = this.screenToVertex(screen, pixeloidScale)
+    const vertex = this.screenToVertex(screen)
     return this.vertexToPixeloid(vertex, offset)
   }
   
   static pixeloidToScreen(
     pixeloid: PixeloidCoordinate,
-    pixeloidScale: number, 
     offset: PixeloidCoordinate
   ): ScreenCoordinate {
     const vertex = this.pixeloidToVertex(pixeloid, offset)
-    return this.vertexToScreen(vertex, pixeloidScale)
+    return this.vertexToScreen(vertex)
   }
   
   // ================================
-  // VIEWPORT CALCULATIONS (PURE)
+  // VIEWPORT CALCULATIONS (MESH AUTHORITY)
   // ================================
   
   /**
-   * Calculate complete viewport bounds (pure function)
+   * Calculate ECS viewport bounds (mesh authority - no hardcoded scale)
    */
-  static calculateViewportBounds(
+  static calculateECSViewportBounds(
     screenSize: { width: number, height: number },
-    pixeloidScale: number,
-    worldPosition: PixeloidCoordinate,
     offset: PixeloidCoordinate
-  ): ViewportBounds {
-    // Screen bounds
-    const screenCenter: ScreenCoordinate = {
-      __brand: 'screen',
-      x: screenSize.width / 2,
-      y: screenSize.height / 2
-    }
-    
-    // Calculate world viewport corners
-    const topLeftScreen: ScreenCoordinate = { __brand: 'screen', x: 0, y: 0 }
-    const bottomRightScreen: ScreenCoordinate = { 
-      __brand: 'screen', 
-      x: screenSize.width, 
-      y: screenSize.height 
-    }
-    
-    const topLeftWorld = this.screenToPixeloid(topLeftScreen, pixeloidScale, offset)
-    const bottomRightWorld = this.screenToPixeloid(bottomRightScreen, pixeloidScale, offset)
-    
-    // Calculate vertex bounds
-    const topLeftVertex = this.screenToVertex(topLeftScreen, pixeloidScale)
-    const bottomRightVertex = this.screenToVertex(bottomRightScreen, pixeloidScale)
+  ): ECSViewportBounds {
+    const cellSize = gameStore_3b.mesh.cellSize
     
     return {
-      screen: {
-        width: screenSize.width,
-        height: screenSize.height,
-        center: screenCenter
+      topLeft: offset,
+      bottomRight: {
+        x: offset.x + screenSize.width / cellSize,
+        y: offset.y + screenSize.height / cellSize
       },
-      world: {
-        top_left: topLeftWorld,
-        bottom_right: bottomRightWorld,
-        center: worldPosition
-      },
-      vertex: {
-        top_left: topLeftVertex,
-        bottom_right: bottomRightVertex,
-        width: bottomRightVertex.x - topLeftVertex.x,
-        height: bottomRightVertex.y - topLeftVertex.y
-      }
+      width: screenSize.width / cellSize,
+      height: screenSize.height / cellSize
     }
   }
   
   /**
-   * Calculate viewport corners in pixeloid coordinates (pure function)
-   */
-  static calculateViewportCorners(
-    cameraPosition: PixeloidCoordinate,
-    viewportSize: { width: number; height: number },
-    pixeloidScale: number
-  ): ViewportCorners {
-    const viewportWidth = viewportSize.width / pixeloidScale
-    const viewportHeight = viewportSize.height / pixeloidScale
-    
-    return {
-      topLeft: {
-        __brand: 'pixeloid',
-        x: cameraPosition.x,
-        y: cameraPosition.y
-      },
-      topRight: {
-        __brand: 'pixeloid',
-        x: cameraPosition.x + viewportWidth,
-        y: cameraPosition.y
-      },
-      bottomLeft: {
-        __brand: 'pixeloid',
-        x: cameraPosition.x,
-        y: cameraPosition.y + viewportHeight
-      },
-      bottomRight: {
-        __brand: 'pixeloid',
-        x: cameraPosition.x + viewportWidth,
-        y: cameraPosition.y + viewportHeight
-      }
-    }
-  }
-
-  /**
-   * Calculate visible grid bounds for rendering optimization (pure function)
+   * Calculate visible grid bounds for rendering optimization (mesh authority)
    */
   static calculateVisibleGridBounds(
-    corners: ViewportCorners,
+    bounds: ECSViewportBounds,
     padding: number = 2
   ): {
     startX: number
@@ -191,24 +117,23 @@ export class CoordinateCalculations {
     endY: number
   } {
     return {
-      startX: Math.floor(corners.topLeft.x) - padding,
-      endX: Math.ceil(corners.topRight.x) + padding,
-      startY: Math.floor(corners.topLeft.y) - padding,
-      endY: Math.ceil(corners.bottomLeft.y) + padding
+      startX: Math.floor(bounds.topLeft.x) - padding,
+      endX: Math.ceil(bounds.bottomRight.x) + padding,
+      startY: Math.floor(bounds.topLeft.y) - padding,
+      endY: Math.ceil(bounds.bottomRight.y) + padding
     }
   }
 
   /**
-   * Calculate camera transform position for rendering (pure function)
+   * Calculate camera transform position for rendering (mesh authority)
    */
   static calculateCameraTransformPosition(
-    cameraPosition: PixeloidCoordinate,
-    pixeloidScale: number
+    cameraPosition: PixeloidCoordinate
   ): PixeloidCoordinate {
+    const cellSize = gameStore_3b.mesh.cellSize
     return {
-      __brand: 'pixeloid',
-      x: -cameraPosition.x * pixeloidScale,
-      y: -cameraPosition.y * pixeloidScale
+      x: -cameraPosition.x * cellSize,
+      y: -cameraPosition.y * cellSize
     }
   }
 
@@ -217,7 +142,6 @@ export class CoordinateCalculations {
    */
   static calculateInitialCameraPosition(): PixeloidCoordinate {
     return {
-      __brand: 'pixeloid',
       x: 0,
       y: 0
     }
@@ -228,7 +152,6 @@ export class CoordinateCalculations {
    */
   static snapPixeloidToVertexAlignment(pixeloid: PixeloidCoordinate): PixeloidCoordinate {
     return {
-      __brand: 'pixeloid',
       x: Math.round(pixeloid.x),
       y: Math.round(pixeloid.y)
     }
@@ -242,17 +165,102 @@ export class CoordinateCalculations {
   }
 
   /**
-   * Calculate movement delta in pixeloid units (pure function)
+   * Calculate movement delta in pixeloid units (mesh authority)
    */
   static calculatePixeloidMovement(
     deltaPixelsX: number,
-    deltaPixelsY: number,
-    pixeloidScale: number
+    deltaPixelsY: number
   ): PixeloidCoordinate {
+    const cellSize = gameStore_3b.mesh.cellSize
     return {
-      __brand: 'pixeloid',
-      x: deltaPixelsX / pixeloidScale,
-      y: deltaPixelsY / pixeloidScale
+      x: deltaPixelsX / cellSize,
+      y: deltaPixelsY / cellSize
+    }
+  }
+
+  // ================================
+  // ECS CALCULATION FUNCTIONS
+  // ================================
+
+  /**
+   * Calculate ECS bounding box from vertices
+   */
+  static calculateECSBounds(vertices: PixeloidCoordinate[]): ECSBoundingBox {
+    if (vertices.length === 0) {
+      return { minX: 0, minY: 0, maxX: 0, maxY: 0, width: 0, height: 0 }
+    }
+    
+    const xs = vertices.map(v => v.x)
+    const ys = vertices.map(v => v.y)
+    const minX = Math.min(...xs)
+    const maxX = Math.max(...xs)
+    const minY = Math.min(...ys)
+    const maxY = Math.max(...ys)
+    
+    return {
+      minX,
+      minY,
+      maxX,
+      maxY,
+      width: maxX - minX,
+      height: maxY - minY
+    }
+  }
+
+  /**
+   * Calculate drawing preview for geometry
+   */
+  static calculateDrawingPreview(
+    mode: DrawingMode,
+    startPoint: PixeloidCoordinate,
+    currentPoint: PixeloidCoordinate
+  ): PreviewObject | null {
+    const style = gameStore_3b.style
+    
+    switch (mode) {
+      case 'line':
+        return {
+          type: 'line',
+          vertices: [startPoint, currentPoint],
+          style: style,
+          isValid: true,
+          bounds: this.calculateECSBounds([startPoint, currentPoint])
+        }
+      case 'rectangle':
+        const rectVertices = [
+          startPoint,
+          { x: currentPoint.x, y: startPoint.y },
+          currentPoint,
+          { x: startPoint.x, y: currentPoint.y }
+        ]
+        return {
+          type: 'rectangle',
+          vertices: rectVertices,
+          style: style,
+          isValid: true,
+          bounds: this.calculateECSBounds(rectVertices)
+        }
+      case 'circle':
+        const radius = Math.sqrt(
+          Math.pow(currentPoint.x - startPoint.x, 2) +
+          Math.pow(currentPoint.y - startPoint.y, 2)
+        )
+        return {
+          type: 'circle',
+          vertices: [startPoint, currentPoint],
+          style: style,
+          isValid: radius > 0,
+          bounds: {
+            minX: startPoint.x - radius,
+            minY: startPoint.y - radius,
+            maxX: startPoint.x + radius,
+            maxY: startPoint.y + radius,
+            width: radius * 2,
+            height: radius * 2
+          }
+        }
+      default:
+        return null
     }
   }
 }

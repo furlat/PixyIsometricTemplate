@@ -71,6 +71,7 @@ export class StorePanel_3b {
     // UI-only subscription for visibility
     subscribe(gameStore_3b.ui, () => {
       this.updateDOMVisibility()
+      this.updateValues()  // ✅ ADD THIS - Updates layer controls when UI state changes
     })
     
     // Data subscriptions for content updates

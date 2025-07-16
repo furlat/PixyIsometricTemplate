@@ -1,481 +1,285 @@
 /**
- * GeometryHelper provides centralized geometric calculations for all shapes
- * Similar to CoordinateHelper for coordinate transformations
+ * GeometryHelper_3b - Phase 3B Simplified Geometry Helper
+ * Focuses on essential functionality for Phase 3B geometry drawing
+ * Mesh authority compliant with store integration
  */
 
 import type {
-  GeometricDiamond,
-  GeometricCircle,
-  GeometricRectangle,
-  GeometricLine,
-  GeometricPoint,
-  GeometricObject,
   PixeloidCoordinate,
-  GeometricMetadata,
-  AnchorSnapPoint,
+  VertexCoordinate,
+  GeometricObject,
+  ECSBoundingBox
 } from '../types'
-import { gameStore } from '../store/gameStore'
-import { CoordinateHelper } from './CoordinateHelper'
+import { gameStore_3b, gameStore_3b_methods } from '../store/gameStore_3b'
+import { CoordinateHelper } from './CoordinateHelper_3b'
+import type { DrawingMode, StyleSettings, PreviewObject, AnchorPoint } from '../types/geometry-drawing'
+import type { ECSDataLayer } from '../types/ecs-data-layer'
 
-export class GeometryHelper {
+export class GeometryHelper_3b {
+
+  // ================================
+  // CORE COORDINATE FUNCTIONS (MESH AUTHORITY)
+  // ================================
 
   /**
-   * UNIFIED PIXELOID ANCHORING SYSTEM
-   * Snap to consistent anchor points within pixeloid for all geometry types
+   * Snap to pixeloid anchor point (mesh authority)
    */
   static snapToPixeloidAnchor(
     clickPosition: PixeloidCoordinate,
-    snapPoint: AnchorSnapPoint
+    snapPoint: 'topLeft' | 'topRight' | 'bottomLeft' | 'bottomRight' | 'center'
   ): PixeloidCoordinate {
     const gridX = Math.floor(clickPosition.x)
     const gridY = Math.floor(clickPosition.y)
     
     switch (snapPoint) {
-      case 'top-left':     return { __brand: 'pixeloid', x: gridX,       y: gridY }
-      case 'top-mid':      return { __brand: 'pixeloid', x: gridX + 0.5, y: gridY }
-      case 'top-right':    return { __brand: 'pixeloid', x: gridX + 1,   y: gridY }
-      case 'left-mid':     return { __brand: 'pixeloid', x: gridX,       y: gridY + 0.5 }
-      case 'center':       return { __brand: 'pixeloid', x: gridX + 0.5, y: gridY + 0.5 }
-      case 'right-mid':    return { __brand: 'pixeloid', x: gridX + 1,   y: gridY + 0.5 }
-      case 'bottom-left':  return { __brand: 'pixeloid', x: gridX,       y: gridY + 1 }
-      case 'bottom-mid':   return { __brand: 'pixeloid', x: gridX + 0.5, y: gridY + 1 }
-      case 'bottom-right': return { __brand: 'pixeloid', x: gridX + 1,   y: gridY + 1 }
+      case 'topLeft': return { x: gridX, y: gridY }
+      case 'topRight': return { x: gridX + 1, y: gridY }
+      case 'bottomLeft': return { x: gridX, y: gridY + 1 }
+      case 'bottomRight': return { x: gridX + 1, y: gridY + 1 }
+      case 'center': return { x: gridX + 0.5, y: gridY + 0.5 }
+      default: return { x: gridX + 0.5, y: gridY + 0.5 }
     }
   }
 
   /**
-   * Calculate diamond vertices from diamond properties
-   * anchorX = west vertex X position, anchorY = center Y position (east/west level)
-   */
-  static calculateDiamondVertices(diamond: GeometricDiamond): {
-    west: PixeloidCoordinate
-    north: PixeloidCoordinate
-    east: PixeloidCoordinate
-    south: PixeloidCoordinate
-  } {
-    const { anchorX, anchorY, width, height } = diamond
-
-    // Calculate center position for north/south vertices
-    const centerX = anchorX + width / 2
-
-    // Calculate diamond vertices:
-    // - West/East vertices: snap to pixeloid centers (top-left anchor)
-    // - North/South vertices: do NOT snap, use exact calculated positions
-    return {
-      west: { __brand: 'pixeloid', x: anchorX, y: anchorY },
-      north: {
-        __brand: 'pixeloid',
-        x: centerX,
-        y: anchorY - height  // No snapping for north/south
-      },
-      east: { __brand: 'pixeloid', x: anchorX + width, y: anchorY },
-      south: {
-        __brand: 'pixeloid',
-        x: centerX,
-        y: anchorY + height  // No snapping for north/south
-      }
-    }
-  }
-
-  /**
-   * Calculate diamond properties from origin vertex and target vertex
-   * Origin vertex (first click) stays FIXED, target vertex (drag position) determines the opposite vertex
-   */
-  static calculateDiamondProperties(
-    originVertex: PixeloidCoordinate,   // First click - FIXED origin vertex
-    targetVertex: PixeloidCoordinate    // Drag position - target vertex
-  ): {
-    anchorX: number
-    anchorY: number
-    width: number
-    height: number
-  } {
-    // Calculate width from horizontal distance (no constraints)
-    const width = Math.abs(targetVertex.x - originVertex.x)
-    
-    // Determine west and east vertices - origin vertex X is FIXED
-    let westX: number
-    
-    if (targetVertex.x >= originVertex.x) {
-      // Dragging RIGHT: origin = west vertex (FIXED)
-      westX = originVertex.x
-    } else {
-      // Dragging LEFT: origin = east vertex (FIXED), so west = origin - width
-      westX = originVertex.x - width
-    }
-    
-    // Center Y = origin vertex Y (west and east vertices are at same Y level)
-    const centerY = originVertex.y
-    
-    // Height calculation: north/south vertices are ± width/4 from center
-    const height = width / 4
-
-    return {
-      anchorX: westX,       // Diamond anchor is always at west vertex X
-      anchorY: centerY,     // Diamond anchor Y is at center Y (= origin Y)
-      width,                // Width between west and east vertices
-      height                // Distance from center to north/south vertices
-    }
-  }
-
-  /**
-   * Calculate diamond preview properties during drawing
-   */
-  static calculateDiamondPreview(
-    startPoint: PixeloidCoordinate,
-    currentPoint: PixeloidCoordinate
-  ): {
-    anchorX: number
-    anchorY: number
-    width: number
-    height: number
-    vertices: {
-      west: PixeloidCoordinate
-      north: PixeloidCoordinate
-      east: PixeloidCoordinate
-      south: PixeloidCoordinate
-    }
-  } {
-    const properties = this.calculateDiamondProperties(startPoint, currentPoint)
-    
-    // Create temporary diamond object for vertex calculation
-    const tempDiamond: GeometricDiamond = {
-      id: 'preview',
-      anchorX: properties.anchorX,
-      anchorY: properties.anchorY,
-      width: properties.width,
-      height: properties.height,
-      color: 0x0066cc,
-      strokeWidth: 2,
-      strokeAlpha: 1.0,
-      isVisible: true,
-      createdAt: Date.now(),
-      metadata: this.calculateDiamondMetadata(properties)
-    }
-
-    const vertices = this.calculateDiamondVertices(tempDiamond)
-
-    return {
-      ...properties,
-      vertices
-    }
-  }
-
-  /**
-   * Snap coordinate to pixeloid center
+   * Snap coordinate to pixeloid center (mesh authority)
    */
   static snapToPixeloidCenter(coordinate: number): number {
     return Math.floor(coordinate) + 0.5
   }
 
   /**
-   * Snap point to pixeloid center
+   * Snap point to pixeloid center (mesh authority)
    */
   static snapPointToPixeloidCenter(point: PixeloidCoordinate): PixeloidCoordinate {
     return {
-      __brand: 'pixeloid',
       x: this.snapToPixeloidCenter(point.x),
       y: this.snapToPixeloidCenter(point.y)
     }
   }
 
   /**
-   * Calculate precise anchor points for a pixeloid
-   * Given a pixeloid coordinate (from mouse), returns all key positions for precise anchoring
-   *
-   * COORDINATE SYSTEM:
-   * - Input: Raw pixeloid coordinates (e.g., mouse position 5.7, 3.2)
-   * - Output: Precise pixeloid coordinates for anchoring
-   * - A pixeloid at integer position (5, 3) spans from (5.0, 3.0) to (6.0, 4.0)
-   * - Top-left origin: Y increases downward
-   * - Integer coordinates are at pixeloid corners/edges
-   * - Half-integer coordinates (x.5, y.5) are at pixeloid centers
+   * Calculate pixeloid anchor points for mouse interaction
    */
   static calculatePixeloidAnchorPoints(pixeloidX: number, pixeloidY: number): {
-    // Corners of the pixeloid square
     topLeft: PixeloidCoordinate
     topRight: PixeloidCoordinate
     bottomLeft: PixeloidCoordinate
     bottomRight: PixeloidCoordinate
-    // Edge midpoints for precise edge-to-edge alignment
     topMid: PixeloidCoordinate
     rightMid: PixeloidCoordinate
     bottomMid: PixeloidCoordinate
     leftMid: PixeloidCoordinate
-    // Pixeloid center
     center: PixeloidCoordinate
   } {
-    // Floor the coordinates to get the pixeloid's integer grid position
     const gridX = Math.floor(pixeloidX)
     const gridY = Math.floor(pixeloidY)
     
     return {
-      // Four corners of the pixeloid square (integer coordinates)
-      topLeft: { __brand: 'pixeloid', x: gridX, y: gridY },
-      topRight: { __brand: 'pixeloid', x: gridX + 1, y: gridY },
-      bottomLeft: { __brand: 'pixeloid', x: gridX, y: gridY + 1 },
-      bottomRight: { __brand: 'pixeloid', x: gridX + 1, y: gridY + 1 },
-      
-      // Midpoints of each edge (half-integer on one axis)
-      topMid: { __brand: 'pixeloid', x: gridX + 0.5, y: gridY },           // Top edge center
-      rightMid: { __brand: 'pixeloid', x: gridX + 1, y: gridY + 0.5 },     // Right edge center
-      bottomMid: { __brand: 'pixeloid', x: gridX + 0.5, y: gridY + 1 },    // Bottom edge center
-      leftMid: { __brand: 'pixeloid', x: gridX, y: gridY + 0.5 },          // Left edge center
-      
-      // Center of the pixeloid (half-integer on both axes)
-      center: { __brand: 'pixeloid', x: gridX + 0.5, y: gridY + 0.5 }      // Pixeloid center
+      topLeft: { x: gridX, y: gridY },
+      topRight: { x: gridX + 1, y: gridY },
+      bottomLeft: { x: gridX, y: gridY + 1 },
+      bottomRight: { x: gridX + 1, y: gridY + 1 },
+      topMid: { x: gridX + 0.5, y: gridY },
+      rightMid: { x: gridX + 1, y: gridY + 0.5 },
+      bottomMid: { x: gridX + 0.5, y: gridY + 1 },
+      leftMid: { x: gridX, y: gridY + 0.5 },
+      center: { x: gridX + 0.5, y: gridY + 0.5 }
     }
   }
 
-  /**
-   * Check if a point is inside a diamond (for selection)
-   */
-  static isPointInsideDiamond(
-    point: PixeloidCoordinate, 
-    diamond: GeometricDiamond
-  ): boolean {
-    const vertices = this.calculateDiamondVertices(diamond)
-    
-    // Use point-in-polygon algorithm for diamond shape
-    // Since diamond is convex, we can use a simpler approach
-    return this.isPointInConvexQuadrilateral(
-      point,
-      vertices.west,
-      vertices.north,
-      vertices.east,
-      vertices.south
-    )
-  }
+  // ================================
+  // DRAWING CALCULATIONS (MESH AUTHORITY)
+  // ================================
 
   /**
-   * Point-in-convex-quadrilateral test
+   * Calculate line preview for drawing
    */
-  private static isPointInConvexQuadrilateral(
-    point: PixeloidCoordinate,
-    v1: PixeloidCoordinate,
-    v2: PixeloidCoordinate,
-    v3: PixeloidCoordinate,
-    v4: PixeloidCoordinate
-  ): boolean {
-    // Check if point is on the same side of each edge
-    const cross1 = this.crossProduct(v1, v2, point)
-    const cross2 = this.crossProduct(v2, v3, point)
-    const cross3 = this.crossProduct(v3, v4, point)
-    const cross4 = this.crossProduct(v4, v1, point)
-
-    // All cross products should have the same sign (or be zero)
-    const hasPos = cross1 > 0 || cross2 > 0 || cross3 > 0 || cross4 > 0
-    const hasNeg = cross1 < 0 || cross2 < 0 || cross3 < 0 || cross4 < 0
-
-    return !(hasPos && hasNeg)
-  }
-
-  /**
-   * Calculate cross product for point-in-polygon test
-   */
-  private static crossProduct(
-    a: PixeloidCoordinate, 
-    b: PixeloidCoordinate, 
-    p: PixeloidCoordinate
-  ): number {
-    return (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x)
-  }
-
-  /**
-   * Calculate metadata for a geometric point
-   * Points occupy at least 1 pixeloid for visibility
-   */
-  static calculatePointMetadata(point: { x: number; y: number }): GeometricMetadata {
-    // Ensure point occupies the pixeloid it's in
-    const pixeloidX = Math.floor(point.x)
-    const pixeloidY = Math.floor(point.y)
+  static calculateLinePreview(
+    startPoint: PixeloidCoordinate,
+    currentPoint: PixeloidCoordinate
+  ): PreviewObject {
+    const style = gameStore_3b.style
+    const vertices = [startPoint, currentPoint]
     
     return {
-      center: { __brand: 'pixeloid', x: point.x, y: point.y },
-      bounds: {
-        minX: pixeloidX,
-        maxX: pixeloidX + 1,  // Full pixeloid width
-        minY: pixeloidY,
-        maxY: pixeloidY + 1   // Full pixeloid height
-      },
-      visibilityCache: new Map(),
-      createdAtScale: gameStore.cameraViewport.zoom_factor
+      type: 'line',
+      vertices: vertices,
+      style: style,
+      isValid: true,
+      bounds: this.calculateBoundsFromVertices(vertices)
     }
   }
 
   /**
-   * Calculate metadata for a geometric line
+   * Calculate rectangle preview for drawing
    */
-  static calculateLineMetadata(line: { startX: number; startY: number; endX: number; endY: number }): GeometricMetadata {
-    const centerX = (line.startX + line.endX) / 2
-    const centerY = (line.startY + line.endY) / 2
-    
-    return {
-      center: { __brand: 'pixeloid', x: centerX, y: centerY },
-      bounds: {
-        minX: Math.min(line.startX, line.endX),
-        maxX: Math.max(line.startX, line.endX),
-        minY: Math.min(line.startY, line.endY),
-        maxY: Math.max(line.startY, line.endY)
-      },
-      visibilityCache: new Map(),
-      createdAtScale: gameStore.cameraViewport.zoom_factor
-    }
-  }
-
-  /**
-   * Calculate metadata for a geometric circle
-   * Uses pixeloid-perfect bounds with Math.floor/ceil
-   */
-  static calculateCircleMetadata(circle: { centerX: number; centerY: number; radius: number }): GeometricMetadata {
-    return {
-      center: { __brand: 'pixeloid', x: circle.centerX, y: circle.centerY },
-      bounds: {
-        minX: Math.floor(circle.centerX - circle.radius),
-        maxX: Math.ceil(circle.centerX + circle.radius),
-        minY: Math.floor(circle.centerY - circle.radius),
-        maxY: Math.ceil(circle.centerY + circle.radius)
-      },
-      visibilityCache: new Map(),
-      createdAtScale: gameStore.cameraViewport.zoom_factor
-    }
-  }
-
-  /**
-   * Calculate metadata for a geometric rectangle
-   */
-  static calculateRectangleMetadata(rectangle: { x: number; y: number; width: number; height: number }): GeometricMetadata {
-    const centerX = rectangle.x + rectangle.width / 2
-    const centerY = rectangle.y + rectangle.height / 2
-    
-    return {
-      center: { __brand: 'pixeloid', x: centerX, y: centerY },
-      bounds: {
-        minX: rectangle.x,
-        maxX: rectangle.x + rectangle.width,
-        minY: rectangle.y,
-        maxY: rectangle.y + rectangle.height
-      },
-      visibilityCache: new Map(),
-      createdAtScale: gameStore.cameraViewport.zoom_factor
-    }
-  }
-
-  /**
-   * Calculate metadata for a geometric diamond with PIXELOID-PERFECT BOUNDS
-   */
-  static calculateDiamondMetadata(diamond: { anchorX: number; anchorY: number; width: number; height: number }): GeometricMetadata {
-    const centerX = diamond.anchorX + diamond.width / 2
-    const centerY = diamond.anchorY
-    
-    return {
-      center: { __brand: 'pixeloid', x: centerX, y: centerY },
-      bounds: {
-        minX: diamond.anchorX,
-        maxX: diamond.anchorX + diamond.width,
-        minY: Math.floor(diamond.anchorY - diamond.height), // ✅ Round DOWN - include full pixeloid containing north vertex
-        maxY: Math.ceil(diamond.anchorY + diamond.height)   // ✅ Round UP - include full pixeloid containing south vertex
-      },
-      visibilityCache: new Map(),
-      createdAtScale: gameStore.cameraViewport.zoom_factor
-    }
-  }
-
-  /**
-   * Mesh-related helper methods for pixeloid intersection testing
-   */
-
-  /**
-   * Check if a pixeloid intersects with an object using multi-point sampling
-   */
-  static pixeloidIntersectsObject(
-    pixeloidX: number, 
-    pixeloidY: number, 
-    obj: GeometricObject,
-    samplingMode: 'fast' | 'precise' = 'precise'
-  ): boolean {
-    // Fast mode: only check center point
-    if (samplingMode === 'fast') {
-      const centerPoint = { __brand: 'pixeloid', x: pixeloidX + 0.5, y: pixeloidY + 0.5 } as PixeloidCoordinate
-      return this.isPointInsideObject(centerPoint, obj)
-    }
-
-    // Precise mode: 5-point sampling within the pixeloid
-    const samples = [
-      { __brand: 'pixeloid', x: pixeloidX + 0.25, y: pixeloidY + 0.25 } as PixeloidCoordinate, // Top-left
-      { __brand: 'pixeloid', x: pixeloidX + 0.75, y: pixeloidY + 0.25 } as PixeloidCoordinate, // Top-right
-      { __brand: 'pixeloid', x: pixeloidX + 0.25, y: pixeloidY + 0.75 } as PixeloidCoordinate, // Bottom-left
-      { __brand: 'pixeloid', x: pixeloidX + 0.75, y: pixeloidY + 0.75 } as PixeloidCoordinate, // Bottom-right
-      { __brand: 'pixeloid', x: pixeloidX + 0.5, y: pixeloidY + 0.5 } as PixeloidCoordinate     // Center
+  static calculateRectanglePreview(
+    startPoint: PixeloidCoordinate,
+    currentPoint: PixeloidCoordinate
+  ): PreviewObject {
+    const style = gameStore_3b.style
+    const vertices = [
+      startPoint,
+      { x: currentPoint.x, y: startPoint.y },
+      currentPoint,
+      { x: startPoint.x, y: currentPoint.y }
     ]
     
-    // If any sample point is inside the object, the pixeloid intersects
-    for (const sample of samples) {
-      if (this.isPointInsideObject(sample, obj)) {
-        return true
+    return {
+      type: 'rectangle',
+      vertices: vertices,
+      style: style,
+      isValid: true,
+      bounds: this.calculateBoundsFromVertices(vertices)
+    }
+  }
+
+  /**
+   * Calculate circle preview for drawing
+   */
+  static calculateCirclePreview(
+    startPoint: PixeloidCoordinate,
+    currentPoint: PixeloidCoordinate
+  ): PreviewObject {
+    const style = gameStore_3b.style
+    const radius = Math.sqrt(
+      Math.pow(currentPoint.x - startPoint.x, 2) + 
+      Math.pow(currentPoint.y - startPoint.y, 2)
+    )
+    
+    return {
+      type: 'circle',
+      vertices: [startPoint, currentPoint],
+      style: style,
+      isValid: radius > 0,
+      bounds: {
+        minX: startPoint.x - radius,
+        minY: startPoint.y - radius,
+        maxX: startPoint.x + radius,
+        maxY: startPoint.y + radius,
+        width: radius * 2,
+        height: radius * 2
       }
     }
-    
-    return false
   }
 
   /**
-   * Generic point-in-object test for all geometric shapes
+   * Calculate drawing preview based on current mode
    */
-  static isPointInsideObject(
-    point: PixeloidCoordinate, 
-    obj: GeometricObject
-  ): boolean {
-    if ('anchorX' in obj && 'anchorY' in obj) {
-      // Diamond
-      return this.isPointInsideDiamond(point, obj as GeometricDiamond)
-    } else if ('centerX' in obj && 'centerY' in obj && 'radius' in obj) {
-      // Circle
-      const circle = obj as GeometricCircle
-      const dx = point.x - circle.centerX
-      const dy = point.y - circle.centerY
-      return (dx * dx + dy * dy) <= (circle.radius * circle.radius)
-    } else if ('x' in obj && 'y' in obj && 'width' in obj && 'height' in obj) {
-      // Rectangle
-      const rect = obj as GeometricRectangle
-      return point.x >= rect.x && point.x <= rect.x + rect.width &&
-             point.y >= rect.y && point.y <= rect.y + rect.height
-    } else if ('startX' in obj && 'endX' in obj) {
-      // Line - check with tolerance
-      return this.isPointNearLine(point, obj as GeometricLine, 0.5)
-    } else if ('x' in obj && 'y' in obj) {
-      // Point
-      const pointObj = obj as GeometricPoint
-      return Math.floor(pointObj.x) === Math.floor(point.x) && 
-             Math.floor(pointObj.y) === Math.floor(point.y)
+  static calculateDrawingPreview(
+    mode: DrawingMode,
+    startPoint: PixeloidCoordinate,
+    currentPoint: PixeloidCoordinate
+  ): PreviewObject | null {
+    switch (mode) {
+      case 'line':
+        return this.calculateLinePreview(startPoint, currentPoint)
+      case 'rectangle':
+        return this.calculateRectanglePreview(startPoint, currentPoint)
+      case 'circle':
+        return this.calculateCirclePreview(startPoint, currentPoint)
+      default:
+        return null
+    }
+  }
+
+  // ================================
+  // BOUNDING BOX CALCULATIONS (MESH AUTHORITY)
+  // ================================
+
+  /**
+   * Calculate ECS bounding box from vertices
+   */
+  static calculateBoundsFromVertices(vertices: PixeloidCoordinate[]): ECSBoundingBox {
+    if (vertices.length === 0) {
+      return { minX: 0, minY: 0, maxX: 0, maxY: 0, width: 0, height: 0 }
     }
     
-    return false
+    const xs = vertices.map(v => v.x)
+    const ys = vertices.map(v => v.y)
+    const minX = Math.min(...xs)
+    const maxX = Math.max(...xs)
+    const minY = Math.min(...ys)
+    const maxY = Math.max(...ys)
+    
+    return { 
+      minX, 
+      minY, 
+      maxX, 
+      maxY, 
+      width: maxX - minX, 
+      height: maxY - minY 
+    }
   }
 
   /**
-   * Check if a point is near a line within tolerance
+   * Calculate pixeloid-aligned bounds
+   */
+  static calculatePixeloidAlignedBounds(bounds: ECSBoundingBox): ECSBoundingBox {
+    const minX = Math.floor(bounds.minX)
+    const maxX = Math.ceil(bounds.maxX)
+    const minY = Math.floor(bounds.minY)
+    const maxY = Math.ceil(bounds.maxY)
+    
+    return {
+      minX,
+      minY,
+      maxX,
+      maxY,
+      width: maxX - minX,
+      height: maxY - minY
+    }
+  }
+
+  // ================================
+  // GEOMETRY OBJECT UTILITIES (MESH AUTHORITY)
+  // ================================
+
+  /**
+   * Check if point is inside basic rectangle
+   */
+  static isPointInRectangle(
+    point: PixeloidCoordinate,
+    bounds: ECSBoundingBox
+  ): boolean {
+    return point.x >= bounds.minX && point.x <= bounds.maxX &&
+           point.y >= bounds.minY && point.y <= bounds.maxY
+  }
+
+  /**
+   * Check if point is inside basic circle
+   */
+  static isPointInCircle(
+    point: PixeloidCoordinate,
+    center: PixeloidCoordinate,
+    radius: number
+  ): boolean {
+    const dx = point.x - center.x
+    const dy = point.y - center.y
+    return (dx * dx + dy * dy) <= (radius * radius)
+  }
+
+  /**
+   * Check if point is near line within tolerance
    */
   static isPointNearLine(
-    point: PixeloidCoordinate, 
-    line: GeometricLine, 
-    tolerance: number
+    point: PixeloidCoordinate,
+    startPoint: PixeloidCoordinate,
+    endPoint: PixeloidCoordinate,
+    tolerance: number = 0.5
   ): boolean {
-    const { startX, startY, endX, endY } = line
-    
-    // Calculate the distance from point to line segment
-    const A = point.x - startX
-    const B = point.y - startY
-    const C = endX - startX
-    const D = endY - startY
+    const A = point.x - startPoint.x
+    const B = point.y - startPoint.y
+    const C = endPoint.x - startPoint.x
+    const D = endPoint.y - startPoint.y
     
     const dot = A * C + B * D
     const lenSq = C * C + D * D
     
     if (lenSq === 0) {
-      // Line is a point
-      const dx = point.x - startX
-      const dy = point.y - startY
+      const dx = point.x - startPoint.x
+      const dy = point.y - startPoint.y
       return Math.sqrt(dx * dx + dy * dy) <= tolerance
     }
     
@@ -483,14 +287,14 @@ export class GeometryHelper {
     
     let xx, yy
     if (param < 0) {
-      xx = startX
-      yy = startY
+      xx = startPoint.x
+      yy = startPoint.y
     } else if (param > 1) {
-      xx = endX
-      yy = endY
+      xx = endPoint.x
+      yy = endPoint.y
     } else {
-      xx = startX + param * C
-      yy = startY + param * D
+      xx = startPoint.x + param * C
+      yy = startPoint.y + param * D
     }
     
     const dx = point.x - xx
@@ -498,178 +302,156 @@ export class GeometryHelper {
     return Math.sqrt(dx * dx + dy * dy) <= tolerance
   }
 
+  // ================================
+  // STORE INTEGRATION (MESH AUTHORITY)
+  // ================================
+
   /**
-   * Calculate pixeloid-aligned bounds for an object
+   * Get current drawing mode from store
    */
-  static calculatePixeloidBounds(obj: GeometricObject): {
-    minX: number
-    maxX: number
-    minY: number
-    maxY: number
-  } {
-    const bounds = obj.metadata!.bounds
-    
-    return {
-      minX: Math.floor(bounds.minX),
-      maxX: Math.ceil(bounds.maxX),
-      minY: Math.floor(bounds.minY),
-      maxY: Math.ceil(bounds.maxY)
-    }
+  static getCurrentDrawingMode(): DrawingMode {
+    return gameStore_3b.drawing.mode
   }
 
   /**
-   * Calculate visibility state and on-screen bounds for an object
-   * Ensures pixeloid-perfect bounds for consistency
+   * Get current style settings from store
    */
-  static calculateVisibilityState(
-    obj: GeometricObject,
-    pixeloidScale: number
-  ): {
-    visibility: 'fully-onscreen' | 'partially-onscreen' | 'offscreen'
-    onScreenBounds?: any
+  static getCurrentStyleSettings(): StyleSettings {
+    return gameStore_3b.style
+  }
+
+  /**
+   * Get current drawing preview from store
+   */
+  static getCurrentDrawingPreview(): PreviewObject | null {
+    return gameStore_3b.drawing.preview.object
+  }
+
+  /**
+   * Update drawing preview in store
+   */
+  static updateDrawingPreview(preview: PreviewObject | null): void {
+    gameStore_3b.drawing.preview.object = preview
+    gameStore_3b.drawing.preview.isActive = preview !== null
+  }
+
+  /**
+   * Get mesh cell size (mesh authority)
+   */
+  static getMeshCellSize(): number {
+    return gameStore_3b.mesh.cellSize
+  }
+
+  /**
+   * Get mesh dimensions (mesh authority)
+   */
+  static getMeshDimensions(): { width: number, height: number } {
+    return gameStore_3b.mesh.dimensions
+  }
+
+  /**
+   * Get current navigation offset (mesh authority)
+   */
+  static getCurrentOffset(): PixeloidCoordinate {
+    return gameStore_3b.navigation.offset
+  }
+
+  // ================================
+  // VISIBILITY CALCULATIONS (MESH AUTHORITY)
+  // ================================
+
+  /**
+   * Calculate if bounds are visible in current viewport
+   */
+  static calculateVisibility(bounds: ECSBoundingBox): {
+    visibility: 'fully-visible' | 'partially-visible' | 'not-visible'
+    screenBounds?: ECSBoundingBox
   } {
-    if (!obj.metadata?.bounds) {
-      return { visibility: 'offscreen' }
-    }
+    const cellSize = this.getMeshCellSize()
+    const dimensions = this.getMeshDimensions()
+    const offset = this.getCurrentOffset()
     
-    const bounds = obj.metadata.bounds
-    const offset = CoordinateHelper.getCurrentOffset()
-    
-    // Convert pixeloid bounds to screen coordinates
+    // Convert to screen coordinates
     const screenBounds = {
-      left: (bounds.minX - offset.x) * pixeloidScale,
-      top: (bounds.minY - offset.y) * pixeloidScale,
-      right: (bounds.maxX - offset.x) * pixeloidScale,
-      bottom: (bounds.maxY - offset.y) * pixeloidScale
+      minX: (bounds.minX - offset.x) * cellSize,
+      minY: (bounds.minY - offset.y) * cellSize,
+      maxX: (bounds.maxX - offset.x) * cellSize,
+      maxY: (bounds.maxY - offset.y) * cellSize,
+      width: bounds.width * cellSize,
+      height: bounds.height * cellSize
     }
     
-    const screenWidth = gameStore.windowWidth
-    const screenHeight = gameStore.windowHeight
-    
-    // Check if completely off-screen
-    if (screenBounds.right < 0 || screenBounds.left > screenWidth ||
-        screenBounds.bottom < 0 || screenBounds.top > screenHeight) {
-      return { visibility: 'offscreen' }
+    // Check if completely outside screen
+    if (screenBounds.maxX < 0 || screenBounds.minX > dimensions.width ||
+        screenBounds.maxY < 0 || screenBounds.minY > dimensions.height) {
+      return { visibility: 'not-visible' }
     }
     
-    // Check if fully on-screen
-    if (screenBounds.left >= 0 && screenBounds.right <= screenWidth &&
-        screenBounds.top >= 0 && screenBounds.bottom <= screenHeight) {
-      return { visibility: 'fully-onscreen' }
+    // Check if fully inside screen
+    if (screenBounds.minX >= 0 && screenBounds.maxX <= dimensions.width &&
+        screenBounds.minY >= 0 && screenBounds.maxY <= dimensions.height) {
+      return { visibility: 'fully-visible', screenBounds }
     }
     
-    // Partially on-screen - calculate intersection
-    const intersection = {
-      left: Math.max(0, screenBounds.left),
-      top: Math.max(0, screenBounds.top),
-      right: Math.min(screenWidth, screenBounds.right),
-      bottom: Math.min(screenHeight, screenBounds.bottom)
-    }
+    // Partially visible
+    return { visibility: 'partially-visible', screenBounds }
+  }
+
+  // ================================
+  // MESH VALIDATION (MESH AUTHORITY)
+  // ================================
+
+  /**
+   * Validate that coordinates are mesh-aligned
+   */
+  static validateMeshAlignment(coord: PixeloidCoordinate): boolean {
+    const cellSize = this.getMeshCellSize()
+    const screenCoord = CoordinateHelper.pixeloidToScreen(coord, this.getCurrentOffset())
     
-    // Convert back to pixeloid coordinates (PIXELOID-PERFECT using floor/ceil)
-    const onScreenBounds = {
-      minX: Math.floor(intersection.left / pixeloidScale) + offset.x,
-      maxX: Math.ceil(intersection.right / pixeloidScale) + offset.x,
-      minY: Math.floor(intersection.top / pixeloidScale) + offset.y,
-      maxY: Math.ceil(intersection.bottom / pixeloidScale) + offset.y,
-      // Texture offset - how many pixels to skip when creating sprite
-      textureOffsetX: Math.max(0, -screenBounds.left),
-      textureOffsetY: Math.max(0, -screenBounds.top)
-    }
+    // Check if coordinates align with mesh cells
+    const alignedX = Math.round(screenCoord.x / cellSize) * cellSize
+    const alignedY = Math.round(screenCoord.y / cellSize) * cellSize
     
-    return {
-      visibility: 'partially-onscreen',
-      onScreenBounds
-    }
+    return Math.abs(screenCoord.x - alignedX) < 0.1 && 
+           Math.abs(screenCoord.y - alignedY) < 0.1
   }
 
   /**
-   * Get all pixeloids that intersect with an object
+   * Align coordinates to mesh
    */
-  static getObjectPixeloids(
-    obj: GeometricObject,
-    samplingMode: 'fast' | 'precise' = 'precise'
-  ): Set<string> {
-    const occupiedPixeloids = new Set<string>()
-    const bounds = this.calculatePixeloidBounds(obj)
+  static alignToMesh(coord: PixeloidCoordinate): PixeloidCoordinate {
+    const cellSize = this.getMeshCellSize()
+    const offset = this.getCurrentOffset()
     
-    const width = bounds.maxX - bounds.minX
-    const height = bounds.maxY - bounds.minY
-    
-    // Safety check for extremely large objects
-    if (width * height > 50000) {
-      console.warn(`GeometryHelper: Object ${obj.id} is very large (${width}x${height} pixeloids), using fast sampling`)
-      samplingMode = 'fast'
+    // Convert to screen, align, convert back
+    const screenCoord = CoordinateHelper.pixeloidToScreen(coord, offset)
+    const alignedScreenCoord = {
+      x: Math.round(screenCoord.x / cellSize) * cellSize,
+      y: Math.round(screenCoord.y / cellSize) * cellSize
     }
     
-    // Test each pixeloid in the bounding box
-    for (let py = 0; py < height; py++) {
-      for (let px = 0; px < width; px++) {
-        const worldX = bounds.minX + px
-        const worldY = bounds.minY + py
-        
-        if (this.pixeloidIntersectsObject(worldX, worldY, obj, samplingMode)) {
-          occupiedPixeloids.add(`${worldX},${worldY}`)
-        }
-      }
-    }
+    return CoordinateHelper.screenToPixeloid(alignedScreenCoord, offset)
+  }
+
+  // ================================
+  // PERFORMANCE UTILITIES
+  // ================================
+
+  /**
+   * Calculate complexity score for geometry
+   */
+  static calculateComplexity(bounds: ECSBoundingBox): 'low' | 'medium' | 'high' {
+    const area = bounds.width * bounds.height
     
-    return occupiedPixeloids
+    if (area > 10000) return 'high'
+    if (area > 1000) return 'medium'
+    return 'low'
   }
 
   /**
-   * Calculate mesh statistics for an object
+   * Get performance-optimized sampling mode
    */
-  static calculateMeshStats(obj: GeometricObject): {
-    estimatedPixeloids: number
-    boundingBoxSize: { width: number, height: number }
-    complexity: 'low' | 'medium' | 'high'
-  } {
-    const bounds = this.calculatePixeloidBounds(obj)
-    const width = bounds.maxX - bounds.minX
-    const height = bounds.maxY - bounds.minY
-    const boundingBoxPixeloids = width * height
-    
-    // Estimate actual pixeloids based on shape type
-    let estimatedPixeloids: number
-    let complexity: 'low' | 'medium' | 'high'
-    
-    if ('radius' in obj) {
-      // Circle - approximately π * r²
-      const circle = obj as GeometricCircle
-      estimatedPixeloids = Math.floor(Math.PI * circle.radius * circle.radius)
-      complexity = 'medium'
-    } else if ('anchorX' in obj && 'anchorY' in obj) {
-      // Diamond - approximately 50% of bounding box
-      estimatedPixeloids = Math.floor(boundingBoxPixeloids * 0.5)
-      complexity = 'medium'
-    } else if ('width' in obj && 'height' in obj) {
-      // Rectangle - full bounding box
-      estimatedPixeloids = boundingBoxPixeloids
-      complexity = 'low'
-    } else if ('startX' in obj && 'endX' in obj) {
-      // Line - approximate based on length
-      const line = obj as GeometricLine
-      const length = Math.sqrt(
-        Math.pow(line.endX - line.startX, 2) + 
-        Math.pow(line.endY - line.startY, 2)
-      )
-      estimatedPixeloids = Math.ceil(length)
-      complexity = 'low'
-    } else {
-      // Point - always 1
-      estimatedPixeloids = 1
-      complexity = 'low'
-    }
-    
-    // Adjust complexity based on size
-    if (estimatedPixeloids > 5000) complexity = 'high'
-    else if (estimatedPixeloids > 1000) complexity = 'medium'
-    
-    return {
-      estimatedPixeloids,
-      boundingBoxSize: { width, height },
-      complexity
-    }
+  static getOptimalSamplingMode(complexity: 'low' | 'medium' | 'high'): 'fast' | 'precise' {
+    return complexity === 'high' ? 'fast' : 'precise'
   }
 }

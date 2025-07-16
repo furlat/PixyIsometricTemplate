@@ -128,7 +128,7 @@ export const gameStore_3b = proxy<GameState3b>({
     showMouse: true,
     showStorePanel: true,
     showLayerToggle: true,
-    enableCheckboard: true,
+    enableCheckboard: false,  // Start disabled, user can enable
     // ✅ NEW: Geometry UI features
     showGeometry: true,
     showGeometryPanel: false,
