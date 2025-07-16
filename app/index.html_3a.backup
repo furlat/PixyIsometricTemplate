@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pixy Phase 3A - Core Foundation</title>
+    <link rel="stylesheet" href="/src/styles/main.css" />
+  </head>
+  <body>
+    <canvas id="gameCanvas"></canvas>
+    
+    <!-- UI Control Bar (Simplified for Phase 3A) -->
+    <div id="ui-control-bar" class="fixed top-4 left-1/2 transform -translate-x-1/2 bg-base-100/95 backdrop-blur-md border border-base-300 rounded-full shadow-lg z-50 px-4 py-2">
+      <div class="flex items-center gap-3">
+        <span class="text-sm font-semibold text-primary">Phase 3A Foundation</span>
+        <div class="divider divider-horizontal mx-0"></div>
+        <button id="toggle-layers" class="btn btn-sm btn-outline rounded-full">
+          <span class="button-text">Layers</span>
+        </button>
+        <button id="toggle-store-panel" class="btn btn-sm btn-primary rounded-full">
+          <span class="button-text">Store</span>
+        </button>
+      </div>
+    </div>
+    
+    <!-- Store Panel (Core Foundation Only) -->
+    <div id="store-panel" class="fixed top-4 right-4 w-80 max-h-[calc(100vh-5rem)] bg-base-100/95 backdrop-blur-md border border-base-300 rounded-xl shadow-2xl z-50 overflow-hidden animate-fade-in">
+      <!-- Header -->
+      <div class="bg-base-200/50 border-b border-base-300 p-4 flex justify-between items-center">
+        <h2 class="text-lg font-bold text-primary flex items-center gap-2">
+          <span class="text-info">🏗️</span>
+          Phase 3A Foundation
+        </h2>
+        <button class="btn btn-sm btn-ghost btn-circle hover:bg-error hover:text-white transition-colors" id="close-store-panel" title="Close Store Panel">
+          <span class="text-lg">✕</span>
+        </button>
+      </div>
+      
+      <!-- Scrollable Content -->
+      <div class="max-h-[calc(100vh-11rem)] overflow-y-auto custom-scrollbar p-2">
+        
+        <!-- Phase 3A Status -->
+        <div class="card bg-base-200/30 shadow-sm mb-3">
+          <div class="card-body p-3">
+            <h3 class="card-title text-sm text-success flex items-center gap-2">
+              <span class="text-xs">▸</span>
+              Phase 3A Status
+            </h3>
+            <div class="space-y-2">
+              <div class="flex justify-between items-center text-xs">
+                <span class="text-base-content/70">Game Initialized:</span>
+                <span id="game-initialized" class="font-bold font-mono status-inactive">false</span>
+              </div>
+              <div class="flex justify-between items-center text-xs">
+                <span class="text-base-content/70">Mesh Scale:</span>
+                <span id="mesh-scale" class="font-bold font-mono status-active">1</span>
+              </div>
+              <div class="flex justify-between items-center text-xs">
+                <span class="text-base-content/70">Layers Active:</span>
+                <span id="layers-active" class="font-bold font-mono status-active">2</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Mouse Position -->
+        <div class="card bg-base-200/30 shadow-sm mb-3">
+          <div class="card-body p-3">
+            <h3 class="card-title text-sm text-accent flex items-center gap-2">
+              <span class="text-xs">▸</span>
+              Mouse Position
+            </h3>
+            <div class="space-y-2">
+              <div class="flex justify-between items-center text-xs">
+                <span class="text-base-content/70">Vertex:</span>
+                <span id="mouse-vertex" class="font-bold font-mono status-mouse">0, 0</span>
+              </div>
+              <div class="flex justify-between items-center text-xs">
+                <span class="text-base-content/70">Screen:</span>
+                <span id="mouse-screen" class="font-bold font-mono status-mouse">0, 0</span>
+              </div>
+              <div class="flex justify-between items-center text-xs">
+                <span class="text-base-content/70">World:</span>
+                <span id="mouse-world" class="font-bold font-mono status-mouse">0, 0</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Navigation -->
+        <div class="card bg-base-200/30 shadow-sm mb-3">
+          <div class="card-body p-3">
+            <h3 class="card-title text-sm text-warning flex items-center gap-2">
+              <span class="text-xs">▸</span>
+              Navigation
+            </h3>
+            <div class="space-y-2">
+              <div class="flex justify-between items-center text-xs">
+                <span class="text-base-content/70">Offset:</span>
+                <span id="navigation-offset" class="font-bold font-mono status-camera">0, 0</span>
+              </div>
+              <div class="flex justify-between items-center text-xs">
+                <span class="text-base-content/70">Is Dragging:</span>
+                <span id="navigation-dragging" class="font-bold font-mono status-inactive">false</span>
+              </div>
+              <div class="flex justify-between items-center text-xs">
+                <span class="text-base-content/70">Move Amount:</span>
+                <span id="navigation-move-amount" class="font-bold font-mono text-primary">1</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Mesh System -->
+        <div class="card bg-base-200/30 shadow-sm mb-3">
+          <div class="card-body p-3">
+            <h3 class="card-title text-sm text-info flex items-center gap-2">
+              <span class="text-xs">▸</span>
+              Mesh System
+            </h3>
+            <div class="space-y-2">
+              <div class="flex justify-between items-center text-xs">
+                <span class="text-base-content/70">Mesh Ready:</span>
+                <span id="mesh-ready" class="font-bold font-mono status-inactive">false</span>
+              </div>
+              <div class="flex justify-between items-center text-xs">
+                <span class="text-base-content/70">Cell Size:</span>
+                <span id="mesh-cell-size" class="font-bold font-mono text-primary">20</span>
+              </div>
+              <div class="flex justify-between items-center text-xs">
+                <span class="text-base-content/70">Dimensions:</span>
+                <span id="mesh-dimensions" class="font-bold font-mono text-primary">0x0</span>
+              </div>
+              <div class="flex justify-between items-center text-xs">
+                <span class="text-base-content/70">Vertex Count:</span>
+                <span id="mesh-vertex-count" class="font-bold font-mono text-primary">0</span>
+              </div>
+              <div class="flex justify-between items-center text-xs">
+                <span class="text-base-content/70">Needs Update:</span>
+                <span id="mesh-needs-update" class="font-bold font-mono status-inactive">false</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Layer Controls -->
+        <div class="card bg-base-200/30 shadow-sm mb-3">
+          <div class="card-body p-3">
+            <h3 class="card-title text-sm text-secondary flex items-center gap-2">
+              <span class="text-xs">▸</span>
+              Layer Controls
+            </h3>
+            <div class="space-y-2">
+              <div class="flex justify-between items-center text-xs">
+                <span class="text-base-content/70">Grid Layer:</span>
+                <span id="layer-grid-status" class="font-bold font-mono status-active">ON</span>
+              </div>
+              <div class="flex justify-between items-center text-xs">
+                <span class="text-base-content/70">Mouse Layer:</span>
+                <span id="layer-mouse-status" class="font-bold font-mono status-active">ON</span>
+              </div>
+              <div class="flex justify-between items-center text-xs">
+                <span class="text-base-content/70">Checkboard:</span>
+                <span id="checkboard-enabled" class="font-bold font-mono status-inactive">OFF</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Mouse Highlight -->
+        <div class="card bg-base-200/30 shadow-sm mb-3">
+          <div class="card-body p-3">
+            <h3 class="card-title text-sm text-accent flex items-center gap-2">
+              <span class="text-xs">▸</span>
+              Mouse Highlight
+            </h3>
+            <div class="space-y-2">
+              <div class="flex justify-between items-center text-xs">
+                <span class="text-base-content/70">Color:</span>
+                <span id="mouse-highlight-color" class="font-bold font-mono text-primary">#ff0000</span>
+              </div>
+              <div class="flex justify-between items-center text-xs">
+                <span class="text-base-content/70">Intensity:</span>
+                <span id="mouse-highlight-intensity" class="font-bold font-mono text-primary">0.80</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Phase 3A Controls -->
+        <div class="alert alert-info bg-info/10 border-info/20">
+          <div class="w-full">
+            <h4 class="font-bold text-sm text-info mb-2 flex items-center gap-2">
+              <span>⌨️</span>
+              Phase 3A Controls
+            </h4>
+            <div class="space-y-1 text-xs text-base-content/80">
+              <div class="flex items-center gap-2">
+                <kbd class="kbd kbd-xs bg-base-300">W</kbd>
+                <kbd class="kbd kbd-xs bg-base-300">A</kbd>
+                <kbd class="kbd kbd-xs bg-base-300">S</kbd>
+                <kbd class="kbd kbd-xs bg-base-300">D</kbd>
+                <span>Move navigation offset</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <kbd class="kbd kbd-xs bg-base-300">F1</kbd>
+                <span>Toggle store panel</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <kbd class="kbd kbd-xs bg-base-300">F2</kbd>
+                <span>Toggle layer controls</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <kbd class="kbd kbd-xs bg-base-300">Space</kbd>
+                <span>Center navigation offset</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Debug Info -->
+        <div class="card bg-base-200/30 shadow-sm">
+          <div class="card-body p-3">
+            <h3 class="card-title text-sm text-error flex items-center gap-2">
+              <span class="text-xs">▸</span>
+              Debug Info
+            </h3>
+            <div class="space-y-1 text-xs text-base-content/60">
+              <div>Phase 3A Foundation - 2 Layer System</div>
+              <div>Single mesh at scale 1 (pixel-perfect)</div>
+              <div>Grid layer: checkboard pattern</div>
+              <div>Mouse layer: highlight at cursor</div>
+              <div>WASD navigation with store updates</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Layer Toggle Bar (Grid + Mouse + Checkboard) -->
+    <div id="layer-toggle-bar" class="fixed bottom-4 right-4 bg-base-100/95 backdrop-blur-md border border-base-300 rounded-full shadow-lg z-50 px-4 py-2">
+      <div class="flex items-center gap-2">
+        <span class="text-sm font-semibold text-accent">Layers</span>
+        <div class="divider divider-horizontal mx-0"></div>
+        <button id="toggle-layer-grid" class="btn btn-sm btn-success rounded-full">
+          <span class="button-text">Grid</span>
+        </button>
+        <button id="toggle-layer-mouse" class="btn btn-sm btn-accent rounded-full">
+          <span class="button-text">Mouse</span>
+        </button>
+        <button id="toggle-checkboard" class="btn btn-sm btn-outline rounded-full">
+          <span class="button-text">Checkboard</span>
+        </button>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
