@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Pixy Phase 3A - Core Foundation</title>
+    <title>Pixy Phase 3B - Geometry System</title>
     <link rel="stylesheet" href="/src/styles/main.css" />
   </head>
   <body>
@@ -13,7 +13,7 @@
     <!-- UI Control Bar (Simplified for Phase 3A) -->
     <div id="ui-control-bar" class="fixed top-4 left-1/2 transform -translate-x-1/2 bg-base-100/95 backdrop-blur-md border border-base-300 rounded-full shadow-lg z-50 px-4 py-2">
       <div class="flex items-center gap-3">
-        <span class="text-sm font-semibold text-primary">Phase 3A Foundation</span>
+        <span class="text-sm font-semibold text-primary">Phase 3B Geometry</span>
         <div class="divider divider-horizontal mx-0"></div>
         <button id="toggle-layers" class="btn btn-sm btn-outline rounded-full">
           <span class="button-text">Layers</span>
@@ -29,8 +29,8 @@
       <!-- Header -->
       <div class="bg-base-200/50 border-b border-base-300 p-4 flex justify-between items-center">
         <h2 class="text-lg font-bold text-primary flex items-center gap-2">
-          <span class="text-info">🏗️</span>
-          Phase 3A Foundation
+          <span class="text-info">🎨</span>
+          Phase 3B Geometry
         </h2>
         <button class="btn btn-sm btn-ghost btn-circle hover:bg-error hover:text-white transition-colors" id="close-store-panel" title="Close Store Panel">
           <span class="text-lg">✕</span>
@@ -45,7 +45,7 @@
           <div class="card-body p-3">
             <h3 class="card-title text-sm text-success flex items-center gap-2">
               <span class="text-xs">▸</span>
-              Phase 3A Status
+              Phase 3B Status
             </h3>
             <div class="space-y-2">
               <div class="flex justify-between items-center text-xs">
@@ -58,7 +58,7 @@
               </div>
               <div class="flex justify-between items-center text-xs">
                 <span class="text-base-content/70">Layers Active:</span>
-                <span id="layers-active" class="font-bold font-mono status-active">2</span>
+                <span id="layers-active" class="font-bold font-mono status-active">3</span>
               </div>
             </div>
           </div>
@@ -153,6 +153,14 @@
             </h3>
             <div class="space-y-2">
               <div class="flex justify-between items-center text-xs">
+                <span class="text-base-content/70">Grid Layer:</span>
+                <span id="layer-grid-status" class="font-bold font-mono status-active">ON</span>
+              </div>
+              <div class="flex justify-between items-center text-xs">
+                <span class="text-base-content/70">Geometry Layer:</span>
+                <span id="layer-geometry-status" class="font-bold font-mono status-active">ON</span>
+              </div>
+              <div class="flex justify-between items-center text-xs">
                 <span class="text-base-content/70">Mouse Layer:</span>
                 <span id="layer-mouse-status" class="font-bold font-mono status-active">ON</span>
               </div>
@@ -184,12 +192,40 @@
           </div>
         </div>
 
-        <!-- Phase 3A Controls -->
+        <!-- Geometry System -->
+        <div class="card bg-base-200/30 shadow-sm mb-3">
+          <div class="card-body p-3">
+            <h3 class="card-title text-sm text-success flex items-center gap-2">
+              <span class="text-xs">▸</span>
+              Geometry System
+            </h3>
+            <div class="space-y-2">
+              <div class="flex justify-between items-center text-xs">
+                <span class="text-base-content/70">Objects Count:</span>
+                <span id="geometry-objects-count" class="font-bold font-mono text-primary">0</span>
+              </div>
+              <div class="flex justify-between items-center text-xs">
+                <span class="text-base-content/70">Drawing Mode:</span>
+                <span id="geometry-drawing-mode" class="font-bold font-mono text-success">none</span>
+              </div>
+              <div class="flex justify-between items-center text-xs">
+                <span class="text-base-content/70">Is Drawing:</span>
+                <span id="geometry-is-drawing" class="font-bold font-mono status-inactive">false</span>
+              </div>
+              <div class="flex justify-between items-center text-xs">
+                <span class="text-base-content/70">Preview Active:</span>
+                <span id="geometry-preview-active" class="font-bold font-mono status-inactive">false</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Phase 3B Controls -->
         <div class="alert alert-info bg-info/10 border-info/20">
           <div class="w-full">
             <h4 class="font-bold text-sm text-info mb-2 flex items-center gap-2">
               <span>⌨️</span>
-              Phase 3A Controls
+              Phase 3B Controls
             </h4>
             <div class="space-y-1 text-xs text-base-content/80">
               <div class="flex items-center gap-2">
@@ -211,6 +247,10 @@
                 <kbd class="kbd kbd-xs bg-base-300">Space</kbd>
                 <span>Center navigation offset</span>
               </div>
+              <div class="flex items-center gap-2">
+                <kbd class="kbd kbd-xs bg-base-300">Click</kbd>
+                <span>Create geometry objects</span>
+              </div>
             </div>
           </div>
         </div>
@@ -223,11 +263,13 @@
               Debug Info
             </h3>
             <div class="space-y-1 text-xs text-base-content/60">
-              <div>Phase 3A Foundation - 2 Layer System</div>
+              <div>Phase 3B Geometry - 3 Layer System</div>
               <div>Single mesh at scale 1 (pixel-perfect)</div>
               <div>Grid layer: checkboard pattern</div>
+              <div>Geometry layer: drawable objects</div>
               <div>Mouse layer: highlight at cursor</div>
               <div>WASD navigation with store updates</div>
+              <div>Click to create geometry objects</div>
             </div>
           </div>
         </div>
@@ -242,6 +284,9 @@
         <div class="divider divider-horizontal mx-0"></div>
         <button id="toggle-layer-mouse" class="btn btn-sm btn-accent rounded-full">
           <span class="button-text">Mouse</span>
+        </button>
+        <button id="toggle-geometry" class="btn btn-sm btn-success rounded-full">
+          <span class="button-text">Geometry</span>
         </button>
         <button id="toggle-checkboard" class="btn btn-sm btn-outline rounded-full">
           <span class="button-text">Checkboard</span>

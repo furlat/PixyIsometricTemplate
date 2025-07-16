@@ -46,9 +46,14 @@ export class StorePanel_3b {
       'mesh-needs-update',
       'layer-grid-status',
       'layer-mouse-status',
+      'layer-geometry-status',
       'checkboard-enabled',
       'mouse-highlight-color',
-      'mouse-highlight-intensity'
+      'mouse-highlight-intensity',
+      'geometry-objects-count',
+      'geometry-drawing-mode',
+      'geometry-is-drawing',
+      'geometry-preview-active'
     ]
     
     elementIds.forEach(id => {
@@ -85,6 +90,14 @@ export class StorePanel_3b {
     
     subscribe(gameStore_3b.mesh, () => {
       this.updateMeshValues()
+    })
+    
+    subscribe(gameStore_3b.geometry, () => {
+      this.updateGeometryValues()
+    })
+    
+    subscribe(gameStore_3b.drawing, () => {
+      this.updateGeometryValues()
     })
   }
   
@@ -125,8 +138,8 @@ export class StorePanel_3b {
         'status-active'
       )
       
-      updateElement(this.elements, 'layers-active', 
-        '2', // Grid + Mouse layers
+      updateElement(this.elements, 'layers-active',
+        '3', // Grid + Geometry + Mouse layers
         'status-active'
       )
       
@@ -202,6 +215,32 @@ export class StorePanel_3b {
       updateElement(this.elements, 'checkboard-enabled',
         getBooleanStatusText(gameStore_3b.ui.enableCheckboard),
         getBooleanStatusClass(gameStore_3b.ui.enableCheckboard)
+      )
+      
+      updateElement(this.elements, 'layer-geometry-status',
+        getBooleanStatusText(gameStore_3b.ui.showGeometry),
+        getBooleanStatusClass(gameStore_3b.ui.showGeometry)
+      )
+      
+      // Geometry System Status
+      updateElement(this.elements, 'geometry-objects-count',
+        gameStore_3b.geometry.objects.length.toString(),
+        'text-primary'
+      )
+      
+      updateElement(this.elements, 'geometry-drawing-mode',
+        gameStore_3b.drawing.mode,
+        gameStore_3b.drawing.mode === 'none' ? 'text-muted' : 'text-success'
+      )
+      
+      updateElement(this.elements, 'geometry-is-drawing',
+        getBooleanStatusText(gameStore_3b.drawing.isDrawing),
+        getBooleanStatusClass(gameStore_3b.drawing.isDrawing)
+      )
+      
+      updateElement(this.elements, 'geometry-preview-active',
+        getBooleanStatusText(gameStore_3b.drawing.preview !== null),
+        getBooleanStatusClass(gameStore_3b.drawing.preview !== null)
       )
       
       // Mouse Highlight Properties
@@ -313,6 +352,40 @@ export class StorePanel_3b {
   }
   
   /**
+   * Update only geometry-related elements
+   */
+  private updateGeometryValues(): void {
+    try {
+      updateElement(this.elements, 'layer-geometry-status',
+        getBooleanStatusText(gameStore_3b.ui.showGeometry),
+        getBooleanStatusClass(gameStore_3b.ui.showGeometry)
+      )
+      
+      updateElement(this.elements, 'geometry-objects-count',
+        gameStore_3b.geometry.objects.length.toString(),
+        'text-primary'
+      )
+      
+      updateElement(this.elements, 'geometry-drawing-mode',
+        gameStore_3b.drawing.mode,
+        gameStore_3b.drawing.mode === 'none' ? 'text-muted' : 'text-success'
+      )
+      
+      updateElement(this.elements, 'geometry-is-drawing',
+        getBooleanStatusText(gameStore_3b.drawing.isDrawing),
+        getBooleanStatusClass(gameStore_3b.drawing.isDrawing)
+      )
+      
+      updateElement(this.elements, 'geometry-preview-active',
+        getBooleanStatusText(gameStore_3b.drawing.preview !== null),
+        getBooleanStatusClass(gameStore_3b.drawing.preview !== null)
+      )
+    } catch (error) {
+      console.warn('StorePanel_3b: Error updating geometry values:', error)
+    }
+  }
+  
+  /**
    * Toggle panel visibility
    */
   public toggle(): void {
@@ -361,6 +434,8 @@ export class StorePanel_3b {
         mouse: gameStore_3b.mouse,
         navigation: gameStore_3b.navigation,
         mesh: gameStore_3b.mesh,
+        geometry: gameStore_3b.geometry,
+        drawing: gameStore_3b.drawing,
         ui: gameStore_3b.ui
       }
     }

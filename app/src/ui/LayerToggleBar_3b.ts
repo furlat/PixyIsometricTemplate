@@ -50,6 +50,16 @@ export class LayerToggleBar_3b {
     } else {
       console.warn('LayerToggleBar_3b: Checkboard toggle button not found')
     }
+    
+    // Geometry toggle
+    const geometryToggle = document.getElementById('toggle-geometry')
+    if (geometryToggle) {
+      geometryToggle.addEventListener('click', () => {
+        this.toggleGeometry()
+      })
+    } else {
+      console.warn('LayerToggleBar_3b: Geometry toggle button not found')
+    }
   }
   
   /**
@@ -79,6 +89,11 @@ export class LayerToggleBar_3b {
       })
     )
     
+    this.unsubscribers.push(
+      subscribeKey(gameStore_3b.ui, 'showGeometry', () => {
+        this.updateGeometryButtonState()
+      })
+    )
     
     console.log('LayerToggleBar_3b: Reactive subscriptions setup complete')
   }
@@ -115,6 +130,23 @@ export class LayerToggleBar_3b {
     document.dispatchEvent(event)
     
     console.log(`LayerToggleBar_3b: Checkboard ${gameStore_3b.ui.enableCheckboard ? 'enabled' : 'disabled'}`)
+  }
+  
+  /**
+   * Toggle geometry layer visibility
+   */
+  private toggleGeometry(): void {
+    console.log('LayerToggleBar_3b: toggleGeometry() called - before:', gameStore_3b.ui.showGeometry)
+    gameStore_3b_methods.toggleGeometry()
+    console.log('LayerToggleBar_3b: toggleGeometry() called - after:', gameStore_3b.ui.showGeometry)
+    
+    // Dispatch event for canvas layer updates
+    const event = new CustomEvent('phase3b-layer-changed', {
+      detail: { layer: 'geometry', visible: gameStore_3b.ui.showGeometry }
+    })
+    document.dispatchEvent(event)
+    
+    console.log(`LayerToggleBar_3b: Geometry layer ${gameStore_3b.ui.showGeometry ? 'shown' : 'hidden'}`)
   }
   
   /**
@@ -176,11 +208,41 @@ export class LayerToggleBar_3b {
   }
   
   /**
+   * Update geometry button visual state
+   */
+  private updateGeometryButtonState(): void {
+    const button = document.getElementById('toggle-geometry')
+    if (!button) return
+    
+    const isActive = gameStore_3b.ui.showGeometry
+    const baseClasses = ['btn', 'btn-sm', 'rounded-full']
+    
+    // Reset button classes
+    button.className = baseClasses.join(' ')
+    
+    if (isActive) {
+      button.classList.add('btn-success')
+    } else {
+      button.classList.add('btn-outline')
+    }
+    
+    // Update button text
+    const buttonText = button.querySelector('.button-text')
+    if (buttonText) {
+      buttonText.textContent = 'Geometry'
+    }
+    
+    // Update tooltip
+    button.title = `${isActive ? 'Hide' : 'Show'} Geometry Layer`
+  }
+  
+  /**
    * Update all button states
    */
   private updateButtonStates(): void {
     this.updateMouseButtonState()
     this.updateCheckboardButtonState()
+    this.updateGeometryButtonState()
   }
   
   /**
@@ -226,17 +288,18 @@ export class LayerToggleBar_3b {
   /**
    * Get current layer states
    */
-  public getLayerStates(): { mouse: boolean; checkboard: boolean } {
+  public getLayerStates(): { mouse: boolean; checkboard: boolean; geometry: boolean } {
     return {
       mouse: gameStore_3b.ui.showMouse,
-      checkboard: gameStore_3b.ui.enableCheckboard
+      checkboard: gameStore_3b.ui.enableCheckboard,
+      geometry: gameStore_3b.ui.showGeometry
     }
   }
   
   /**
    * Set layer state programmatically
    */
-  public setLayerState(layer: 'mouse' | 'checkboard', visible: boolean): void {
+  public setLayerState(layer: 'mouse' | 'checkboard' | 'geometry', visible: boolean): void {
     if (layer === 'mouse') {
       if (gameStore_3b.ui.showMouse !== visible) {
         this.toggleMouse()
@@ -244,6 +307,10 @@ export class LayerToggleBar_3b {
     } else if (layer === 'checkboard') {
       if (gameStore_3b.ui.enableCheckboard !== visible) {
         this.toggleCheckboard()
+      }
+    } else if (layer === 'geometry') {
+      if (gameStore_3b.ui.showGeometry !== visible) {
+        this.toggleGeometry()
       }
     }
   }
@@ -265,11 +332,16 @@ export class LayerToggleBar_3b {
         checkboard: {
           found: document.getElementById('toggle-checkboard') !== null,
           active: gameStore_3b.ui.enableCheckboard
+        },
+        geometry: {
+          found: document.getElementById('toggle-geometry') !== null,
+          active: gameStore_3b.ui.showGeometry
         }
       },
       store: {
         showMouse: gameStore_3b.ui.showMouse,
         enableCheckboard: gameStore_3b.ui.enableCheckboard,
+        showGeometry: gameStore_3b.ui.showGeometry,
         showLayerToggle: gameStore_3b.ui.showLayerToggle
       }
     }

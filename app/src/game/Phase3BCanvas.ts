@@ -3,6 +3,7 @@ import { Application, Container } from 'pixi.js'
 import { BackgroundGridRenderer_3b } from './BackgroundGridRenderer_3b'
 import { MouseHighlightShader_3b } from './MouseHighlightShader_3b'
 import { InputManager_3b } from './InputManager_3b'
+import { GeometryRenderer_3b } from './GeometryRenderer_3b'
 import { gameStore_3b, gameStore_3b_methods } from '../store/gameStore_3b'
 import { PixeloidCoordinate } from '../types/ecs-coordinates'
 
@@ -15,19 +16,21 @@ interface ViewportCorners {
 }
 
 /**
- * Phase3BCanvas - Mesh-first 2-layer canvas for Phase 3B foundation
+ * Phase3BCanvas - Mesh-first 3-layer canvas for Phase 3B foundation
  *
  * This replaces LayeredInfiniteCanvas.ts with a minimal implementation
- * that focuses on the core foundation: mesh + grid + mouse layers.
+ * that focuses on the core foundation: mesh + grid + geometry + mouse layers.
  */
 export class Phase3BCanvas {
   private app: Application
   private backgroundGridRenderer: BackgroundGridRenderer_3b
   private mouseHighlightShader: MouseHighlightShader_3b
   private inputManager: InputManager_3b
+  private geometryRenderer: GeometryRenderer_3b
   
-  // 2-layer system
+  // 3-layer system
   private gridLayer: Container
+  private geometryLayer: Container
   private mouseLayer: Container
   
   constructor(app: Application) {
@@ -36,12 +39,14 @@ export class Phase3BCanvas {
     
     // Initialize layer containers
     this.gridLayer = new Container()
+    this.geometryLayer = new Container()
     this.mouseLayer = new Container()
     
     // Initialize renderers with mesh-first architecture
     this.backgroundGridRenderer = new BackgroundGridRenderer_3b()
     this.mouseHighlightShader = new MouseHighlightShader_3b(this.backgroundGridRenderer.getMeshManager())
     this.inputManager = new InputManager_3b()
+    this.geometryRenderer = new GeometryRenderer_3b()
     
     // Setup layers
     this.setupLayers()
@@ -59,18 +64,20 @@ export class Phase3BCanvas {
   }
   
   /**
-   * Set up the 2-layer architecture for Phase 3B
+   * Set up the 3-layer architecture for Phase 3B
    */
   private setupLayers(): void {
     // Create layer containers
     this.gridLayer = new Container()
+    this.geometryLayer = new Container()
     this.mouseLayer = new Container()
     
     // Add layers to stage in correct order
     this.app.stage.addChild(this.gridLayer)
+    this.app.stage.addChild(this.geometryLayer)
     this.app.stage.addChild(this.mouseLayer)
     
-    console.log('Phase3BCanvas: Layers setup complete')
+    console.log('Phase3BCanvas: 3-layer system setup complete')
   }
   
   /**
@@ -114,14 +121,21 @@ export class Phase3BCanvas {
   public render(): void {
     // ✅ Functional store reading (no reactive subscriptions)
     const showGrid = gameStore_3b.ui.showGrid
+    const showGeometry = gameStore_3b.ui.showGeometry
     const showMouse = gameStore_3b.ui.showMouse
     
-    // Only clear grid layer
+    // Clear layers that need updating
     this.gridLayer.removeChildren()
+    this.geometryLayer.removeChildren()
     
     // Render grid layer if visible
     if (showGrid) {
       this.renderGridLayer()
+    }
+    
+    // Render geometry layer if visible
+    if (showGeometry) {
+      this.renderGeometryLayer()
     }
     
     // ✅ Mouse layer is NEVER cleared - just visibility
@@ -146,6 +160,23 @@ export class Phase3BCanvas {
     }
   }
   
+  /**
+   * Render the geometry layer using GeometryRenderer_3b
+   */
+  private renderGeometryLayer(): void {
+    try {
+      // ✅ GEOMETRY RENDERING - Render all geometry objects
+      this.geometryRenderer.render()
+      
+      // Get the geometry container from the renderer
+      const geometryContainer = this.geometryRenderer.getContainer()
+      if (geometryContainer) {
+        this.geometryLayer.addChild(geometryContainer)
+      }
+    } catch (error) {
+      console.warn('Phase3BCanvas: Geometry rendering error:', error)
+    }
+  }
   
   /**
    * Get simple screen-based viewport corners for Phase 3B
@@ -184,6 +215,13 @@ export class Phase3BCanvas {
   }
   
   /**
+   * Get the geometry renderer for external access
+   */
+  public getGeometryRenderer(): GeometryRenderer_3b {
+    return this.geometryRenderer
+  }
+  
+  /**
    * Handle window resize for Phase 3B
    */
   public onResize(width: number, height: number): void {
@@ -201,12 +239,15 @@ export class Phase3BCanvas {
     
     // Clean up layers
     this.gridLayer.removeChildren()
+    this.geometryLayer.removeChildren()
     this.mouseLayer.removeChildren()
     this.gridLayer.destroy()
+    this.geometryLayer.destroy()
     this.mouseLayer.destroy()
     
     // Clean up renderers
     this.backgroundGridRenderer.destroy()
+    this.geometryRenderer.destroy()
     this.mouseHighlightShader.destroy()
     
     // Clean up input manager
@@ -226,6 +267,10 @@ export class Phase3BCanvas {
         gridLayer: {
           visible: this.gridLayer.visible,
           children: this.gridLayer.children.length
+        },
+        geometryLayer: {
+          visible: this.geometryLayer.visible,
+          children: this.geometryLayer.children.length
         },
         mouseLayer: {
           visible: this.mouseLayer.visible,
@@ -249,6 +294,7 @@ export class Phase3BCanvas {
       },
       ui: {
         showGrid: gameStore_3b.ui.showGrid,
+        showGeometry: gameStore_3b.ui.showGeometry,
         showMouse: gameStore_3b.ui.showMouse
       }
     }
