@@ -253,7 +253,7 @@ export const gameStore_3b_methods = {
     gameStore_3b.mesh.needsUpdate = true
   },
 
-  updateMeshDataLegacy: (vertexData: MeshVertexData) => {
+  updateMeshDataLegacy: (_vertexData: MeshVertexData) => {
     console.log('gameStore_3b: Updating mesh data (legacy)')
     gameStore_3b.mesh.needsUpdate = false
   },

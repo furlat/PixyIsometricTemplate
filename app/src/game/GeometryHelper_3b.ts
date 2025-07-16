@@ -6,14 +6,11 @@
 
 import type {
   PixeloidCoordinate,
-  VertexCoordinate,
-  GeometricObject,
   ECSBoundingBox
 } from '../types'
-import { gameStore_3b, gameStore_3b_methods } from '../store/gameStore_3b'
+import { gameStore_3b } from '../store/gameStore_3b'
 import { CoordinateHelper } from './CoordinateHelper_3b'
 import type { DrawingMode, StyleSettings, PreviewObject } from '../types/geometry-drawing'
-import type { ECSDataLayer } from '../types/ecs-data-layer'
 
 export class GeometryHelper_3b {
 

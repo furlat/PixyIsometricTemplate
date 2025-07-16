@@ -1,6 +1,5 @@
 import { Graphics, Container } from 'pixi.js'
 import { gameStore_3b, gameStore_3b_methods } from '../store/gameStore_3b'
-import { GeometryHelper_3b } from './GeometryHelper_3b'
 import { subscribe } from 'valtio'
 import type {
   GeometricObject
@@ -125,7 +124,7 @@ export class GeometryRenderer_3b {
    * Handle drawing input events - MOVED FROM BackgroundGridRenderer_3b
    * This is the correct architectural location for drawing logic
    */
-  public handleDrawingInput(eventType: 'down' | 'up' | 'move', pixeloidCoord: PixeloidCoordinate, event: any): void {
+  public handleDrawingInput(eventType: 'down' | 'up' | 'move', pixeloidCoord: PixeloidCoordinate, _event: any): void {
     const drawingMode = gameStore_3b.drawing.mode
     
     if (drawingMode === 'none') return
