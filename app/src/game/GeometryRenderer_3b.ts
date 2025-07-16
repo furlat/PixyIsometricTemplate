@@ -1,10 +1,11 @@
 import { Graphics, Container } from 'pixi.js'
-import { gameStore_3b } from '../store/gameStore_3b'
+import { gameStore_3b, gameStore_3b_methods } from '../store/gameStore_3b'
 import { GeometryHelper_3b } from './GeometryHelper_3b'
 import { subscribe } from 'valtio'
 import type {
   GeometricObject
 } from '../types/ecs-data-layer'
+import type { PixeloidCoordinate } from '../types/ecs-coordinates'
 
 /**
  * GeometryRenderer_3b handles rendering of user-drawn geometric shapes for Phase 3B
@@ -117,6 +118,34 @@ export class GeometryRenderer_3b {
     // Reassign all objects to correct containers when selection changes
     for (const [objectId, container] of this.objectContainers) {
       this.assignObjectToFilterContainer(objectId, container)
+    }
+  }
+  
+  /**
+   * Handle drawing input events - MOVED FROM BackgroundGridRenderer_3b
+   * This is the correct architectural location for drawing logic
+   */
+  public handleDrawingInput(eventType: 'down' | 'up' | 'move', pixeloidCoord: PixeloidCoordinate, event: any): void {
+    const drawingMode = gameStore_3b.drawing.mode
+    
+    if (drawingMode === 'none') return
+    
+    if (eventType === 'down' && drawingMode === 'point') {
+      // Create point immediately
+      console.log('GeometryRenderer_3b: Creating point at', pixeloidCoord)
+      gameStore_3b_methods.startDrawing(pixeloidCoord)
+      gameStore_3b_methods.finishDrawing()
+    } else if (eventType === 'down' && drawingMode !== 'point') {
+      // Start multi-step drawing
+      console.log('GeometryRenderer_3b: Starting', drawingMode, 'at', pixeloidCoord)
+      gameStore_3b_methods.startDrawing(pixeloidCoord)
+    } else if (eventType === 'move' && gameStore_3b.drawing.isDrawing) {
+      // Update preview
+      gameStore_3b_methods.updateDrawingPreview(pixeloidCoord)
+    } else if (eventType === 'up' && gameStore_3b.drawing.isDrawing) {
+      // Finish drawing
+      console.log('GeometryRenderer_3b: Finishing', drawingMode, 'at', pixeloidCoord)
+      gameStore_3b_methods.finishDrawing()
     }
   }
   

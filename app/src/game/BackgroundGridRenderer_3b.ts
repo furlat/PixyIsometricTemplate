@@ -3,6 +3,7 @@ import { MeshSimple } from 'pixi.js'
 import { MeshManager_3b } from './MeshManager_3b'
 import { GridShaderRenderer_3b } from './GridShaderRenderer_3b'
 import { MouseHighlightShader_3b } from './MouseHighlightShader_3b'
+import { GeometryRenderer_3b } from './GeometryRenderer_3b'
 import { gameStore_3b, gameStore_3b_methods } from '../store/gameStore_3b'
 import { VertexCoordinate } from '../types/ecs-coordinates'
 
@@ -16,6 +17,7 @@ export class BackgroundGridRenderer_3b {
   private meshManager: MeshManager_3b
   private gridShaderRenderer: GridShaderRenderer_3b
   private mouseHighlightShader: MouseHighlightShader_3b | null = null
+  private geometryRenderer: GeometryRenderer_3b | null = null
   
   constructor() {
     console.log('BackgroundGridRenderer_3b: Initializing with mesh-first architecture')
@@ -162,35 +164,29 @@ export class BackgroundGridRenderer_3b {
   }
   
   /**
-   * Handle geometry input events for drawing
+   * Handle geometry input events for drawing - DELEGATES TO GEOMETRY RENDERER
+   * BackgroundGridRenderer should only handle mouse capture, not drawing logic
    */
   private handleGeometryInput(eventType: 'down' | 'up' | 'move', vertexCoord: VertexCoordinate, event: any): void {
-    const drawingMode = gameStore_3b.drawing.mode
-    
-    if (drawingMode === 'none') return
-    
     // Convert vertex coordinates to pixeloid coordinates
     const pixeloidCoord = {
       x: vertexCoord.x + gameStore_3b.navigation.offset.x,
       y: vertexCoord.y + gameStore_3b.navigation.offset.y
     }
     
-    if (eventType === 'down' && drawingMode === 'point') {
-      // Create point immediately
-      console.log('BackgroundGridRenderer_3b: Creating point at', pixeloidCoord)
-      gameStore_3b_methods.startDrawing(pixeloidCoord)
-      gameStore_3b_methods.finishDrawing()
-    } else if (eventType === 'down' && drawingMode !== 'point') {
-      // Start multi-step drawing
-      console.log('BackgroundGridRenderer_3b: Starting', drawingMode, 'at', pixeloidCoord)
-      gameStore_3b_methods.startDrawing(pixeloidCoord)
-    } else if (eventType === 'move' && gameStore_3b.drawing.isDrawing) {
-      // Update preview
-      gameStore_3b_methods.updateDrawingPreview(pixeloidCoord)
-    } else if (eventType === 'up' && gameStore_3b.drawing.isDrawing) {
-      // Finish drawing
-      console.log('BackgroundGridRenderer_3b: Finishing', drawingMode, 'at', pixeloidCoord)
-      gameStore_3b_methods.finishDrawing()
+    // Delegate to geometry renderer (correct architectural location)
+    if (this.geometryRenderer) {
+      this.geometryRenderer.handleDrawingInput(eventType, pixeloidCoord, event)
+    } else {
+      console.warn('BackgroundGridRenderer_3b: No geometry renderer registered for drawing input')
     }
+  }
+  
+  /**
+   * Register geometry renderer for drawing input delegation
+   */
+  public registerGeometryRenderer(geometryRenderer: GeometryRenderer_3b): void {
+    this.geometryRenderer = geometryRenderer
+    console.log('BackgroundGridRenderer_3b: Geometry renderer registered for drawing input')
   }
 }

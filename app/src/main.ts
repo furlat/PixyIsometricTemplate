@@ -3,6 +3,7 @@ import { gameStore_3b, gameStore_3b_methods } from './store/gameStore_3b'
 import { StorePanel_3b } from './ui/StorePanel_3b'
 import { UIControlBar_3b } from './ui/UIControlBar_3b'
 import { LayerToggleBar_3b } from './ui/LayerToggleBar_3b'
+import { GeometryPanel_3b } from './ui/GeometryPanel_3b'
 import './styles/main.css'
 
 /**
@@ -17,6 +18,7 @@ import './styles/main.css'
 
 let game: Game_3b | null = null
 let storePanel: StorePanel_3b | null = null
+let geometryPanel: GeometryPanel_3b | null = null
 let uiControlBar: UIControlBar_3b | null = null
 let layerToggleBar: LayerToggleBar_3b | null = null
 
@@ -37,12 +39,16 @@ async function initPhase3B(): Promise<void> {
     
     // Initialize UI components for Phase 3B
     storePanel = new StorePanel_3b()
+    geometryPanel = new GeometryPanel_3b()
     uiControlBar = new UIControlBar_3b()
     layerToggleBar = new LayerToggleBar_3b()
     
     // Connect UI components for Phase 3B
     if (storePanel && uiControlBar) {
       uiControlBar.registerStorePanel(storePanel)
+    }
+    if (geometryPanel && uiControlBar) {
+      uiControlBar.registerGeometryPanel(geometryPanel)
     }
     if (layerToggleBar && uiControlBar) {
       uiControlBar.registerLayerToggleBar(layerToggleBar)
@@ -55,6 +61,7 @@ async function initPhase3B(): Promise<void> {
     console.log('✅ Game_3b Instance:', game)
     console.log('✅ Phase3BCanvas:', game.getCanvas())
     console.log('✅ Store Panel:', storePanel)
+    console.log('✅ Geometry Panel:', geometryPanel)
     console.log('✅ UI Control Bar:', uiControlBar)
     console.log('✅ Layer Toggle Bar:', layerToggleBar)
     console.log('')
@@ -139,6 +146,7 @@ function cleanup(): void {
   }
   
   storePanel = null
+  geometryPanel = null
   uiControlBar = null
   layerToggleBar = null
   

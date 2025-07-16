@@ -20,6 +20,7 @@ import {
 } from '../types/geometry-drawing'
 import { dataLayerIntegration } from './ecs-data-layer-integration'
 import { coordinateWASDMovement } from './ecs-coordination-functions'
+import { GeometryHelper_3b } from '../game/GeometryHelper_3b'
 
 // Phase 3b Game State Interface - Updated with mesh-first architecture + geometry features
 export interface GameState3b {
@@ -373,73 +374,27 @@ export const gameStore_3b_methods = {
     gameStore_3b.drawing.preview.startPoint = startPoint
   },
 
-  // Update drawing preview
+  // Update drawing preview - USING GeometryHelper_3b for all modes
   updateDrawingPreview: (currentPoint: PixeloidCoordinate) => {
     if (!gameStore_3b.drawing.isDrawing || !gameStore_3b.drawing.startPoint) return
     
     gameStore_3b.drawing.preview.currentPoint = currentPoint
     
-    // Update preview object based on drawing mode
+    // Use GeometryHelper_3b for all drawing modes
     const startPoint = gameStore_3b.drawing.startPoint
     const mode = gameStore_3b.drawing.mode
     
-    if (mode === 'line') {
-      gameStore_3b.drawing.preview.object = {
-        type: 'line',
-        vertices: [startPoint, currentPoint],
-        style: gameStore_3b.style,
-        isValid: true,
-        bounds: {
-          minX: Math.min(startPoint.x, currentPoint.x),
-          minY: Math.min(startPoint.y, currentPoint.y),
-          maxX: Math.max(startPoint.x, currentPoint.x),
-          maxY: Math.max(startPoint.y, currentPoint.y),
-          width: Math.abs(currentPoint.x - startPoint.x),
-          height: Math.abs(currentPoint.y - startPoint.y)
-        }
-      }
-    } else if (mode === 'rectangle') {
-      gameStore_3b.drawing.preview.object = {
-        type: 'rectangle',
-        vertices: [
-          startPoint,
-          { x: currentPoint.x, y: startPoint.y },
-          currentPoint,
-          { x: startPoint.x, y: currentPoint.y }
-        ],
-        style: gameStore_3b.style,
-        isValid: true,
-        bounds: {
-          minX: Math.min(startPoint.x, currentPoint.x),
-          minY: Math.min(startPoint.y, currentPoint.y),
-          maxX: Math.max(startPoint.x, currentPoint.x),
-          maxY: Math.max(startPoint.y, currentPoint.y),
-          width: Math.abs(currentPoint.x - startPoint.x),
-          height: Math.abs(currentPoint.y - startPoint.y)
-        }
-      }
-    } else if (mode === 'circle') {
-      const radius = Math.sqrt(
-        Math.pow(currentPoint.x - startPoint.x, 2) + Math.pow(currentPoint.y - startPoint.y, 2)
-      )
-      gameStore_3b.drawing.preview.object = {
-        type: 'circle',
-        vertices: [startPoint, currentPoint], // center + radius point
-        style: gameStore_3b.style,
-        isValid: radius > 0,
-        bounds: {
-          minX: startPoint.x - radius,
-          minY: startPoint.y - radius,
-          maxX: startPoint.x + radius,
-          maxY: startPoint.y + radius,
-          width: radius * 2,
-          height: radius * 2
-        }
-      }
+    const previewObject = GeometryHelper_3b.calculateDrawingPreview(mode, startPoint, currentPoint)
+    
+    if (previewObject) {
+      gameStore_3b.drawing.preview.object = previewObject
+      console.log('gameStore_3b: Updated drawing preview for', mode, previewObject)
+    } else {
+      console.warn('gameStore_3b: Could not calculate preview for mode', mode)
     }
   },
 
-  // Finish drawing operation
+  // Finish drawing operation - USING GeometryHelper_3b for metadata
   finishDrawing: () => {
     console.log('gameStore_3b: Finishing drawing')
     
@@ -449,6 +404,50 @@ export const gameStore_3b_methods = {
     }
     
     const previewObj = gameStore_3b.drawing.preview.object
+    const startPoint = gameStore_3b.drawing.startPoint!
+    const currentPoint = gameStore_3b.drawing.preview.currentPoint!
+    
+    // Create metadata using GeometryHelper_3b based on drawing mode
+    let metadata: any = null
+    const mode = gameStore_3b.drawing.mode
+    
+    switch (mode) {
+      case 'point':
+        metadata = GeometryHelper_3b.calculatePointMetadata(startPoint)
+        break
+      case 'line':
+        metadata = GeometryHelper_3b.calculateLineMetadata({
+          startX: startPoint.x,
+          startY: startPoint.y,
+          endX: currentPoint.x,
+          endY: currentPoint.y
+        })
+        break
+      case 'circle':
+        const radius = Math.sqrt(
+          Math.pow(currentPoint.x - startPoint.x, 2) +
+          Math.pow(currentPoint.y - startPoint.y, 2)
+        )
+        metadata = GeometryHelper_3b.calculateCircleMetadata({
+          centerX: startPoint.x,
+          centerY: startPoint.y,
+          radius: radius
+        })
+        break
+      case 'rectangle':
+        const x = Math.min(startPoint.x, currentPoint.x)
+        const y = Math.min(startPoint.y, currentPoint.y)
+        const width = Math.abs(currentPoint.x - startPoint.x)
+        const height = Math.abs(currentPoint.y - startPoint.y)
+        metadata = GeometryHelper_3b.calculateRectangleMetadata({ x, y, width, height })
+        break
+      case 'diamond':
+        const diamondProps = GeometryHelper_3b.calculateDiamondProperties(startPoint, currentPoint)
+        metadata = GeometryHelper_3b.calculateDiamondMetadata(diamondProps)
+        break
+      default:
+        metadata = { createdAt: Date.now() }
+    }
     
     // Create the actual geometry object
     const geometryParams: CreateGeometricObjectParams = {
@@ -461,6 +460,8 @@ export const gameStore_3b_methods = {
     
     // Clear drawing state
     gameStore_3b_methods.cancelDrawing()
+    
+    console.log('gameStore_3b: Created geometry object', objectId, 'with metadata', metadata)
     
     return objectId
   },

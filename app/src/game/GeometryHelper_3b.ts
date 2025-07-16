@@ -165,6 +165,121 @@ export class GeometryHelper_3b {
   }
 
   /**
+   * Calculate diamond properties from origin vertex and target vertex
+   */
+  static calculateDiamondProperties(
+    originVertex: PixeloidCoordinate,
+    targetVertex: PixeloidCoordinate
+  ): {
+    anchorX: number
+    anchorY: number
+    width: number
+    height: number
+  } {
+    const width = Math.abs(targetVertex.x - originVertex.x)
+    
+    let westX: number
+    if (targetVertex.x >= originVertex.x) {
+      westX = originVertex.x
+    } else {
+      westX = originVertex.x - width
+    }
+    
+    const centerY = originVertex.y
+    const height = width / 4
+    
+    return {
+      anchorX: westX,
+      anchorY: centerY,
+      width,
+      height
+    }
+  }
+
+  /**
+   * Calculate diamond vertices from diamond properties
+   */
+  static calculateDiamondVertices(diamond: {
+    anchorX: number
+    anchorY: number
+    width: number
+    height: number
+  }): {
+    west: PixeloidCoordinate
+    north: PixeloidCoordinate
+    east: PixeloidCoordinate
+    south: PixeloidCoordinate
+  } {
+    const { anchorX, anchorY, width, height } = diamond
+    const centerX = anchorX + width / 2
+    
+    return {
+      west: { x: anchorX, y: anchorY },
+      north: { x: centerX, y: anchorY - height },
+      east: { x: anchorX + width, y: anchorY },
+      south: { x: centerX, y: anchorY + height }
+    }
+  }
+
+  /**
+   * Calculate diamond preview for drawing
+   */
+  static calculateDiamondPreview(
+    startPoint: PixeloidCoordinate,
+    currentPoint: PixeloidCoordinate
+  ): PreviewObject {
+    const style = gameStore_3b.style
+    const properties = this.calculateDiamondProperties(startPoint, currentPoint)
+    const vertices = this.calculateDiamondVertices(properties)
+    
+    return {
+      type: 'diamond',
+      vertices: [
+        vertices.west,
+        vertices.north,
+        vertices.east,
+        vertices.south
+      ],
+      style: style,
+      isValid: properties.width > 0,
+      bounds: {
+        minX: properties.anchorX,
+        minY: Math.floor(properties.anchorY - properties.height),
+        maxX: properties.anchorX + properties.width,
+        maxY: Math.ceil(properties.anchorY + properties.height),
+        width: properties.width,
+        height: properties.height * 2
+      }
+    }
+  }
+
+  /**
+   * Calculate point preview for drawing
+   */
+  static calculatePointPreview(
+    point: PixeloidCoordinate
+  ): PreviewObject {
+    const style = gameStore_3b.style
+    const pixeloidX = Math.floor(point.x)
+    const pixeloidY = Math.floor(point.y)
+    
+    return {
+      type: 'point',
+      vertices: [point],
+      style: style,
+      isValid: true,
+      bounds: {
+        minX: pixeloidX,
+        minY: pixeloidY,
+        maxX: pixeloidX + 1,
+        maxY: pixeloidY + 1,
+        width: 1,
+        height: 1
+      }
+    }
+  }
+
+  /**
    * Calculate drawing preview based on current mode
    */
   static calculateDrawingPreview(
@@ -173,12 +288,16 @@ export class GeometryHelper_3b {
     currentPoint: PixeloidCoordinate
   ): PreviewObject | null {
     switch (mode) {
+      case 'point':
+        return this.calculatePointPreview(startPoint)
       case 'line':
         return this.calculateLinePreview(startPoint, currentPoint)
       case 'rectangle':
         return this.calculateRectanglePreview(startPoint, currentPoint)
       case 'circle':
         return this.calculateCirclePreview(startPoint, currentPoint)
+      case 'diamond':
+        return this.calculateDiamondPreview(startPoint, currentPoint)
       default:
         return null
     }
@@ -453,5 +572,101 @@ export class GeometryHelper_3b {
    */
   static getOptimalSamplingMode(complexity: 'low' | 'medium' | 'high'): 'fast' | 'precise' {
     return complexity === 'high' ? 'fast' : 'precise'
+  }
+
+  // ================================
+  // METADATA CALCULATION METHODS
+  // ================================
+
+  /**
+   * Calculate metadata for point objects
+   */
+  static calculatePointMetadata(point: { x: number; y: number }): any {
+    const pixeloidX = Math.floor(point.x)
+    const pixeloidY = Math.floor(point.y)
+    
+    return {
+      center: { x: point.x, y: point.y },
+      bounds: {
+        minX: pixeloidX,
+        maxX: pixeloidX + 1,
+        minY: pixeloidY,
+        maxY: pixeloidY + 1
+      },
+      createdAt: Date.now()
+    }
+  }
+
+  /**
+   * Calculate metadata for line objects
+   */
+  static calculateLineMetadata(line: { startX: number; startY: number; endX: number; endY: number }): any {
+    const centerX = (line.startX + line.endX) / 2
+    const centerY = (line.startY + line.endY) / 2
+    
+    return {
+      center: { x: centerX, y: centerY },
+      bounds: {
+        minX: Math.min(line.startX, line.endX),
+        maxX: Math.max(line.startX, line.endX),
+        minY: Math.min(line.startY, line.endY),
+        maxY: Math.max(line.startY, line.endY)
+      },
+      createdAt: Date.now()
+    }
+  }
+
+  /**
+   * Calculate metadata for circle objects
+   */
+  static calculateCircleMetadata(circle: { centerX: number; centerY: number; radius: number }): any {
+    return {
+      center: { x: circle.centerX, y: circle.centerY },
+      bounds: {
+        minX: Math.floor(circle.centerX - circle.radius),
+        maxX: Math.ceil(circle.centerX + circle.radius),
+        minY: Math.floor(circle.centerY - circle.radius),
+        maxY: Math.ceil(circle.centerY + circle.radius)
+      },
+      createdAt: Date.now()
+    }
+  }
+
+  /**
+   * Calculate metadata for rectangle objects
+   */
+  static calculateRectangleMetadata(rectangle: { x: number; y: number; width: number; height: number }): any {
+    const centerX = rectangle.x + rectangle.width / 2
+    const centerY = rectangle.y + rectangle.height / 2
+    
+    return {
+      center: { x: centerX, y: centerY },
+      bounds: {
+        minX: rectangle.x,
+        maxX: rectangle.x + rectangle.width,
+        minY: rectangle.y,
+        maxY: rectangle.y + rectangle.height
+      },
+      createdAt: Date.now()
+    }
+  }
+
+  /**
+   * Calculate metadata for diamond objects
+   */
+  static calculateDiamondMetadata(diamond: { anchorX: number; anchorY: number; width: number; height: number }): any {
+    const centerX = diamond.anchorX + diamond.width / 2
+    const centerY = diamond.anchorY
+    
+    return {
+      center: { x: centerX, y: centerY },
+      bounds: {
+        minX: diamond.anchorX,
+        maxX: diamond.anchorX + diamond.width,
+        minY: Math.floor(diamond.anchorY - diamond.height),
+        maxY: Math.ceil(diamond.anchorY + diamond.height)
+      },
+      createdAt: Date.now()
+    }
   }
 }

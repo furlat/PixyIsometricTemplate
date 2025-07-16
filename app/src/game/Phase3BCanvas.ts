@@ -57,6 +57,9 @@ export class Phase3BCanvas {
     // Register mouse highlight shader for direct mesh updates
     this.backgroundGridRenderer.registerMouseHighlightShader(this.mouseHighlightShader)
     
+    // Register geometry renderer with background grid for drawing input
+    this.backgroundGridRenderer.registerGeometryRenderer(this.geometryRenderer)
+    
     // Initialize mesh data in store
     this.initializeMeshData()
     

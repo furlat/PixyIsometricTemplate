@@ -1,4 +1,5 @@
 import { StorePanel_3b } from './StorePanel_3b'
+import { GeometryPanel_3b } from './GeometryPanel_3b'
 import { gameStore_3b, gameStore_3b_methods } from '../store/gameStore_3b'
 
 /**
@@ -13,6 +14,7 @@ import { gameStore_3b, gameStore_3b_methods } from '../store/gameStore_3b'
  */
 export class UIControlBar_3b {
   private storePanel: StorePanel_3b | null = null
+  private geometryPanel: GeometryPanel_3b | null = null
   private layerToggleBar: { toggle: () => void; isVisible: () => boolean } | null = null
   
   constructor() {
@@ -25,6 +27,16 @@ export class UIControlBar_3b {
    * Setup event listeners for control bar buttons
    */
   private setupEventListeners(): void {
+    // Geometry panel toggle button
+    const geometryPanelToggle = document.getElementById('toggle-geometry-panel')
+    if (geometryPanelToggle) {
+      geometryPanelToggle.addEventListener('click', () => {
+        this.toggleGeometryPanel()
+      })
+    } else {
+      console.warn('UIControlBar_3b: Geometry panel toggle button not found')
+    }
+    
     // Store panel toggle button
     const storePanelToggle = document.getElementById('toggle-store-panel')
     if (storePanelToggle) {
@@ -47,7 +59,7 @@ export class UIControlBar_3b {
   }
   
   /**
-   * Setup keyboard shortcuts for Phase 3A
+   * Setup keyboard shortcuts for Phase 3B
    */
   private setupKeyboardShortcuts(): void {
     document.addEventListener('keydown', (event) => {
@@ -57,6 +69,10 @@ export class UIControlBar_3b {
       }
       if (event.key === 'F2') {
         this.toggleLayerBar()
+        event.preventDefault()
+      }
+      if (event.key === 'F3') {
+        this.toggleGeometryPanel()
         event.preventDefault()
       }
     })
@@ -69,6 +85,15 @@ export class UIControlBar_3b {
     this.storePanel = storePanel
     this.updateStorePanelButton()
     console.log('UIControlBar_3b: Registered store panel')
+  }
+  
+  /**
+   * Register geometry panel with the control bar
+   */
+  public registerGeometryPanel(geometryPanel: GeometryPanel_3b): void {
+    this.geometryPanel = geometryPanel
+    this.updateGeometryPanelButton()
+    console.log('UIControlBar_3b: Registered geometry panel')
   }
   
   /**
@@ -89,6 +114,22 @@ export class UIControlBar_3b {
     
     // StorePanel_3b handles its own DOM updates via subscription
     console.log(`UIControlBar_3b: Store panel ${gameStore_3b.ui.showStorePanel ? 'shown' : 'hidden'}`)
+  }
+  
+  /**
+   * Toggle geometry panel visibility
+   */
+  private toggleGeometryPanel(): void {
+    gameStore_3b_methods.toggleGeometryPanel()
+    this.updateGeometryPanelButton()
+    
+    // Update DOM visibility
+    const geometryPanel = document.getElementById('geometry-panel')
+    if (geometryPanel) {
+      geometryPanel.style.display = gameStore_3b.ui.showGeometryPanel ? 'block' : 'none'
+    }
+    
+    console.log(`UIControlBar_3b: Geometry panel ${gameStore_3b.ui.showGeometryPanel ? 'shown' : 'hidden'}`)
   }
   
   /**
@@ -136,6 +177,34 @@ export class UIControlBar_3b {
   }
   
   /**
+   * Update geometry panel button visual state
+   */
+  private updateGeometryPanelButton(): void {
+    const button = document.getElementById('toggle-geometry-panel')
+    if (button) {
+      const isVisible = gameStore_3b.ui.showGeometryPanel
+      
+      // Update button appearance
+      if (isVisible) {
+        button.classList.remove('btn-outline')
+        button.classList.add('btn-success')
+      } else {
+        button.classList.remove('btn-success')
+        button.classList.add('btn-outline')
+      }
+      
+      // Update button text
+      const buttonText = button.querySelector('.button-text')
+      if (buttonText) {
+        buttonText.textContent = 'Geometry'
+      }
+      
+      // Update tooltip
+      button.title = `${isVisible ? 'Hide' : 'Show'} Geometry Panel (F3)`
+    }
+  }
+  
+  /**
    * Update layer toggle button visual state
    */
   private updateLayerToggleButton(): void {
@@ -167,6 +236,7 @@ export class UIControlBar_3b {
    * Update all button states
    */
   public updateAllButtonStates(): void {
+    this.updateGeometryPanelButton()
     this.updateStorePanelButton()
     this.updateLayerToggleButton()
   }
@@ -176,6 +246,10 @@ export class UIControlBar_3b {
    */
   public getDebugInfo(): any {
     return {
+      geometryPanel: {
+        registered: this.geometryPanel !== null,
+        visible: gameStore_3b.ui.showGeometryPanel
+      },
       storePanel: {
         registered: this.storePanel !== null,
         visible: gameStore_3b.ui.showStorePanel
