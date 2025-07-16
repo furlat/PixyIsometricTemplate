@@ -1,5 +1,5 @@
-import { StorePanel_3a } from './StorePanel_3a'
-import { gameStore_3a, gameStore_3a_methods } from '../store/gameStore_3a'
+import { StorePanel_3b } from './StorePanel_3b'
+import { gameStore_3b, gameStore_3b_methods } from '../store/gameStore_3b'
 
 /**
  * Phase 3A UI Control Bar
@@ -9,16 +9,16 @@ import { gameStore_3a, gameStore_3a_methods } from '../store/gameStore_3a'
  * - Layer toggle bar
  * - Keyboard shortcuts (F1, F2)
  * 
- * Complete isolation from old system - only uses gameStore_3a
+ * Complete isolation from old system - only uses gameStore_3b
  */
-export class UIControlBar_3a {
-  private storePanel: StorePanel_3a | null = null
+export class UIControlBar_3b {
+  private storePanel: StorePanel_3b | null = null
   private layerToggleBar: { toggle: () => void; isVisible: () => boolean } | null = null
   
   constructor() {
     this.setupEventListeners()
     this.setupKeyboardShortcuts()
-    console.log('UIControlBar_3a: Initialized Phase 3A control bar')
+    console.log('UIControlBar_3b: Initialized Phase 3A control bar')
   }
   
   /**
@@ -32,7 +32,7 @@ export class UIControlBar_3a {
         this.toggleStorePanel()
       })
     } else {
-      console.warn('UIControlBar_3a: Store panel toggle button not found')
+      console.warn('UIControlBar_3b: Store panel toggle button not found')
     }
     
     // Layer toggle bar button
@@ -42,7 +42,7 @@ export class UIControlBar_3a {
         this.toggleLayerBar()
       })
     } else {
-      console.warn('UIControlBar_3a: Layer toggle button not found')
+      console.warn('UIControlBar_3b: Layer toggle button not found')
     }
   }
   
@@ -65,10 +65,10 @@ export class UIControlBar_3a {
   /**
    * Register store panel with the control bar
    */
-  public registerStorePanel(storePanel: StorePanel_3a): void {
+  public registerStorePanel(storePanel: StorePanel_3b): void {
     this.storePanel = storePanel
     this.updateStorePanelButton()
-    console.log('UIControlBar_3a: Registered store panel')
+    console.log('UIControlBar_3b: Registered store panel')
   }
   
   /**
@@ -77,34 +77,34 @@ export class UIControlBar_3a {
   public registerLayerToggleBar(layerToggleBar: { toggle: () => void; isVisible: () => boolean }): void {
     this.layerToggleBar = layerToggleBar
     this.updateLayerToggleButton()
-    console.log('UIControlBar_3a: Registered layer toggle bar')
+    console.log('UIControlBar_3b: Registered layer toggle bar')
   }
   
   /**
    * Toggle store panel visibility
    */
   private toggleStorePanel(): void {
-    gameStore_3a_methods.toggleStorePanel()
+    gameStore_3b_methods.toggleStorePanel()
     this.updateStorePanelButton()
     
-    // StorePanel_3a handles its own DOM updates via subscription
-    console.log(`UIControlBar_3a: Store panel ${gameStore_3a.ui.showStorePanel ? 'shown' : 'hidden'}`)
+    // StorePanel_3b handles its own DOM updates via subscription
+    console.log(`UIControlBar_3b: Store panel ${gameStore_3b.ui.showStorePanel ? 'shown' : 'hidden'}`)
   }
   
   /**
    * Toggle layer toggle bar visibility
    */
   private toggleLayerBar(): void {
-    gameStore_3a_methods.toggleLayerToggle()
+    gameStore_3b_methods.toggleLayerToggle()
     this.updateLayerToggleButton()
     
     // Update DOM visibility
     const toggleBar = document.getElementById('layer-toggle-bar')
     if (toggleBar) {
-      toggleBar.style.display = gameStore_3a.ui.showLayerToggle ? 'block' : 'none'
+      toggleBar.style.display = gameStore_3b.ui.showLayerToggle ? 'block' : 'none'
     }
     
-    console.log(`UIControlBar_3a: Layer toggle bar ${gameStore_3a.ui.showLayerToggle ? 'shown' : 'hidden'}`)
+    console.log(`UIControlBar_3b: Layer toggle bar ${gameStore_3b.ui.showLayerToggle ? 'shown' : 'hidden'}`)
   }
   
   /**
@@ -113,7 +113,7 @@ export class UIControlBar_3a {
   private updateStorePanelButton(): void {
     const button = document.getElementById('toggle-store-panel')
     if (button) {
-      const isVisible = gameStore_3a.ui.showStorePanel
+      const isVisible = gameStore_3b.ui.showStorePanel
       
       // Update button appearance
       if (isVisible) {
@@ -141,7 +141,7 @@ export class UIControlBar_3a {
   private updateLayerToggleButton(): void {
     const button = document.getElementById('toggle-layers')
     if (button) {
-      const isVisible = gameStore_3a.ui.showLayerToggle
+      const isVisible = gameStore_3b.ui.showLayerToggle
       
       // Update button appearance
       if (isVisible) {
@@ -178,11 +178,11 @@ export class UIControlBar_3a {
     return {
       storePanel: {
         registered: this.storePanel !== null,
-        visible: gameStore_3a.ui.showStorePanel
+        visible: gameStore_3b.ui.showStorePanel
       },
       layerToggleBar: {
         registered: this.layerToggleBar !== null,
-        visible: gameStore_3a.ui.showLayerToggle
+        visible: gameStore_3b.ui.showLayerToggle
       }
     }
   }
@@ -192,6 +192,6 @@ export class UIControlBar_3a {
    */
   public destroy(): void {
     // Clean up event listeners if needed
-    console.log('UIControlBar_3a: Destroyed')
+    console.log('UIControlBar_3b: Destroyed')
   }
 }

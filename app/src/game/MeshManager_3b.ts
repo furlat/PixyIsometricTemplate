@@ -1,14 +1,14 @@
-// app/src/game/MeshManager_3a.ts
+// app/src/game/MeshManager_3b.ts
 import { MeshSimple, Texture } from 'pixi.js'
 import { VertexCoordinate } from '../types/ecs-coordinates'
-import { gameStore_3a } from '../store/gameStore_3a'
+import { gameStore_3b } from '../store/gameStore_3b'
 
-export class MeshManager_3a {
+export class MeshManager_3b {
   private mesh: MeshSimple | null = null
   private vertices: Float32Array | null = null
   private indices: Uint32Array | null = null
   
-  constructor(private store: typeof gameStore_3a) {
+  constructor(private store: typeof gameStore_3b) {
     this.generateMesh()
   }
   

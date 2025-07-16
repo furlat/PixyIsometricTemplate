@@ -1,4 +1,4 @@
-import { gameStore_3a, gameStore_3a_methods } from '../store/gameStore_3a'
+import { gameStore_3b, gameStore_3b_methods } from '../store/gameStore_3b'
 
 /**
  * Phase 3A Layer Toggle Bar
@@ -7,9 +7,9 @@ import { gameStore_3a, gameStore_3a_methods } from '../store/gameStore_3a'
  * - Grid layer toggle
  * - Mouse layer toggle
  * 
- * Complete isolation from old system - only uses gameStore_3a
+ * Complete isolation from old system - only uses gameStore_3b
  */
-export class LayerToggleBar_3a {
+export class LayerToggleBar_3b {
   private panel: HTMLElement | null = null
   private _isVisible: boolean = false
   
@@ -18,7 +18,7 @@ export class LayerToggleBar_3a {
     this.setupEventHandlers()
     this.updateButtonStates()
     this.updateVisibility()
-    console.log('LayerToggleBar_3a: Initialized Phase 3A layer toggle bar')
+    console.log('LayerToggleBar_3b: Initialized Phase 3A layer toggle bar')
   }
   
   /**
@@ -26,7 +26,7 @@ export class LayerToggleBar_3a {
    */
   private setupEventHandlers(): void {
     if (!this.panel) {
-      console.warn('LayerToggleBar_3a: Panel element not found')
+      console.warn('LayerToggleBar_3b: Panel element not found')
       return
     }
     
@@ -37,7 +37,7 @@ export class LayerToggleBar_3a {
         this.toggleGrid()
       })
     } else {
-      console.warn('LayerToggleBar_3a: Grid toggle button not found')
+      console.warn('LayerToggleBar_3b: Grid toggle button not found')
     }
     
     // Mouse layer toggle
@@ -47,7 +47,7 @@ export class LayerToggleBar_3a {
         this.toggleMouse()
       })
     } else {
-      console.warn('LayerToggleBar_3a: Mouse toggle button not found')
+      console.warn('LayerToggleBar_3b: Mouse toggle button not found')
     }
     
     // Checkboard toggle
@@ -57,7 +57,7 @@ export class LayerToggleBar_3a {
         this.toggleCheckboard()
       })
     } else {
-      console.warn('LayerToggleBar_3a: Checkboard toggle button not found')
+      console.warn('LayerToggleBar_3b: Checkboard toggle button not found')
     }
   }
   
@@ -65,48 +65,48 @@ export class LayerToggleBar_3a {
    * Toggle grid layer visibility
    */
   private toggleGrid(): void {
-    gameStore_3a_methods.toggleGrid()
+    gameStore_3b_methods.toggleGrid()
     this.updateGridButtonState()
     
     // Dispatch event for canvas layer updates
-    const event = new CustomEvent('phase3a-layer-changed', {
-      detail: { layer: 'grid', visible: gameStore_3a.ui.showGrid }
+    const event = new CustomEvent('phase3b-layer-changed', {
+      detail: { layer: 'grid', visible: gameStore_3b.ui.showGrid }
     })
     document.dispatchEvent(event)
     
-    console.log(`LayerToggleBar_3a: Grid layer ${gameStore_3a.ui.showGrid ? 'shown' : 'hidden'}`)
+    console.log(`LayerToggleBar_3b: Grid layer ${gameStore_3b.ui.showGrid ? 'shown' : 'hidden'}`)
   }
   
   /**
    * Toggle mouse layer visibility
    */
   private toggleMouse(): void {
-    gameStore_3a_methods.toggleMouse()
+    gameStore_3b_methods.toggleMouse()
     this.updateMouseButtonState()
     
     // Dispatch event for canvas layer updates
-    const event = new CustomEvent('phase3a-layer-changed', {
-      detail: { layer: 'mouse', visible: gameStore_3a.ui.showMouse }
+    const event = new CustomEvent('phase3b-layer-changed', {
+      detail: { layer: 'mouse', visible: gameStore_3b.ui.showMouse }
     })
     document.dispatchEvent(event)
     
-    console.log(`LayerToggleBar_3a: Mouse layer ${gameStore_3a.ui.showMouse ? 'shown' : 'hidden'}`)
+    console.log(`LayerToggleBar_3b: Mouse layer ${gameStore_3b.ui.showMouse ? 'shown' : 'hidden'}`)
   }
   
   /**
    * Toggle checkboard visibility
    */
   private toggleCheckboard(): void {
-    gameStore_3a_methods.toggleCheckboard()
+    gameStore_3b_methods.toggleCheckboard()
     this.updateCheckboardButtonState()
     
     // Dispatch event for canvas layer updates
-    const event = new CustomEvent('phase3a-layer-changed', {
-      detail: { layer: 'checkboard', visible: gameStore_3a.ui.enableCheckboard }
+    const event = new CustomEvent('phase3b-layer-changed', {
+      detail: { layer: 'checkboard', visible: gameStore_3b.ui.enableCheckboard }
     })
     document.dispatchEvent(event)
     
-    console.log(`LayerToggleBar_3a: Checkboard ${gameStore_3a.ui.enableCheckboard ? 'enabled' : 'disabled'}`)
+    console.log(`LayerToggleBar_3b: Checkboard ${gameStore_3b.ui.enableCheckboard ? 'enabled' : 'disabled'}`)
   }
   
   /**
@@ -116,7 +116,7 @@ export class LayerToggleBar_3a {
     const button = document.getElementById('toggle-layer-grid')
     if (!button) return
     
-    const isActive = gameStore_3a.ui.showGrid
+    const isActive = gameStore_3b.ui.showGrid
     const baseClasses = ['btn', 'btn-sm', 'rounded-full']
     
     // Reset button classes
@@ -145,7 +145,7 @@ export class LayerToggleBar_3a {
     const button = document.getElementById('toggle-layer-mouse')
     if (!button) return
     
-    const isActive = gameStore_3a.ui.showMouse
+    const isActive = gameStore_3b.ui.showMouse
     const baseClasses = ['btn', 'btn-sm', 'rounded-full']
     
     // Reset button classes
@@ -174,7 +174,7 @@ export class LayerToggleBar_3a {
     const button = document.getElementById('toggle-checkboard')
     if (!button) return
     
-    const isActive = gameStore_3a.ui.enableCheckboard
+    const isActive = gameStore_3b.ui.enableCheckboard
     const baseClasses = ['btn', 'btn-sm', 'rounded-full']
     
     // Reset button classes
@@ -220,7 +220,7 @@ export class LayerToggleBar_3a {
   public toggle(): void {
     this._isVisible = !this._isVisible
     this.updateVisibility()
-    console.log(`LayerToggleBar_3a: Panel ${this._isVisible ? 'shown' : 'hidden'}`)
+    console.log(`LayerToggleBar_3b: Panel ${this._isVisible ? 'shown' : 'hidden'}`)
   }
   
   /**
@@ -250,9 +250,9 @@ export class LayerToggleBar_3a {
    */
   public getLayerStates(): { grid: boolean; mouse: boolean; checkboard: boolean } {
     return {
-      grid: gameStore_3a.ui.showGrid,
-      mouse: gameStore_3a.ui.showMouse,
-      checkboard: gameStore_3a.ui.enableCheckboard
+      grid: gameStore_3b.ui.showGrid,
+      mouse: gameStore_3b.ui.showMouse,
+      checkboard: gameStore_3b.ui.enableCheckboard
     }
   }
   
@@ -261,15 +261,15 @@ export class LayerToggleBar_3a {
    */
   public setLayerState(layer: 'grid' | 'mouse' | 'checkboard', visible: boolean): void {
     if (layer === 'grid') {
-      if (gameStore_3a.ui.showGrid !== visible) {
+      if (gameStore_3b.ui.showGrid !== visible) {
         this.toggleGrid()
       }
     } else if (layer === 'mouse') {
-      if (gameStore_3a.ui.showMouse !== visible) {
+      if (gameStore_3b.ui.showMouse !== visible) {
         this.toggleMouse()
       }
     } else if (layer === 'checkboard') {
-      if (gameStore_3a.ui.enableCheckboard !== visible) {
+      if (gameStore_3b.ui.enableCheckboard !== visible) {
         this.toggleCheckboard()
       }
     }
@@ -287,22 +287,22 @@ export class LayerToggleBar_3a {
       buttons: {
         grid: {
           found: document.getElementById('toggle-layer-grid') !== null,
-          active: gameStore_3a.ui.showGrid
+          active: gameStore_3b.ui.showGrid
         },
         mouse: {
           found: document.getElementById('toggle-layer-mouse') !== null,
-          active: gameStore_3a.ui.showMouse
+          active: gameStore_3b.ui.showMouse
         },
         checkboard: {
           found: document.getElementById('toggle-checkboard') !== null,
-          active: gameStore_3a.ui.enableCheckboard
+          active: gameStore_3b.ui.enableCheckboard
         }
       },
       store: {
-        showGrid: gameStore_3a.ui.showGrid,
-        showMouse: gameStore_3a.ui.showMouse,
-        enableCheckboard: gameStore_3a.ui.enableCheckboard,
-        showLayerToggle: gameStore_3a.ui.showLayerToggle
+        showGrid: gameStore_3b.ui.showGrid,
+        showMouse: gameStore_3b.ui.showMouse,
+        enableCheckboard: gameStore_3b.ui.enableCheckboard,
+        showLayerToggle: gameStore_3b.ui.showLayerToggle
       }
     }
   }
@@ -312,6 +312,6 @@ export class LayerToggleBar_3a {
    */
   public destroy(): void {
     // Clean up event listeners if needed
-    console.log('LayerToggleBar_3a: Destroyed')
+    console.log('LayerToggleBar_3b: Destroyed')
   }
 }

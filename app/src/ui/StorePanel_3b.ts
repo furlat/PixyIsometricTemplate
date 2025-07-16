@@ -1,6 +1,6 @@
-// app/src/ui/StorePanel_3a.ts - Updated to show mesh data
+// app/src/ui/StorePanel_3b.ts - Updated to show mesh data
 import { subscribe } from 'valtio'
-import { gameStore_3a, gameStore_3a_methods } from '../store/gameStore_3a'
+import { gameStore_3b, gameStore_3b_methods } from '../store/gameStore_3b'
 import {
   updateElement,
   getBooleanStatusClass,
@@ -9,8 +9,8 @@ import {
 } from './handlers/UIHandlers'
 
 /**
- * StorePanel_3a - Mesh-first Store Panel for Phase 3A
- * 
+ * StorePanel_3b - Mesh-first Store Panel for Phase 3B
+ *
  * Displays core foundation data:
  * - Game initialization status
  * - Mouse position (vertex, screen, world)
@@ -18,7 +18,7 @@ import {
  * - Mesh system status with vertex data
  * - Layer controls
  */
-export class StorePanel_3a {
+export class StorePanel_3b {
   private elements: Map<string, HTMLElement> = new Map()
   
   constructor() {
@@ -28,7 +28,7 @@ export class StorePanel_3a {
   }
   
   private initializeElements(): void {
-    // Get all Phase 3A elements by their IDs
+    // Get all Phase 3b elements by their IDs
     const elementIds = [
       'game-initialized',
       'mesh-scale',
@@ -56,7 +56,7 @@ export class StorePanel_3a {
       if (element) {
         this.elements.set(id, element)
       } else {
-        console.warn(`StorePanel_3a: Element with id '${id}' not found`)
+        console.warn(`StorePanel_3b: Element with id '${id}' not found`)
       }
     })
   }
@@ -69,20 +69,20 @@ export class StorePanel_3a {
     // ✅ PRECISE SUBSCRIPTIONS - Only subscribe to relevant slices
     
     // UI-only subscription for visibility
-    subscribe(gameStore_3a.ui, () => {
+    subscribe(gameStore_3b.ui, () => {
       this.updateDOMVisibility()
     })
     
     // Data subscriptions for content updates
-    subscribe(gameStore_3a.mouse, () => {
+    subscribe(gameStore_3b.mouse, () => {
       this.updateMouseValues()
     })
     
-    subscribe(gameStore_3a.navigation, () => {
+    subscribe(gameStore_3b.navigation, () => {
       this.updateNavigationValues()
     })
     
-    subscribe(gameStore_3a.mesh, () => {
+    subscribe(gameStore_3b.mesh, () => {
       this.updateMeshValues()
     })
   }
@@ -99,28 +99,28 @@ export class StorePanel_3a {
     const panelElement = document.getElementById('store-panel')
     
     if (!panelElement) {
-      console.error('StorePanel_3a: store-panel element not found')
+      console.error('StorePanel_3b: store-panel element not found')
       return
     }
     
-    const shouldShow = gameStore_3a.ui.showStorePanel
+    const shouldShow = gameStore_3b.ui.showStorePanel
     const displayValue = shouldShow ? 'block' : 'none'
     
-    console.log(`StorePanel_3a: Setting visibility to ${displayValue}`)
+    console.log(`StorePanel_3b: Setting visibility to ${displayValue}`)
     panelElement.style.display = displayValue
   }
   
   private updateValues(): void {
     
     try {
-      // Phase 3A Status
+      // Phase 3b Status
       updateElement(this.elements, 'game-initialized', 
-        'true', // Game_3a initializes synchronously
+        'true', // Game_3b initializes synchronously
         'status-active'
       )
       
       updateElement(this.elements, 'mesh-scale', 
-        '1', // Always scale 1 for Phase 3A
+        '1', // Always scale 1 for Phase 3b
         'status-active'
       )
       
@@ -131,91 +131,91 @@ export class StorePanel_3a {
       
       // ✅ MESH-FIRST MOUSE POSITION - Show all coordinate systems
       updateElement(this.elements, 'mouse-vertex',
-        `${gameStore_3a.mouse.vertex.x}, ${gameStore_3a.mouse.vertex.y}`,
+        `${gameStore_3b.mouse.vertex.x}, ${gameStore_3b.mouse.vertex.y}`,
         STATUS_COLORS.mouse
       )
       
       updateElement(this.elements, 'mouse-screen',
-        `${gameStore_3a.mouse.screen.x.toFixed(0)}, ${gameStore_3a.mouse.screen.y.toFixed(0)}`,
+        `${gameStore_3b.mouse.screen.x.toFixed(0)}, ${gameStore_3b.mouse.screen.y.toFixed(0)}`,
         STATUS_COLORS.mouse
       )
       
       updateElement(this.elements, 'mouse-world',
-        `${gameStore_3a.mouse.world.x}, ${gameStore_3a.mouse.world.y}`,
+        `${gameStore_3b.mouse.world.x}, ${gameStore_3b.mouse.world.y}`,
         STATUS_COLORS.mouse
       )
       
       // Navigation
       updateElement(this.elements, 'navigation-offset',
-        `${gameStore_3a.navigation.offset.x.toFixed(1)}, ${gameStore_3a.navigation.offset.y.toFixed(1)}`,
+        `${gameStore_3b.navigation.offset.x.toFixed(1)}, ${gameStore_3b.navigation.offset.y.toFixed(1)}`,
         STATUS_COLORS.camera
       )
       
       updateElement(this.elements, 'navigation-dragging',
-        getBooleanStatusText(gameStore_3a.navigation.isDragging),
-        getBooleanStatusClass(gameStore_3a.navigation.isDragging)
+        getBooleanStatusText(gameStore_3b.navigation.isDragging),
+        getBooleanStatusClass(gameStore_3b.navigation.isDragging)
       )
       
       updateElement(this.elements, 'navigation-move-amount',
-        gameStore_3a.navigation.moveAmount.toString(),
+        gameStore_3b.navigation.moveAmount.toString(),
         'text-primary'
       )
       
       // ✅ MESH SYSTEM - Show mesh data
       updateElement(this.elements, 'mesh-ready',
-        getBooleanStatusText(gameStore_3a.mesh.vertexData !== null),
-        getBooleanStatusClass(gameStore_3a.mesh.vertexData !== null)
+        getBooleanStatusText(gameStore_3b.mesh.vertexData !== null),
+        getBooleanStatusClass(gameStore_3b.mesh.vertexData !== null)
       )
       
       updateElement(this.elements, 'mesh-cell-size',
-        gameStore_3a.mesh.cellSize.toString(),
+        gameStore_3b.mesh.cellSize.toString(),
         'text-primary'
       )
       
       updateElement(this.elements, 'mesh-dimensions',
-        `${gameStore_3a.mesh.dimensions.width}x${gameStore_3a.mesh.dimensions.height}`,
+        `${gameStore_3b.mesh.dimensions.width}x${gameStore_3b.mesh.dimensions.height}`,
         'text-primary'
       )
       
       updateElement(this.elements, 'mesh-vertex-count',
-        gameStore_3a.mesh.vertexData ? (gameStore_3a.mesh.vertexData.length / 2).toString() : '0',
+        gameStore_3b.mesh.vertexData ? (gameStore_3b.mesh.vertexData.length / 2).toString() : '0',
         'text-primary'
       )
       
       updateElement(this.elements, 'mesh-needs-update',
-        getBooleanStatusText(gameStore_3a.mesh.needsUpdate),
-        getBooleanStatusClass(gameStore_3a.mesh.needsUpdate)
+        getBooleanStatusText(gameStore_3b.mesh.needsUpdate),
+        getBooleanStatusClass(gameStore_3b.mesh.needsUpdate)
       )
       
       // Layer Controls
       updateElement(this.elements, 'layer-grid-status',
-        getBooleanStatusText(gameStore_3a.ui.showGrid),
-        getBooleanStatusClass(gameStore_3a.ui.showGrid)
+        getBooleanStatusText(gameStore_3b.ui.showGrid),
+        getBooleanStatusClass(gameStore_3b.ui.showGrid)
       )
       
       updateElement(this.elements, 'layer-mouse-status',
-        getBooleanStatusText(gameStore_3a.ui.showMouse),
-        getBooleanStatusClass(gameStore_3a.ui.showMouse)
+        getBooleanStatusText(gameStore_3b.ui.showMouse),
+        getBooleanStatusClass(gameStore_3b.ui.showMouse)
       )
       
       updateElement(this.elements, 'checkboard-enabled',
-        getBooleanStatusText(gameStore_3a.ui.enableCheckboard),
-        getBooleanStatusClass(gameStore_3a.ui.enableCheckboard)
+        getBooleanStatusText(gameStore_3b.ui.enableCheckboard),
+        getBooleanStatusClass(gameStore_3b.ui.enableCheckboard)
       )
       
       // Mouse Highlight Properties
       updateElement(this.elements, 'mouse-highlight-color',
-        `#${gameStore_3a.ui.mouse.highlightColor.toString(16).padStart(6, '0')}`,
+        `#${gameStore_3b.ui.mouse.highlightColor.toString(16).padStart(6, '0')}`,
         'text-primary'
       )
       
       updateElement(this.elements, 'mouse-highlight-intensity',
-        gameStore_3a.ui.mouse.highlightIntensity.toFixed(2),
+        gameStore_3b.ui.mouse.highlightIntensity.toFixed(2),
         'text-primary'
       )
       
     } catch (error) {
-      console.warn('StorePanel_3a: Error updating values:', error)
+      console.warn('StorePanel_3b: Error updating values:', error)
     }
   }
   
@@ -225,31 +225,31 @@ export class StorePanel_3a {
   private updateMouseValues(): void {
     try {
       updateElement(this.elements, 'mouse-vertex',
-        `${gameStore_3a.mouse.vertex.x}, ${gameStore_3a.mouse.vertex.y}`,
+        `${gameStore_3b.mouse.vertex.x}, ${gameStore_3b.mouse.vertex.y}`,
         STATUS_COLORS.mouse
       )
       
       updateElement(this.elements, 'mouse-screen',
-        `${gameStore_3a.mouse.screen.x.toFixed(0)}, ${gameStore_3a.mouse.screen.y.toFixed(0)}`,
+        `${gameStore_3b.mouse.screen.x.toFixed(0)}, ${gameStore_3b.mouse.screen.y.toFixed(0)}`,
         STATUS_COLORS.mouse
       )
       
       updateElement(this.elements, 'mouse-world',
-        `${gameStore_3a.mouse.world.x}, ${gameStore_3a.mouse.world.y}`,
+        `${gameStore_3b.mouse.world.x}, ${gameStore_3b.mouse.world.y}`,
         STATUS_COLORS.mouse
       )
       
       updateElement(this.elements, 'mouse-highlight-color',
-        `#${gameStore_3a.ui.mouse.highlightColor.toString(16).padStart(6, '0')}`,
+        `#${gameStore_3b.ui.mouse.highlightColor.toString(16).padStart(6, '0')}`,
         'text-primary'
       )
       
       updateElement(this.elements, 'mouse-highlight-intensity',
-        gameStore_3a.ui.mouse.highlightIntensity.toFixed(2),
+        gameStore_3b.ui.mouse.highlightIntensity.toFixed(2),
         'text-primary'
       )
     } catch (error) {
-      console.warn('StorePanel_3a: Error updating mouse values:', error)
+      console.warn('StorePanel_3b: Error updating mouse values:', error)
     }
   }
   
@@ -259,21 +259,21 @@ export class StorePanel_3a {
   private updateNavigationValues(): void {
     try {
       updateElement(this.elements, 'navigation-offset',
-        `${gameStore_3a.navigation.offset.x.toFixed(1)}, ${gameStore_3a.navigation.offset.y.toFixed(1)}`,
+        `${gameStore_3b.navigation.offset.x.toFixed(1)}, ${gameStore_3b.navigation.offset.y.toFixed(1)}`,
         STATUS_COLORS.camera
       )
       
       updateElement(this.elements, 'navigation-dragging',
-        getBooleanStatusText(gameStore_3a.navigation.isDragging),
-        getBooleanStatusClass(gameStore_3a.navigation.isDragging)
+        getBooleanStatusText(gameStore_3b.navigation.isDragging),
+        getBooleanStatusClass(gameStore_3b.navigation.isDragging)
       )
       
       updateElement(this.elements, 'navigation-move-amount',
-        gameStore_3a.navigation.moveAmount.toString(),
+        gameStore_3b.navigation.moveAmount.toString(),
         'text-primary'
       )
     } catch (error) {
-      console.warn('StorePanel_3a: Error updating navigation values:', error)
+      console.warn('StorePanel_3b: Error updating navigation values:', error)
     }
   }
   
@@ -283,31 +283,31 @@ export class StorePanel_3a {
   private updateMeshValues(): void {
     try {
       updateElement(this.elements, 'mesh-ready',
-        getBooleanStatusText(gameStore_3a.mesh.vertexData !== null),
-        getBooleanStatusClass(gameStore_3a.mesh.vertexData !== null)
+        getBooleanStatusText(gameStore_3b.mesh.vertexData !== null),
+        getBooleanStatusClass(gameStore_3b.mesh.vertexData !== null)
       )
       
       updateElement(this.elements, 'mesh-cell-size',
-        gameStore_3a.mesh.cellSize.toString(),
+        gameStore_3b.mesh.cellSize.toString(),
         'text-primary'
       )
       
       updateElement(this.elements, 'mesh-dimensions',
-        `${gameStore_3a.mesh.dimensions.width}x${gameStore_3a.mesh.dimensions.height}`,
+        `${gameStore_3b.mesh.dimensions.width}x${gameStore_3b.mesh.dimensions.height}`,
         'text-primary'
       )
       
       updateElement(this.elements, 'mesh-vertex-count',
-        gameStore_3a.mesh.vertexData ? (gameStore_3a.mesh.vertexData.length / 2).toString() : '0',
+        gameStore_3b.mesh.vertexData ? (gameStore_3b.mesh.vertexData.length / 2).toString() : '0',
         'text-primary'
       )
       
       updateElement(this.elements, 'mesh-needs-update',
-        getBooleanStatusText(gameStore_3a.mesh.needsUpdate),
-        getBooleanStatusClass(gameStore_3a.mesh.needsUpdate)
+        getBooleanStatusText(gameStore_3b.mesh.needsUpdate),
+        getBooleanStatusClass(gameStore_3b.mesh.needsUpdate)
       )
     } catch (error) {
-      console.warn('StorePanel_3a: Error updating mesh values:', error)
+      console.warn('StorePanel_3b: Error updating mesh values:', error)
     }
   }
   
@@ -315,14 +315,14 @@ export class StorePanel_3a {
    * Toggle panel visibility
    */
   public toggle(): void {
-    const currentState = gameStore_3a.ui.showStorePanel
-    console.log(`StorePanel_3a: Toggling from ${currentState} to ${!currentState}`)
+    const currentState = gameStore_3b.ui.showStorePanel
+    console.log(`StorePanel_3b: Toggling from ${currentState} to ${!currentState}`)
     
     // Use store method instead of local state
-    gameStore_3a_methods.toggleStorePanel()
+    gameStore_3b_methods.toggleStorePanel()
     
     // Verify state change
-    console.log(`StorePanel_3a: New state is ${gameStore_3a.ui.showStorePanel}`)
+    console.log(`StorePanel_3b: New state is ${gameStore_3b.ui.showStorePanel}`)
   }
   
   /**
@@ -330,15 +330,15 @@ export class StorePanel_3a {
    */
   public setVisible(visible: boolean): void {
     // Update store state instead of local state
-    gameStore_3a.ui.showStorePanel = visible
-    console.log('StorePanel_3a: Set visibility to', visible)
+    gameStore_3b.ui.showStorePanel = visible
+    console.log('StorePanel_3b: Set visibility to', visible)
   }
   
   /**
    * Get current visibility state
    */
   public getVisible(): boolean {
-    return gameStore_3a.ui.showStorePanel
+    return gameStore_3b.ui.showStorePanel
   }
   
   /**
@@ -354,13 +354,13 @@ export class StorePanel_3a {
    */
   public getDebugInfo(): any {
     return {
-      isVisible: gameStore_3a.ui.showStorePanel,
+      isVisible: gameStore_3b.ui.showStorePanel,
       elementsFound: this.elements.size,
       storeData: {
-        mouse: gameStore_3a.mouse,
-        navigation: gameStore_3a.navigation,
-        mesh: gameStore_3a.mesh,
-        ui: gameStore_3a.ui
+        mouse: gameStore_3b.mouse,
+        navigation: gameStore_3b.navigation,
+        mesh: gameStore_3b.mesh,
+        ui: gameStore_3b.ui
       }
     }
   }
@@ -369,8 +369,8 @@ export class StorePanel_3a {
    * Clean up resources
    */
   public destroy(): void {
-    console.log('StorePanel_3a: Starting cleanup')
+    console.log('StorePanel_3b: Starting cleanup')
     this.elements.clear()
-    console.log('StorePanel_3a: Cleanup complete')
+    console.log('StorePanel_3b: Cleanup complete')
   }
 }

@@ -1,13 +1,13 @@
-// app/src/game/GridShaderRenderer_3a.ts
+// app/src/game/GridShaderRenderer_3b.ts
 import { Shader, MeshSimple } from 'pixi.js'
-import { MeshManager_3a } from './MeshManager_3a'
-import { gameStore_3a } from '../store/gameStore_3a'
+import { MeshManager_3b } from './MeshManager_3b'
+import { gameStore_3b } from '../store/gameStore_3b'
 
-export class GridShaderRenderer_3a {
+export class GridShaderRenderer_3b {
   private shader: Shader | null = null
-  private meshManager: MeshManager_3a
+  private meshManager: MeshManager_3b
   
-  constructor(meshManager: MeshManager_3a) {
+  constructor(meshManager: MeshManager_3b) {
     this.meshManager = meshManager
     this.createCheckboardShader()
   }
@@ -70,16 +70,16 @@ export class GridShaderRenderer_3a {
     const mesh = this.meshManager.getMesh()
     if (!mesh) return
     
-    if (gameStore_3a.ui.enableCheckboard) {
+    if (gameStore_3b.ui.enableCheckboard) {
       // Apply shader
       if (this.shader) {
         (mesh as any).shader = this.shader
-        console.log('GridShaderRenderer_3a: Checkboard shader applied')
+        console.log('GridShaderRenderer_3b: Checkboard shader applied')
       }
     } else {
       // Remove shader
       (mesh as any).shader = null
-      console.log('GridShaderRenderer_3a: Checkboard shader removed')
+      console.log('GridShaderRenderer_3b: Checkboard shader removed')
     }
   }
   

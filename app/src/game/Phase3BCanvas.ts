@@ -1,9 +1,9 @@
-// app/src/game/Phase3ACanvas.ts - Updated with mesh-first modules
+// app/src/game/Phase3BCanvas.ts - Updated with mesh-first modules
 import { Application, Container } from 'pixi.js'
-import { BackgroundGridRenderer_3a } from './BackgroundGridRenderer_3a'
-import { MouseHighlightShader_3a } from './MouseHighlightShader_3a'
-import { InputManager_3a } from './InputManager_3a'
-import { gameStore_3a, gameStore_3a_methods } from '../store/gameStore_3a'
+import { BackgroundGridRenderer_3b } from './BackgroundGridRenderer_3b'
+import { MouseHighlightShader_3b } from './MouseHighlightShader_3b'
+import { InputManager_3b } from './InputManager_3b'
+import { gameStore_3b, gameStore_3b_methods } from '../store/gameStore_3b'
 import { PixeloidCoordinate } from '../types/ecs-coordinates'
 
 // Simple interface for viewport corners
@@ -15,16 +15,16 @@ interface ViewportCorners {
 }
 
 /**
- * Phase3ACanvas - Mesh-first 2-layer canvas for Phase 3A foundation
- * 
+ * Phase3BCanvas - Mesh-first 2-layer canvas for Phase 3B foundation
+ *
  * This replaces LayeredInfiniteCanvas.ts with a minimal implementation
  * that focuses on the core foundation: mesh + grid + mouse layers.
  */
-export class Phase3ACanvas {
+export class Phase3BCanvas {
   private app: Application
-  private backgroundGridRenderer: BackgroundGridRenderer_3a
-  private mouseHighlightShader: MouseHighlightShader_3a
-  private inputManager: InputManager_3a
+  private backgroundGridRenderer: BackgroundGridRenderer_3b
+  private mouseHighlightShader: MouseHighlightShader_3b
+  private inputManager: InputManager_3b
   
   // 2-layer system
   private gridLayer: Container
@@ -32,16 +32,16 @@ export class Phase3ACanvas {
   
   constructor(app: Application) {
     this.app = app
-    console.log('Phase3ACanvas: Initializing with mesh-first architecture')
+    console.log('Phase3BCanvas: Initializing with mesh-first architecture')
     
     // Initialize layer containers
     this.gridLayer = new Container()
     this.mouseLayer = new Container()
     
     // Initialize renderers with mesh-first architecture
-    this.backgroundGridRenderer = new BackgroundGridRenderer_3a()
-    this.mouseHighlightShader = new MouseHighlightShader_3a(this.backgroundGridRenderer.getMeshManager())
-    this.inputManager = new InputManager_3a()
+    this.backgroundGridRenderer = new BackgroundGridRenderer_3b()
+    this.mouseHighlightShader = new MouseHighlightShader_3b(this.backgroundGridRenderer.getMeshManager())
+    this.inputManager = new InputManager_3b()
     
     // Setup layers
     this.setupLayers()
@@ -55,11 +55,11 @@ export class Phase3ACanvas {
     // Initialize mesh data in store
     this.initializeMeshData()
     
-    console.log('Phase3ACanvas: Initialization complete')
+    console.log('Phase3BCanvas: Initialization complete')
   }
   
   /**
-   * Set up the 2-layer architecture for Phase 3A
+   * Set up the 2-layer architecture for Phase 3B
    */
   private setupLayers(): void {
     // Create layer containers
@@ -70,7 +70,7 @@ export class Phase3ACanvas {
     this.app.stage.addChild(this.gridLayer)
     this.app.stage.addChild(this.mouseLayer)
     
-    console.log('Phase3ACanvas: Layers setup complete')
+    console.log('Phase3BCanvas: Layers setup complete')
   }
   
   /**
@@ -80,7 +80,7 @@ export class Phase3ACanvas {
     // ✅ Add mouse sprite ONCE, never remove
     const mouseSprite = this.mouseHighlightShader.getSprite()
     this.mouseLayer.addChild(mouseSprite)
-    console.log('Phase3ACanvas: Mouse sprite added once - never to be removed')
+    console.log('Phase3BCanvas: Mouse sprite added once - never to be removed')
   }
   
   /**
@@ -93,28 +93,28 @@ export class Phase3ACanvas {
     const dimensions = meshManager.getMeshDimensions()
     
     if (vertices) {
-      gameStore_3a_methods.updateMeshData(vertices, cellSize, dimensions)
-      console.log('Phase3ACanvas: Mesh data initialized in store', { cellSize, dimensions })
+      gameStore_3b_methods.updateMeshData(vertices, cellSize, dimensions)
+      console.log('Phase3BCanvas: Mesh data initialized in store', { cellSize, dimensions })
     }
   }
   
   /**
-   * Initialize the Phase 3A system
+   * Initialize the Phase 3B system
    */
   public initialize(): void {
-    // Initialize input manager for Phase 3A
+    // Initialize input manager for Phase 3B
     this.inputManager.initialize()
     
-    console.log('Phase3ACanvas: Phase 3A system initialized')
+    console.log('Phase3BCanvas: Phase 3B system initialized')
   }
   
   /**
-   * Main render method for Phase 3A - ✅ FUNCTIONAL GAME LOOP
+   * Main render method for Phase 3B - ✅ FUNCTIONAL GAME LOOP
    */
   public render(): void {
     // ✅ Functional store reading (no reactive subscriptions)
-    const showGrid = gameStore_3a.ui.showGrid
-    const showMouse = gameStore_3a.ui.showMouse
+    const showGrid = gameStore_3b.ui.showGrid
+    const showMouse = gameStore_3b.ui.showMouse
     
     // Only clear grid layer
     this.gridLayer.removeChildren()
@@ -142,13 +142,13 @@ export class Phase3ACanvas {
         this.gridLayer.addChild(gridMesh)
       }
     } catch (error) {
-      console.warn('Phase3ACanvas: Grid rendering error:', error)
+      console.warn('Phase3BCanvas: Grid rendering error:', error)
     }
   }
   
   
   /**
-   * Get simple screen-based viewport corners for Phase 3A
+   * Get simple screen-based viewport corners for Phase 3B
    */
   private getSimpleCorners(): ViewportCorners {
     const width = this.app.screen.width
@@ -165,39 +165,39 @@ export class Phase3ACanvas {
   /**
    * Get the input manager for external access
    */
-  public getInputManager(): InputManager_3a {
+  public getInputManager(): InputManager_3b {
     return this.inputManager
   }
   
   /**
    * Get the grid renderer for external access
    */
-  public getGridRenderer(): BackgroundGridRenderer_3a {
+  public getGridRenderer(): BackgroundGridRenderer_3b {
     return this.backgroundGridRenderer
   }
   
   /**
    * Get the mouse shader for external access
    */
-  public getMouseShader(): MouseHighlightShader_3a {
+  public getMouseShader(): MouseHighlightShader_3b {
     return this.mouseHighlightShader
   }
   
   /**
-   * Handle window resize for Phase 3A
+   * Handle window resize for Phase 3B
    */
   public onResize(width: number, height: number): void {
     // Simple resize handling - re-render with new dimensions
     // Note: In future phases, this might require mesh regeneration
     this.render()
-    console.log('Phase3ACanvas: Resize handled', { width, height })
+    console.log('Phase3BCanvas: Resize handled', { width, height })
   }
   
   /**
    * Clean up resources
    */
   public destroy(): void {
-    console.log('Phase3ACanvas: Starting cleanup')
+    console.log('Phase3BCanvas: Starting cleanup')
     
     // Clean up layers
     this.gridLayer.removeChildren()
@@ -214,11 +214,11 @@ export class Phase3ACanvas {
       this.inputManager.destroy()
     }
     
-    console.log('Phase3ACanvas: Cleanup complete')
+    console.log('Phase3BCanvas: Cleanup complete')
   }
   
   /**
-   * Get debug information for Phase 3A
+   * Get debug information for Phase 3B
    */
   public getDebugInfo(): any {
     return {
@@ -233,23 +233,23 @@ export class Phase3ACanvas {
         }
       },
       mesh: {
-        initialized: gameStore_3a.mesh.vertexData !== null,
-        cellSize: gameStore_3a.mesh.cellSize,
-        dimensions: gameStore_3a.mesh.dimensions,
-        scale: 1 // Always scale 1 for Phase 3A
+        initialized: gameStore_3b.mesh.vertexData !== null,
+        cellSize: gameStore_3b.mesh.cellSize,
+        dimensions: gameStore_3b.mesh.dimensions,
+        scale: 1 // Always scale 1 for Phase 3B
       },
       mouse: {
-        vertex: gameStore_3a.mouse.vertex,
-        screen: gameStore_3a.mouse.screen,
-        world: gameStore_3a.mouse.world
+        vertex: gameStore_3b.mouse.vertex,
+        screen: gameStore_3b.mouse.screen,
+        world: gameStore_3b.mouse.world
       },
       navigation: {
-        offset: gameStore_3a.navigation.offset,
-        isDragging: gameStore_3a.navigation.isDragging
+        offset: gameStore_3b.navigation.offset,
+        isDragging: gameStore_3b.navigation.isDragging
       },
       ui: {
-        showGrid: gameStore_3a.ui.showGrid,
-        showMouse: gameStore_3a.ui.showMouse
+        showGrid: gameStore_3b.ui.showGrid,
+        showMouse: gameStore_3b.ui.showMouse
       }
     }
   }
