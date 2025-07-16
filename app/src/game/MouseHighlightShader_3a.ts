@@ -1,105 +1,58 @@
-// app/src/game/MouseHighlightShader_3a.ts - Use mesh coordinates
-import { Graphics } from 'pixi.js'
+// app/src/game/MouseHighlightShader_3a.ts - GPU-accelerated sprite highlighting
+import { Sprite, Texture, ColorMatrixFilter } from 'pixi.js'
 import { gameStore_3a } from '../store/gameStore_3a'
-import { subscribe } from 'valtio'
+import { MeshManager_3a } from './MeshManager_3a'
+import { VertexCoordinate } from '../types/ecs-coordinates'
 
 /**
- * MouseHighlightShader_3a - Mesh-first mouse highlighter for Phase 3A
- * 
- * Renders simple highlight effects at mouse position using mesh vertex coordinates
- * Works with gameStore_3a for Phase 3A foundation
+ * MouseHighlightShader_3a - GPU-accelerated mouse highlighter for Phase 3A
+ *
+ * Uses Sprite + ColorMatrixFilter for responsive, GPU-accelerated highlighting
+ * No animations - static highlighting for maximum performance
  */
 export class MouseHighlightShader_3a {
-  private graphics: Graphics
-  
-  // Animation state
-  private startTime: number = Date.now()
-  private isDirty: boolean = true
-  
-  // Highlight properties from store
-  private get highlightColor(): number {
-    return gameStore_3a.ui.mouse.highlightColor
-  }
-  private get highlightIntensity(): number {
-    return gameStore_3a.ui.mouse.highlightIntensity
-  }
+  private highlightSprite: Sprite
+  private colorMatrixFilter: ColorMatrixFilter
+  private meshManager: MeshManager_3a
 
-  constructor() {
-    // Create graphics for rendering highlight
-    this.graphics = new Graphics()
+  constructor(meshManager: MeshManager_3a) {
+    this.meshManager = meshManager
     
-    // Subscribe to mouse position changes
-    this.setupMouseSubscription()
+    // Create simple white sprite for highlighting
+    this.highlightSprite = new Sprite(Texture.WHITE)
     
-    console.log('MouseHighlightShader_3a: Initialized with mesh-first architecture')
-  }
-
-  /**
-   * Subscribe to mouse position changes for real-time updates
-   */
-  private setupMouseSubscription(): void {
-    subscribe(gameStore_3a.mouse, () => {
-      this.isDirty = true
-    })
+    // Set highlight color via tint (from store)
+    this.highlightSprite.tint = gameStore_3a.ui.mouse.highlightColor
+    
+    // Create color matrix filter for visual enhancement
+    this.colorMatrixFilter = new ColorMatrixFilter()
+    this.colorMatrixFilter.brightness(1.3, false)  // Static brightness boost
+    this.colorMatrixFilter.contrast(1.1, false)    // Static contrast boost
+    
+    // Apply filter to sprite
+    this.highlightSprite.filters = [this.colorMatrixFilter]
+    
+    // Initially hidden
+    this.highlightSprite.visible = false
+    
+    console.log('MouseHighlightShader_3a: Initialized with Sprite + ColorMatrixFilter')
   }
 
   /**
-   * Render mouse highlight effects using mesh vertex coordinates
+   * ✅ Update mouse highlight directly from mesh coordinates - IMMEDIATE POSITIONING
    */
-  public render(): void {
-    if (!this.isDirty) return
+  public updateFromMesh(vertexCoord: VertexCoordinate): void {
+    // ✅ Direct positioning - no delays, no animation frames
+    const cellSize = this.meshManager.getCellSize()
     
-    // Clear previous graphics
-    this.graphics.clear()
+    // Position sprite at mesh cell immediately
+    this.highlightSprite.x = vertexCoord.x * cellSize
+    this.highlightSprite.y = vertexCoord.y * cellSize
+    this.highlightSprite.width = cellSize
+    this.highlightSprite.height = cellSize
+    this.highlightSprite.visible = true
     
-    // Only render if mouse highlighting is enabled
-    if (!gameStore_3a.ui.showMouse) {
-      this.isDirty = false
-      return
-    }
-    
-    // ✅ USE MESH VERTEX COORDINATES (authoritative)
-    const mouseVertex = gameStore_3a.mouse.vertex
-    const cellSize = gameStore_3a.mesh.cellSize
-    
-    if (!mouseVertex || cellSize <= 0) {
-      console.warn('MouseHighlightShader_3a: Invalid mesh data or mouse position')
-      this.isDirty = false
-      return
-    }
-    
-    // Get current time for animation
-    const currentTime = (Date.now() - this.startTime) / 1000.0
-    const mouseConfig = gameStore_3a.ui.mouse
-    const pulse = mouseConfig.pulseMin + mouseConfig.pulseMax * Math.sin(currentTime * mouseConfig.animationSpeed)
-    
-    // Calculate animated alpha
-    const animatedAlpha = this.highlightIntensity * pulse
-    
-    // Convert vertex coordinates to screen coordinates for rendering
-    const screenX = mouseVertex.x * cellSize
-    const screenY = mouseVertex.y * cellSize
-    
-    console.log(`MouseHighlightShader_3a: Rendering at vertex (${mouseVertex.x}, ${mouseVertex.y}) -> screen (${screenX}, ${screenY})`)
-    
-    // Draw highlight rectangle at mesh vertex position
-    this.graphics
-      .rect(screenX, screenY, cellSize, cellSize)
-      .stroke({
-        width: gameStore_3a.ui.mouse.strokeWidth,
-        color: this.highlightColor,
-        alpha: animatedAlpha
-      })
-    
-    // Add inner fill for better visibility
-    this.graphics
-      .rect(screenX + 1, screenY + 1, cellSize - 2, cellSize - 2)
-      .fill({
-        color: this.highlightColor,
-        alpha: animatedAlpha * gameStore_3a.ui.mouse.fillAlpha
-      })
-    
-    this.isDirty = false
+    console.log('MouseHighlightShader_3a: Direct positioning at', vertexCoord)
   }
 
   /**
@@ -107,37 +60,32 @@ export class MouseHighlightShader_3a {
    */
   public setHighlightColor(color: number): void {
     gameStore_3a.ui.mouse.highlightColor = color
-    this.isDirty = true
+    this.highlightSprite.tint = color
     console.log('MouseHighlightShader_3a: Highlight color set to', color.toString(16))
   }
 
   public setHighlightIntensity(intensity: number): void {
     gameStore_3a.ui.mouse.highlightIntensity = Math.max(0, Math.min(1, intensity))
-    this.isDirty = true
-    console.log('MouseHighlightShader_3a: Highlight intensity set to', this.highlightIntensity)
+    // Update filter brightness based on intensity
+    this.colorMatrixFilter.brightness(1 + intensity * 0.5, false)
+    console.log('MouseHighlightShader_3a: Highlight intensity set to', intensity)
   }
 
   /**
-   * Get graphics for adding to stage
+   * Get sprite for adding to stage
    */
-  public getGraphics(): Graphics {
-    return this.graphics
-  }
-
-  /**
-   * Force a re-render on next frame
-   */
-  public markDirty(): void {
-    this.isDirty = true
+  public getSprite(): Sprite {
+    return this.highlightSprite
   }
 
   /**
    * Destroy shader and clean up resources
    */
   public destroy(): void {
-    if (this.graphics) {
-      this.graphics.destroy()
+    if (this.highlightSprite) {
+      this.highlightSprite.destroy()
     }
+    
     console.log('MouseHighlightShader_3a: Cleanup complete')
   }
 }

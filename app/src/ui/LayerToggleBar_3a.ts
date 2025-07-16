@@ -49,6 +49,16 @@ export class LayerToggleBar_3a {
     } else {
       console.warn('LayerToggleBar_3a: Mouse toggle button not found')
     }
+    
+    // Checkboard toggle
+    const checkboardToggle = document.getElementById('toggle-checkboard')
+    if (checkboardToggle) {
+      checkboardToggle.addEventListener('click', () => {
+        this.toggleCheckboard()
+      })
+    } else {
+      console.warn('LayerToggleBar_3a: Checkboard toggle button not found')
+    }
   }
   
   /**
@@ -81,6 +91,22 @@ export class LayerToggleBar_3a {
     document.dispatchEvent(event)
     
     console.log(`LayerToggleBar_3a: Mouse layer ${gameStore_3a.ui.showMouse ? 'shown' : 'hidden'}`)
+  }
+  
+  /**
+   * Toggle checkboard visibility
+   */
+  private toggleCheckboard(): void {
+    gameStore_3a_methods.toggleCheckboard()
+    this.updateCheckboardButtonState()
+    
+    // Dispatch event for canvas layer updates
+    const event = new CustomEvent('phase3a-layer-changed', {
+      detail: { layer: 'checkboard', visible: gameStore_3a.ui.enableCheckboard }
+    })
+    document.dispatchEvent(event)
+    
+    console.log(`LayerToggleBar_3a: Checkboard ${gameStore_3a.ui.enableCheckboard ? 'enabled' : 'disabled'}`)
   }
   
   /**
@@ -142,11 +168,41 @@ export class LayerToggleBar_3a {
   }
   
   /**
+   * Update checkboard button visual state
+   */
+  private updateCheckboardButtonState(): void {
+    const button = document.getElementById('toggle-checkboard')
+    if (!button) return
+    
+    const isActive = gameStore_3a.ui.enableCheckboard
+    const baseClasses = ['btn', 'btn-sm', 'rounded-full']
+    
+    // Reset button classes
+    button.className = baseClasses.join(' ')
+    
+    if (isActive) {
+      button.classList.add('btn-warning')
+    } else {
+      button.classList.add('btn-outline')
+    }
+    
+    // Update button text
+    const buttonText = button.querySelector('.button-text')
+    if (buttonText) {
+      buttonText.textContent = 'Checkboard'
+    }
+    
+    // Update tooltip
+    button.title = `${isActive ? 'Hide' : 'Show'} Checkboard Pattern`
+  }
+  
+  /**
    * Update all button states
    */
   private updateButtonStates(): void {
     this.updateGridButtonState()
     this.updateMouseButtonState()
+    this.updateCheckboardButtonState()
   }
   
   /**
@@ -192,17 +248,18 @@ export class LayerToggleBar_3a {
   /**
    * Get current layer states
    */
-  public getLayerStates(): { grid: boolean; mouse: boolean } {
+  public getLayerStates(): { grid: boolean; mouse: boolean; checkboard: boolean } {
     return {
       grid: gameStore_3a.ui.showGrid,
-      mouse: gameStore_3a.ui.showMouse
+      mouse: gameStore_3a.ui.showMouse,
+      checkboard: gameStore_3a.ui.enableCheckboard
     }
   }
   
   /**
    * Set layer state programmatically
    */
-  public setLayerState(layer: 'grid' | 'mouse', visible: boolean): void {
+  public setLayerState(layer: 'grid' | 'mouse' | 'checkboard', visible: boolean): void {
     if (layer === 'grid') {
       if (gameStore_3a.ui.showGrid !== visible) {
         this.toggleGrid()
@@ -210,6 +267,10 @@ export class LayerToggleBar_3a {
     } else if (layer === 'mouse') {
       if (gameStore_3a.ui.showMouse !== visible) {
         this.toggleMouse()
+      }
+    } else if (layer === 'checkboard') {
+      if (gameStore_3a.ui.enableCheckboard !== visible) {
+        this.toggleCheckboard()
       }
     }
   }
@@ -231,11 +292,16 @@ export class LayerToggleBar_3a {
         mouse: {
           found: document.getElementById('toggle-layer-mouse') !== null,
           active: gameStore_3a.ui.showMouse
+        },
+        checkboard: {
+          found: document.getElementById('toggle-checkboard') !== null,
+          active: gameStore_3a.ui.enableCheckboard
         }
       },
       store: {
         showGrid: gameStore_3a.ui.showGrid,
         showMouse: gameStore_3a.ui.showMouse,
+        enableCheckboard: gameStore_3a.ui.enableCheckboard,
         showLayerToggle: gameStore_3a.ui.showLayerToggle
       }
     }

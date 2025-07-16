@@ -2,17 +2,20 @@
 import { MeshSimple } from 'pixi.js'
 import { MeshManager_3a } from './MeshManager_3a'
 import { GridShaderRenderer_3a } from './GridShaderRenderer_3a'
+import { MouseHighlightShader_3a } from './MouseHighlightShader_3a'
 import { gameStore_3a, gameStore_3a_methods } from '../store/gameStore_3a'
+import { VertexCoordinate } from '../types/ecs-coordinates'
 
 /**
  * BackgroundGridRenderer_3a - Orchestrator for mesh-first architecture
- * 
+ *
  * Coordinates MeshManager_3a (mesh creation) and GridShaderRenderer_3a (visual rendering)
- * Handles mesh interaction events and routes to store
+ * Handles mesh interaction events and routes to store and mouse highlight
  */
 export class BackgroundGridRenderer_3a {
   private meshManager: MeshManager_3a
   private gridShaderRenderer: GridShaderRenderer_3a
+  private mouseHighlightShader: MouseHighlightShader_3a | null = null
   
   constructor() {
     console.log('BackgroundGridRenderer_3a: Initializing with mesh-first architecture')
@@ -45,16 +48,24 @@ export class BackgroundGridRenderer_3a {
     
     console.log('BackgroundGridRenderer_3a: Setting up mesh interaction')
     
-    // ✅ MESH-FIRST MOUSE EVENTS
+    // ✅ SIMPLE DUAL IMMEDIATE UPDATES - GPU + Store
     mesh.on('globalpointermove', (event) => {
       // Get local position from mesh (authoritative)
       const localPos = event.getLocalPosition(mesh)
       
-      // Convert to vertex coordinates using mesh manager
-      const vertexCoord = this.meshManager.screenToVertex(localPos.x, localPos.y)
+      // Convert to vertex coordinates directly
+      const vertexCoord = {
+        x: Math.floor(localPos.x),
+        y: Math.floor(localPos.y)
+      }
       
-      // ✅ USE MESH COORDINATES (no hardcoded division)
-      gameStore_3a_methods.updateMousePosition(vertexCoord.x, vertexCoord.y)
+      // ✅ IMMEDIATE GPU UPDATE (visual feedback)
+      if (this.mouseHighlightShader) {
+        this.mouseHighlightShader.updateFromMesh(vertexCoord)
+      }
+      
+      // ✅ IMMEDIATE STORE UPDATE (UI sync)
+      gameStore_3a_methods.updateMouseVertex(vertexCoord.x, vertexCoord.y)
     })
     
     // Mouse click handling
@@ -97,6 +108,14 @@ export class BackgroundGridRenderer_3a {
    */
   public getMesh(): MeshSimple | null {
     return this.meshManager.getMesh()
+  }
+  
+  /**
+   * Register mouse highlight shader for direct mesh updates
+   */
+  public registerMouseHighlightShader(mouseHighlightShader: MouseHighlightShader_3a): void {
+    this.mouseHighlightShader = mouseHighlightShader
+    console.log('BackgroundGridRenderer_3a: Mouse highlight shader registered for direct mesh updates')
   }
   
   /**

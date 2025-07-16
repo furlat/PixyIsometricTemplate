@@ -74,8 +74,8 @@ export const gameStore_3a = proxy<GameState3A>({
     showGrid: true,
     showMouse: true,
     showStorePanel: true,
-    showLayerToggle: false,
-    enableCheckboard: false,
+    showLayerToggle: true,
+    enableCheckboard: true,
     mouse: {
       highlightColor: 0xff0000,
       highlightIntensity: 0.8,
@@ -108,6 +108,11 @@ export const gameStore_3a_methods = {
       x: vertexX * gameStore_3a.mesh.cellSize,
       y: vertexY * gameStore_3a.mesh.cellSize
     }
+  },
+
+  updateMouseVertex(x: number, y: number): void {
+    gameStore_3a.mouse.vertex = { x, y }
+    // No reactive triggers - just functional updates
   },
 
   // Navigation methods with mesh-first coordinates

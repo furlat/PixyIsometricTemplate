@@ -36,20 +36,17 @@ export class GridShaderRenderer_3a {
       varying vec2 vUV;
       varying vec2 vPosition;
       
-      uniform float uCellSize;
-      
       void main() {
-        // Calculate grid cell coordinates
-        vec2 cellCoord = floor(vPosition / uCellSize);
+        // Calculate checkerboard pattern based on grid position
+        // Each quad represents a 1x1 grid square
+        vec2 gridCoord = floor(vPosition);
+        float checker = mod(gridCoord.x + gridCoord.y, 2.0);
         
-        // Calculate checkerboard pattern
-        float checker = mod(cellCoord.x + cellCoord.y, 2.0);
+        // Light and dark colors for checkerboard (matching original BackgroundGridRenderer)
+        vec3 lightColor = vec3(0.941, 0.941, 0.941); // 0xf0f0f0
+        vec3 darkColor = vec3(0.878, 0.878, 0.878);  // 0xe0e0e0
         
-        // Light and dark colors
-        vec3 lightColor = vec3(0.941, 0.941, 0.941); // #f0f0f0
-        vec3 darkColor = vec3(0.878, 0.878, 0.878);  // #e0e0e0
-        
-        // Mix colors based on checker pattern
+        // Mix between light and dark based on checker value
         vec3 color = mix(lightColor, darkColor, checker);
         
         gl_FragColor = vec4(color, 1.0);
@@ -62,25 +59,27 @@ export class GridShaderRenderer_3a {
         fragment: fragmentShader
       },
       resources: {
-        uCellSize: this.meshManager.getCellSize()
+        // No uniform needed - using direct grid coordinates like old working shader
       }
     })
     
-    console.log('Grid shader created with cell size:', this.meshManager.getCellSize())
+    console.log('Grid shader created using old working approach (direct grid coordinates)')
   }
   
   public render(): void {
-    // Check if checkboard is enabled in store
-    if (!gameStore_3a.ui.enableCheckboard) {
-      console.log('GridShaderRenderer_3a: Checkboard disabled in store')
-      return
-    }
-    
     const mesh = this.meshManager.getMesh()
-    if (mesh && this.shader) {
-      // Apply shader to mesh
-      (mesh as any).shader = this.shader
-      console.log('Grid shader applied to mesh')
+    if (!mesh) return
+    
+    if (gameStore_3a.ui.enableCheckboard) {
+      // Apply shader
+      if (this.shader) {
+        (mesh as any).shader = this.shader
+        console.log('GridShaderRenderer_3a: Checkboard shader applied')
+      }
+    } else {
+      // Remove shader
+      (mesh as any).shader = null
+      console.log('GridShaderRenderer_3a: Checkboard shader removed')
     }
   }
   

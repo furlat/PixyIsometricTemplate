@@ -40,11 +40,17 @@ export class Phase3ACanvas {
     
     // Initialize renderers with mesh-first architecture
     this.backgroundGridRenderer = new BackgroundGridRenderer_3a()
-    this.mouseHighlightShader = new MouseHighlightShader_3a()
+    this.mouseHighlightShader = new MouseHighlightShader_3a(this.backgroundGridRenderer.getMeshManager())
     this.inputManager = new InputManager_3a()
     
     // Setup layers
     this.setupLayers()
+    
+    // ✅ ADD MOUSE SPRITE ONCE - NEVER REMOVE
+    this.setupOneTimeMouseIntegration()
+    
+    // Register mouse highlight shader for direct mesh updates
+    this.backgroundGridRenderer.registerMouseHighlightShader(this.mouseHighlightShader)
     
     // Initialize mesh data in store
     this.initializeMeshData()
@@ -65,6 +71,16 @@ export class Phase3ACanvas {
     this.app.stage.addChild(this.mouseLayer)
     
     console.log('Phase3ACanvas: Layers setup complete')
+  }
+  
+  /**
+   * ✅ Setup one-time mouse integration - add sprite once, never remove
+   */
+  private setupOneTimeMouseIntegration(): void {
+    // ✅ Add mouse sprite ONCE, never remove
+    const mouseSprite = this.mouseHighlightShader.getSprite()
+    this.mouseLayer.addChild(mouseSprite)
+    console.log('Phase3ACanvas: Mouse sprite added once - never to be removed')
   }
   
   /**
@@ -93,22 +109,23 @@ export class Phase3ACanvas {
   }
   
   /**
-   * Main render method for Phase 3A
+   * Main render method for Phase 3A - ✅ FUNCTIONAL GAME LOOP
    */
   public render(): void {
-    // Clear layers
+    // ✅ Functional store reading (no reactive subscriptions)
+    const showGrid = gameStore_3a.ui.showGrid
+    const showMouse = gameStore_3a.ui.showMouse
+    
+    // Only clear grid layer
     this.gridLayer.removeChildren()
-    this.mouseLayer.removeChildren()
     
     // Render grid layer if visible
-    if (gameStore_3a.ui.showGrid) {
+    if (showGrid) {
       this.renderGridLayer()
     }
     
-    // Render mouse layer if visible
-    if (gameStore_3a.ui.showMouse) {
-      this.renderMouseLayer()
-    }
+    // ✅ Mouse layer is NEVER cleared - just visibility
+    this.mouseLayer.visible = showMouse
   }
   
   /**
@@ -129,23 +146,6 @@ export class Phase3ACanvas {
     }
   }
   
-  /**
-   * Render the mouse layer using mesh coordinates
-   */
-  private renderMouseLayer(): void {
-    try {
-      // Use mesh-first MouseHighlightShader
-      this.mouseHighlightShader.render()
-      
-      // Get the graphics from the shader
-      const mouseGraphics = this.mouseHighlightShader.getGraphics()
-      if (mouseGraphics) {
-        this.mouseLayer.addChild(mouseGraphics)
-      }
-    } catch (error) {
-      console.warn('Phase3ACanvas: Mouse rendering error:', error)
-    }
-  }
   
   /**
    * Get simple screen-based viewport corners for Phase 3A
