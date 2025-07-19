@@ -7,6 +7,13 @@ export class GridShaderRenderer_3b {
   private shader: Shader | null = null
   private meshManager: MeshManager_3b
   
+  // Statistics tracking
+  private shaderStats = {
+    toggleCount: 0,
+    lastStatsTime: Date.now(),
+    lastState: false
+  }
+  
   constructor(meshManager: MeshManager_3b) {
     this.meshManager = meshManager
     this.createCheckboardShader()
@@ -70,19 +77,46 @@ export class GridShaderRenderer_3b {
     const mesh = this.meshManager.getMesh()
     if (!mesh) return
     
-    if (gameStore_3b.ui.enableCheckboard) {
+    const enabled = gameStore_3b.ui.enableCheckboard
+    
+    if (enabled) {
       // Apply shader
       if (this.shader) {
         (mesh as any).shader = this.shader
-        console.log('GridShaderRenderer_3b: Checkboard shader applied')
       }
     } else {
       // Remove shader
       (mesh as any).shader = null
-      console.log('GridShaderRenderer_3b: Checkboard shader removed')
     }
+    
+    // Track state changes for statistics
+    this.updateShaderStats(enabled)
   }
   
+  /**
+   * Update shader statistics and log every 15 seconds
+   */
+  private updateShaderStats(enabled: boolean): void {
+    // Track state changes
+    if (enabled !== this.shaderStats.lastState) {
+      this.shaderStats.toggleCount++
+      this.shaderStats.lastState = enabled
+    }
+    
+    // Log statistics every 15 seconds
+    const now = Date.now()
+    if (now - this.shaderStats.lastStatsTime >= 15000) {
+      console.log('📊 GridShaderRenderer_3b Stats (15s):', {
+        toggles: this.shaderStats.toggleCount,
+        currentState: enabled ? 'ON' : 'OFF'
+      })
+      
+      // Reset stats
+      this.shaderStats.toggleCount = 0
+      this.shaderStats.lastStatsTime = now
+    }
+  }
+
   public getMesh(): MeshSimple | null {
     return this.meshManager.getMesh()
   }

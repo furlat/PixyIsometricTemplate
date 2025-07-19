@@ -23,6 +23,15 @@ export class GeometryRenderer_3b {
   private objectGraphics: Map<string, Graphics> = new Map()
   private previewGraphics: Graphics = new Graphics()
   
+  // Performance statistics
+  private renderStats = {
+    renderCount: 0,
+    lastStatsTime: Date.now(),
+    totalRenderTime: 0,
+    objectsRendered: 0,
+    lastObjectCount: 0
+  }
+  
   constructor() {
     // Setup container hierarchy
     this.mainContainer.addChild(this.normalContainer)
@@ -42,16 +51,11 @@ export class GeometryRenderer_3b {
    * No memoization, no optimization - just reliable rendering every time
    */
   public render(): void {
+    const startTime = Date.now()
+    
     // For Phase 3B, we use fixed zoom factor 1 and no ECS sampling yet
     const zoomFactor = 1
     const samplingPos = gameStore_3b.navigation.offset
-    
-    console.log('🎨 GeometryRenderer_3b: Rendering', {
-      samplingPos: { ...samplingPos },
-      zoomFactor: zoomFactor,
-      objectCount: gameStore_3b.geometry.objects.length,
-      timestamp: Date.now()
-    })
 
     // Get all objects from store
     const objects = gameStore_3b.geometry.objects
@@ -69,19 +73,21 @@ export class GeometryRenderer_3b {
         container.destroy()
         this.objectContainers.delete(objectId)
         this.objectGraphics.delete(objectId)
-        console.log(`GeometryRenderer_3b: Removed object ${objectId} (no longer visible)`)
       }
     }
 
     // Render objects at fixed scale 1 (Phase 3B foundation)
     for (const obj of visibleObjects) {
-      this.renderObjectDirectly(obj)
+      // ✅ NEW: Use store method to get object for rendering (drag OR edit preview)
+      const renderObj = gameStore_3b_methods.getObjectForRender(obj.id) || obj
+      this.renderObjectDirectly(renderObj)
     }
 
     // Always render preview for active drawing
     this.renderPreviewDirectly()
     
-    console.log('✅ GeometryRenderer_3b: Render completed - always renders every call')
+    // Update statistics
+    this.updateRenderStats(startTime, visibleObjects.length)
   }
 
   /**
@@ -123,12 +129,44 @@ export class GeometryRenderer_3b {
   /**
    * Handle drawing input events - MOVED FROM BackgroundGridRenderer_3b
    * This is the correct architectural location for drawing logic
+   * ✅ EXTENDED: Now handles selection when drawing mode is 'none'
    */
-  public handleDrawingInput(eventType: 'down' | 'up' | 'move', pixeloidCoord: PixeloidCoordinate, _event: any): void {
+  public handleDrawingInput(eventType: 'down' | 'up' | 'move', pixeloidCoord: PixeloidCoordinate, event: any): void {
     const drawingMode = gameStore_3b.drawing.mode
     
-    if (drawingMode === 'none') return
+    // ✅ NEW: Use state machine for all interactions
+    if (drawingMode === 'none') {
+      this.handleSelectionInput(eventType, pixeloidCoord, event)
+      return
+    }
     
+    // ✅ NEW: Check for interactions even during drawing mode
+    if (eventType === 'down') {
+      const clickedObjectId = this.getObjectAtPosition(pixeloidCoord)
+      
+      if (clickedObjectId) {
+        // Use state machine to handle clicks
+        const action = gameStore_3b_methods.handleMouseDown(pixeloidCoord)
+        
+        // Check if this should exit drawing mode
+        if (gameStore_3b.interaction.clickCount === 2) {
+          // Double-click exits drawing mode and selects object
+          console.log('GeometryRenderer_3b: Double-click on object', clickedObjectId, '- exiting drawing mode')
+          
+          gameStore_3b_methods.setDrawingMode('none')
+          if (gameStore_3b.drawing.isDrawing) {
+            gameStore_3b_methods.cancelDrawing()
+          }
+          gameStore_3b_methods.selectObject(clickedObjectId)
+          return
+        }
+      } else {
+        // Click on empty space - continue with drawing
+        gameStore_3b_methods.handleMouseDown(pixeloidCoord)
+      }
+    }
+    
+    // Continue with normal drawing logic
     if (eventType === 'down' && drawingMode === 'point') {
       // Create point immediately
       console.log('GeometryRenderer_3b: Creating point at', pixeloidCoord)
@@ -146,6 +184,224 @@ export class GeometryRenderer_3b {
       console.log('GeometryRenderer_3b: Finishing', drawingMode, 'at', pixeloidCoord)
       gameStore_3b_methods.finishDrawing()
     }
+    
+    // Handle mouse up
+    if (eventType === 'up') {
+      gameStore_3b_methods.handleMouseUp(pixeloidCoord)
+    }
+  }
+  
+  /**
+   * ✅ NEW: Handle selection input events using state machine
+   */
+  private handleSelectionInput(eventType: 'down' | 'up' | 'move', pixeloidCoord: PixeloidCoordinate, event: any): void {
+    if (eventType === 'down') {
+      // Use state machine for mouse down
+      gameStore_3b_methods.handleMouseDown(pixeloidCoord)
+      
+      // Check if we're clicking on an object
+      const clickedObjectId = this.getObjectAtPosition(pixeloidCoord)
+      
+      if (clickedObjectId) {
+        // Store the clicked object for potential actions
+        gameStore_3b_methods.selectObject(clickedObjectId)
+        console.log('GeometryRenderer_3b: Object clicked', clickedObjectId)
+      } else {
+        // Click on empty space: Clear selection
+        console.log('GeometryRenderer_3b: Clicked empty space, clearing selection')
+        gameStore_3b_methods.clearSelectionEnhanced()
+      }
+      
+    } else if (eventType === 'move') {
+      // Use state machine for mouse move
+      const action = gameStore_3b_methods.handleMouseMove(pixeloidCoord)
+      
+      if (action === 'double-click-drag' || action === 'single-click-drag') {
+        // Start dragging if not already dragging
+        const selectedObjectId = gameStore_3b.selection.selectedObjectId
+        if (selectedObjectId && !gameStore_3b.dragging.isDragging) {
+          // ✅ FIXED: Use original click position, not current mouse position
+          const originalClickPosition = gameStore_3b.interaction.lastMovePosition
+          if (originalClickPosition) {
+            console.log('GeometryRenderer_3b: Starting drag for', selectedObjectId, 'from original click at', originalClickPosition)
+            gameStore_3b_methods.startDragging(selectedObjectId, originalClickPosition)
+          }
+        }
+      }
+      
+      // Update dragging if active
+      if (gameStore_3b.dragging.isDragging) {
+        gameStore_3b_methods.updateDragging(pixeloidCoord)
+      }
+      
+    } else if (eventType === 'up') {
+      // Use state machine for mouse up
+      const action = gameStore_3b_methods.handleMouseUp(pixeloidCoord)
+      
+      // Stop dragging if active
+      if (gameStore_3b.dragging.isDragging) {
+        gameStore_3b_methods.stopDragging(pixeloidCoord)
+        console.log('GeometryRenderer_3b: Stopped dragging at', pixeloidCoord)
+      }
+      
+      // Handle specific actions
+      if (action === 'double-click-select') {
+        // Double-click-release: Open edit panel (placeholder)
+        const selectedObjectId = gameStore_3b.selection.selectedObjectId
+        if (selectedObjectId) {
+          console.log('GeometryRenderer_3b: Double-click-release on object', selectedObjectId)
+          // TODO: Open ObjectEditPanel when implemented
+        }
+      }
+    }
+    
+    // Handle right-click for context menu
+    if (event && event.button === 2) {
+      event.preventDefault()
+      const clickedObjectId = this.getObjectAtPosition(pixeloidCoord)
+      if (clickedObjectId) {
+        console.log('GeometryRenderer_3b: Right-click on object', clickedObjectId, '- opening edit panel')
+        gameStore_3b_methods.selectObject(clickedObjectId)
+        // TODO: Open ObjectEditPanel when implemented
+      }
+    }
+  }
+  
+  /**
+   * ✅ NEW: Get object at specific position using hit testing
+   */
+  private getObjectAtPosition(pixeloidCoord: PixeloidCoordinate): string | null {
+    // Test objects from top to bottom (last drawn first)
+    for (let i = gameStore_3b.geometry.objects.length - 1; i >= 0; i--) {
+      const obj = gameStore_3b.geometry.objects[i]
+      if (obj.isVisible !== false && this.hitTestObject(obj, pixeloidCoord)) {
+        return obj.id
+      }
+    }
+    return null
+  }
+  
+  /**
+   * ✅ NEW: Hit test object using modular approach for each shape type
+   */
+  private hitTestObject(obj: GeometricObject, pixeloidPos: PixeloidCoordinate): boolean {
+    switch (obj.type) {
+      case 'point':
+        return this.isPointInsidePoint(pixeloidPos, obj.vertices[0])
+        
+      case 'line':
+        return this.isPointInsideLine(pixeloidPos, obj.vertices[0], obj.vertices[1], obj.style.strokeWidth)
+        
+      case 'circle':
+        return this.isPointInsideCircle(pixeloidPos, obj.vertices[0], obj.vertices[1])
+        
+      case 'rectangle':
+        return this.isPointInsideRectangle(pixeloidPos, obj.vertices[0], obj.vertices[1])
+               
+      case 'diamond':
+        return this.isPointInsideDiamond(pixeloidPos, obj.vertices)
+        
+      default:
+        return false
+    }
+  }
+
+  /**
+   * ✅ NEW: Individual hit testing methods for each shape type
+   */
+  private isPointInsidePoint(clickPos: PixeloidCoordinate, pointPos: PixeloidCoordinate): boolean {
+    const dx = Math.abs(clickPos.x - pointPos.x)
+    const dy = Math.abs(clickPos.y - pointPos.y)
+    return dx <= 2 && dy <= 2 // 4x4 pixeloid selection area
+  }
+
+  private isPointInsideLine(clickPos: PixeloidCoordinate, startPos: PixeloidCoordinate, endPos: PixeloidCoordinate, strokeWidth: number): boolean {
+    const tolerance = Math.max(strokeWidth * 0.5, 2)
+    return this.isPointNearLine(clickPos, startPos, endPos, tolerance)
+  }
+
+  private isPointInsideCircle(clickPos: PixeloidCoordinate, centerPos: PixeloidCoordinate, radiusPos: PixeloidCoordinate): boolean {
+    const radius = Math.sqrt(
+      Math.pow(radiusPos.x - centerPos.x, 2) +
+      Math.pow(radiusPos.y - centerPos.y, 2)
+    )
+    const distance = Math.sqrt(
+      Math.pow(clickPos.x - centerPos.x, 2) +
+      Math.pow(clickPos.y - centerPos.y, 2)
+    )
+    return distance <= radius
+  }
+
+  private isPointInsideRectangle(clickPos: PixeloidCoordinate, vertex1: PixeloidCoordinate, vertex2: PixeloidCoordinate): boolean {
+    // ✅ FIXED: Direction-independent rectangle hit testing
+    const minX = Math.min(vertex1.x, vertex2.x)
+    const maxX = Math.max(vertex1.x, vertex2.x)
+    const minY = Math.min(vertex1.y, vertex2.y)
+    const maxY = Math.max(vertex1.y, vertex2.y)
+    
+    return clickPos.x >= minX && clickPos.x <= maxX &&
+           clickPos.y >= minY && clickPos.y <= maxY
+  }
+
+  private isPointInsideDiamond(clickPos: PixeloidCoordinate, vertices: PixeloidCoordinate[]): boolean {
+    // ✅ IMPROVED: Better diamond hit testing using point-in-polygon algorithm
+    if (vertices.length < 4) return false
+    
+    // Use point-in-polygon algorithm for accurate diamond hit testing
+    let inside = false
+    let j = vertices.length - 1
+    
+    for (let i = 0; i < vertices.length; i++) {
+      const xi = vertices[i].x
+      const yi = vertices[i].y
+      const xj = vertices[j].x
+      const yj = vertices[j].y
+      
+      if (((yi > clickPos.y) !== (yj > clickPos.y)) &&
+          (clickPos.x < (xj - xi) * (clickPos.y - yi) / (yj - yi) + xi)) {
+        inside = !inside
+      }
+      j = i
+    }
+    
+    return inside
+  }
+
+  /**
+   * ✅ NEW: Helper method for line hit testing
+   */
+  private isPointNearLine(point: PixeloidCoordinate, start: PixeloidCoordinate, end: PixeloidCoordinate, tolerance: number): boolean {
+    const A = point.x - start.x
+    const B = point.y - start.y
+    const C = end.x - start.x
+    const D = end.y - start.y
+    
+    const dot = A * C + B * D
+    const lenSq = C * C + D * D
+    
+    if (lenSq === 0) {
+      const dx = point.x - start.x
+      const dy = point.y - start.y
+      return Math.sqrt(dx * dx + dy * dy) <= tolerance
+    }
+    
+    let param = dot / lenSq
+    
+    let xx, yy
+    if (param < 0) {
+      xx = start.x
+      yy = start.y
+    } else if (param > 1) {
+      xx = end.x
+      yy = end.y
+    } else {
+      xx = start.x + param * C
+      yy = start.y + param * D
+    }
+    
+    const dx = point.x - xx
+    const dy = point.y - yy
+    return Math.sqrt(dx * dx + dy * dy) <= tolerance
   }
   
   /**
@@ -462,6 +718,39 @@ export class GeometryRenderer_3b {
           })
         }
         break
+    }
+  }
+
+  /**
+   * Update render statistics and log every 15 seconds
+   */
+  private updateRenderStats(startTime: number, objectCount: number): void {
+    const renderTime = Date.now() - startTime
+    
+    this.renderStats.renderCount++
+    this.renderStats.totalRenderTime += renderTime
+    this.renderStats.objectsRendered += objectCount
+    this.renderStats.lastObjectCount = objectCount
+    
+    // Log statistics every 15 seconds
+    const now = Date.now()
+    if (now - this.renderStats.lastStatsTime >= 15000) {
+      const avgRenderTime = this.renderStats.totalRenderTime / this.renderStats.renderCount
+      const renderRate = this.renderStats.renderCount / 15 // renders per second
+      
+      console.log('📊 GeometryRenderer_3b Stats (15s):', {
+        renders: this.renderStats.renderCount,
+        avgRenderTime: avgRenderTime.toFixed(2) + 'ms',
+        renderRate: renderRate.toFixed(1) + '/s',
+        objects: this.renderStats.lastObjectCount,
+        totalObjects: this.renderStats.objectsRendered
+      })
+      
+      // Reset stats
+      this.renderStats.renderCount = 0
+      this.renderStats.totalRenderTime = 0
+      this.renderStats.objectsRendered = 0
+      this.renderStats.lastStatsTime = now
     }
   }
 

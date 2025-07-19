@@ -47,6 +47,9 @@ export class InputManager_3b {
         this.handleSpacebarCentering()
       }
       
+      // ✅ NEW: Handle selection shortcuts
+      this.handleSelectionShortcuts(event)
+      
       this.keysPressed.add(key)
     })
     
@@ -90,6 +93,120 @@ export class InputManager_3b {
   private handleSpacebarCentering(): void {
     gameStore_3b_methods.resetNavigationOffset()
     console.log('InputManager_3b: Centered navigation offset (Space)')
+  }
+
+  /**
+   * ✅ NEW: Handle selection keyboard shortcuts
+   */
+  private handleSelectionShortcuts(event: KeyboardEvent): void {
+    const key = event.key.toLowerCase()
+    
+    // Delete key - delete selected object
+    if (key === 'delete' || key === 'backspace') {
+      if (gameStore_3b.selection.selectedObjectId) {
+        event.preventDefault()
+        gameStore_3b_methods.deleteSelected()
+        console.log('InputManager_3b: Deleted selected object')
+      }
+    }
+    
+    // ✅ NEW: E key - open object edit panel
+    if (key === 'e') {
+      console.log('🔍 InputManager_3b: E key pressed!')
+      console.log('🔍 Selected object ID:', gameStore_3b.selection.selectedObjectId)
+      console.log('🔍 Selection state:', JSON.stringify(gameStore_3b.selection, null, 2))
+      
+      if (gameStore_3b.selection.selectedObjectId) {
+        event.preventDefault()
+        console.log('✅ InputManager_3b: Opening edit panel for selected object (E)')
+        console.log('✅ Store selection state:', gameStore_3b.selection)
+        
+        // Set edit panel open flag
+        gameStore_3b.selection.isEditPanelOpen = true
+        console.log('✅ InputManager_3b: Edit panel flag set to true')
+        // Note: The UIControlBar_3b automatically handles showing/hiding the edit panel
+        // based on selection state, so we don't need to do anything else here
+      } else {
+        console.log('❌ InputManager_3b: No object selected - E key ignored')
+      }
+    }
+    
+    // ✅ UPDATED: Ctrl+C - copy selected object (standard shortcut)
+    if (key === 'c' && (event.ctrlKey || event.metaKey)) {
+      if (gameStore_3b.selection.selectedObjectId) {
+        event.preventDefault()
+        gameStore_3b_methods.copyObject(gameStore_3b.selection.selectedObjectId)
+        console.log('InputManager_3b: Copied selected object (Ctrl+C)')
+      }
+    }
+    
+    // ✅ UPDATED: Ctrl+V - paste copied object (standard shortcut with center-based positioning)
+    if (key === 'v' && (event.ctrlKey || event.metaKey)) {
+      if (gameStore_3b_methods.hasClipboardObject()) {
+        event.preventDefault()
+        // ✅ FIXED: Use mouse position as center (our new pasteObject method handles this)
+        const mousePos = gameStore_3b.mouse.world
+        const newObjectId = gameStore_3b_methods.pasteObject(mousePos)
+        if (newObjectId) {
+          gameStore_3b_methods.selectObject(newObjectId)
+          console.log('InputManager_3b: Pasted object with center at', mousePos, '(Ctrl+V)')
+        }
+      }
+    }
+    
+    // ✅ KEPT: Simple C/V keys for quick access (optional)
+    if (key === 'c' && !event.ctrlKey && !event.metaKey) {
+      if (gameStore_3b.selection.selectedObjectId) {
+        event.preventDefault()
+        gameStore_3b_methods.copyObject(gameStore_3b.selection.selectedObjectId)
+        console.log('InputManager_3b: Copied selected object (C)')
+      }
+    }
+    
+    if (key === 'v' && !event.ctrlKey && !event.metaKey) {
+      if (gameStore_3b_methods.hasClipboardObject()) {
+        event.preventDefault()
+        const mousePos = gameStore_3b.mouse.world
+        const newObjectId = gameStore_3b_methods.pasteObject(mousePos)
+        if (newObjectId) {
+          gameStore_3b_methods.selectObject(newObjectId)
+          console.log('InputManager_3b: Pasted object with center at', mousePos, '(V)')
+        }
+      }
+    }
+    
+    // Escape - clear selection and cancel drawing
+    if (key === 'escape') {
+      event.preventDefault()
+      
+      // Clear selection
+      gameStore_3b_methods.clearSelectionEnhanced()
+      
+      // Cancel any active drawing
+      if (gameStore_3b.drawing.isDrawing) {
+        gameStore_3b_methods.cancelDrawing()
+      }
+      
+      // ✅ NEW: Reset drawing mode to 'none'
+      if (gameStore_3b.drawing.mode !== 'none') {
+        gameStore_3b_methods.setDrawingMode('none')
+        console.log('InputManager_3b: Reset drawing mode to none')
+      }
+      
+      // Cancel any dragging
+      if (gameStore_3b.dragging.isDragging) {
+        gameStore_3b_methods.cancelDragging()
+      }
+      
+      console.log('InputManager_3b: Cleared selection and cancelled all actions')
+    }
+    
+    // Ctrl+A - select all objects (placeholder for future multi-select)
+    if (key === 'a' && event.ctrlKey) {
+      event.preventDefault()
+      console.log('InputManager_3b: Select all (not implemented yet)')
+      // TODO: Implement multi-select when needed
+    }
   }
 
   /**

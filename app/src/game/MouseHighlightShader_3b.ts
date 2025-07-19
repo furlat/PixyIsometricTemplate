@@ -15,6 +15,9 @@ export class MouseHighlightShader_3b {
   private colorMatrixFilter: ColorMatrixFilter
   private meshManager: MeshManager_3b
 
+  // Debug constants
+  private readonly VERBOSE_LOGGING = false
+  
   constructor(meshManager: MeshManager_3b) {
     this.meshManager = meshManager
     
@@ -52,7 +55,9 @@ export class MouseHighlightShader_3b {
     this.highlightSprite.height = cellSize
     this.highlightSprite.visible = true
     
-    console.log('MouseHighlightShader_3b: Direct positioning at', vertexCoord)
+    if (this.VERBOSE_LOGGING) {
+      console.log('MouseHighlightShader_3b: Direct positioning at', vertexCoord)
+    }
   }
 
   /**

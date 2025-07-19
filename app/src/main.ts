@@ -4,6 +4,7 @@ import { StorePanel_3b } from './ui/StorePanel_3b'
 import { UIControlBar_3b } from './ui/UIControlBar_3b'
 import { LayerToggleBar_3b } from './ui/LayerToggleBar_3b'
 import { GeometryPanel_3b } from './ui/GeometryPanel_3b'
+import { ObjectEditPanel_3b } from './ui/ObjectEditPanel_3b'
 import './styles/main.css'
 
 /**

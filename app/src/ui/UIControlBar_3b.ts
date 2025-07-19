@@ -1,6 +1,8 @@
 import { StorePanel_3b } from './StorePanel_3b'
 import { GeometryPanel_3b } from './GeometryPanel_3b'
+import { ObjectEditPanel_3b } from './ObjectEditPanel_3b'
 import { gameStore_3b, gameStore_3b_methods } from '../store/gameStore_3b'
+import { subscribe } from 'valtio'
 
 /**
  * Phase 3A UI Control Bar
@@ -16,10 +18,12 @@ export class UIControlBar_3b {
   private storePanel: StorePanel_3b | null = null
   private geometryPanel: GeometryPanel_3b | null = null
   private layerToggleBar: { toggle: () => void; isVisible: () => boolean } | null = null
+  private objectEditPanel: ObjectEditPanel_3b | null = null
   
   constructor() {
     this.setupEventListeners()
     this.setupKeyboardShortcuts()
+    this.setupSelectionSubscription()
     console.log('UIControlBar_3b: Initialized Phase 3A control bar')
   }
   
@@ -76,6 +80,46 @@ export class UIControlBar_3b {
         event.preventDefault()
       }
     })
+  }
+  
+  /**
+   * Setup selection subscription for object edit panel
+   */
+  private setupSelectionSubscription(): void {
+    console.log('🔍 UIControlBar_3b: Setting up selection subscription...')
+    
+    subscribe(gameStore_3b.selection, () => {
+      console.log('🔍 UIControlBar_3b: Selection changed!')
+      console.log('🔍 Selected object ID:', gameStore_3b.selection.selectedObjectId)
+      console.log('🔍 Current panel instance:', this.objectEditPanel ? 'EXISTS' : 'NULL')
+      
+      if (gameStore_3b.selection.selectedObjectId) {
+        // Object selected - show edit panel
+        console.log('✅ UIControlBar_3b: Object selected - creating panel...')
+        if (!this.objectEditPanel) {
+          console.log('✅ UIControlBar_3b: Creating new ObjectEditPanel_3b instance...')
+          try {
+            this.objectEditPanel = new ObjectEditPanel_3b()
+            console.log('✅ UIControlBar_3b: ObjectEditPanel_3b created successfully!')
+          } catch (error) {
+            console.error('❌ UIControlBar_3b: Error creating ObjectEditPanel_3b:', error)
+          }
+        } else {
+          console.log('✅ UIControlBar_3b: Panel already exists, reusing instance')
+        }
+      } else {
+        // No object selected - hide edit panel
+        console.log('❌ UIControlBar_3b: No object selected - destroying panel...')
+        if (this.objectEditPanel) {
+          console.log('❌ UIControlBar_3b: Destroying ObjectEditPanel_3b instance...')
+          this.objectEditPanel.destroy()
+          this.objectEditPanel = null
+          console.log('❌ UIControlBar_3b: ObjectEditPanel_3b destroyed')
+        }
+      }
+    })
+    
+    console.log('✅ UIControlBar_3b: Selection subscription setup complete')
   }
   
   /**

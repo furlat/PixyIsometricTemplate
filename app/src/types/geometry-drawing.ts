@@ -5,7 +5,7 @@
  */
 
 import { PixeloidCoordinate, ECSBoundingBox } from './ecs-coordinates'
-import { GeometricObject } from './ecs-data-layer'
+import { GeometricObject, GeometryProperties } from './ecs-data-layer'
 
 // ================================
 // DRAWING MODES
@@ -105,6 +105,92 @@ export interface SelectionState {
   selectionBounds: ECSBoundingBox | null
   multiSelectEnabled: boolean
   selectedObjects: string[]
+  isEditPanelOpen: boolean
+}
+
+// ================================
+// OBJECT EDIT PREVIEW SYSTEM (like drag system)
+// ================================
+
+/**
+ * Object edit form data - UI input values (NOT stored properties)
+ */
+export interface ObjectEditFormData {
+  // Common properties
+  isVisible: boolean
+  
+  // Type-specific form inputs (user typing)
+  point?: {
+    centerX: number
+    centerY: number
+  }
+  
+  line?: {
+    startX: number
+    startY: number
+    endX: number
+    endY: number
+  }
+  
+  circle?: {
+    centerX: number
+    centerY: number
+    radius: number
+  }
+  
+  rectangle?: {
+    centerX: number
+    centerY: number
+    width: number
+    height: number
+  }
+  
+  diamond?: {
+    centerX: number
+    centerY: number
+    width: number
+    height: number
+  }
+  
+  // Style form inputs
+  style: {
+    strokeColor: string  // hex color for UI
+    strokeWidth: number
+    strokeAlpha: number
+    fillColor?: string   // hex color for UI
+    fillAlpha?: number
+    hasFill: boolean
+  }
+}
+
+/**
+ * Temporary preview data for object editing - SEPARATE from renderer data
+ */
+export interface ObjectEditPreviewData {
+  // Shape-specific preview properties (calculated from form input)
+  previewProperties: GeometryProperties | null
+  previewVertices: PixeloidCoordinate[]
+  previewStyle: Partial<StyleSettings>
+  previewBounds: ECSBoundingBox | null
+  
+  // UI state
+  isValid: boolean
+  hasChanges: boolean
+  lastUpdateTime: number
+}
+
+/**
+ * Object edit preview state - EXACTLY like drag system
+ */
+export interface ObjectEditPreviewState {
+  isActive: boolean
+  editingObjectId: string | null
+  originalObject: GeometricObject | null  // For cancel restoration
+  previewData: ObjectEditPreviewData | null
+  
+  // Preview rendering info (separate from actual renderer)
+  shouldShowPreview: boolean
+  previewOpacity: number
 }
 
 // ================================
@@ -176,7 +262,20 @@ export const createDefaultSelectionState = (): SelectionState => ({
   highlightEnabled: true,
   selectionBounds: null,
   multiSelectEnabled: false,
-  selectedObjects: []
+  selectedObjects: [],
+  isEditPanelOpen: false
+})
+
+/**
+ * Create default object edit preview state
+ */
+export const createDefaultObjectEditPreviewState = (): ObjectEditPreviewState => ({
+  isActive: false,
+  editingObjectId: null,
+  originalObject: null,
+  previewData: null,
+  shouldShowPreview: true,
+  previewOpacity: 0.8
 })
 
 /**

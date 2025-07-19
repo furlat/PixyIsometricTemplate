@@ -53,7 +53,27 @@ export class StorePanel_3b {
       'geometry-objects-count',
       'geometry-drawing-mode',
       'geometry-is-drawing',
-      'geometry-preview-active'
+      'geometry-preview-active',
+      // ✅ NEW: Selected object testing elements
+      'selected-object-id',
+      'selected-object-type',
+      'selected-object-pixeloid-x',
+      'selected-object-pixeloid-y',
+      'selected-object-vertex-x',
+      'selected-object-vertex-y',
+      'selected-object-screen-x',
+      'selected-object-screen-y',
+      'selected-object-style-color',
+      'selected-object-style-stroke-width',
+      'selected-object-dragging-state',
+      // ✅ NEW: Drag state elements
+      'drag-state-is-dragging',
+      'drag-state-object-id',
+      'drag-state-click-position',
+      'drag-state-vertex-offsets-count',
+      'drag-preview-is-active',
+      'drag-preview-mouse-position',
+      'drag-preview-vertices-count'
     ]
     
     elementIds.forEach(id => {
@@ -98,6 +118,20 @@ export class StorePanel_3b {
     
     subscribe(gameStore_3b.drawing, () => {
       this.updateGeometryValues()
+    })
+    
+    // ✅ NEW: Selection subscription
+    subscribe(gameStore_3b.selection, () => {
+      this.updateSelectedObjectValues()
+    })
+    
+    // ✅ NEW: Drag state subscriptions
+    subscribe(gameStore_3b.dragging, () => {
+      this.updateDragValues()
+    })
+    
+    subscribe(gameStore_3b.dragPreview, () => {
+      this.updateDragValues()
     })
   }
   
@@ -260,6 +294,82 @@ export class StorePanel_3b {
   }
   
   /**
+   * ✅ NEW: Update selected object display for testing
+   */
+  private updateSelectedObjectValues(): void {
+    try {
+      const selectedId = gameStore_3b.selection.selectedObjectId
+      const selectedObject = selectedId ?
+        gameStore_3b.geometry.objects.find(obj => obj.id === selectedId) : null
+      
+      if (selectedObject) {
+        // Object info
+        updateElement(this.elements, 'selected-object-id',
+          selectedId || 'none', 'text-info')
+        
+        updateElement(this.elements, 'selected-object-type',
+          selectedObject.type, 'text-success')
+        
+        // Position in different coordinate systems
+        const firstVertex = selectedObject.vertices[0]
+        updateElement(this.elements, 'selected-object-pixeloid-x',
+          firstVertex.x.toFixed(2), 'text-primary')
+        
+        updateElement(this.elements, 'selected-object-pixeloid-y',
+          firstVertex.y.toFixed(2), 'text-primary')
+        
+        // Convert to vertex coordinates (subtract navigation offset)
+        const vertexX = firstVertex.x - gameStore_3b.navigation.offset.x
+        const vertexY = firstVertex.y - gameStore_3b.navigation.offset.y
+        
+        updateElement(this.elements, 'selected-object-vertex-x',
+          vertexX.toFixed(2), STATUS_COLORS.mouse)
+        
+        updateElement(this.elements, 'selected-object-vertex-y',
+          vertexY.toFixed(2), STATUS_COLORS.mouse)
+        
+        // Convert to screen coordinates
+        const screenX = vertexX * gameStore_3b.mesh.cellSize
+        const screenY = vertexY * gameStore_3b.mesh.cellSize
+        
+        updateElement(this.elements, 'selected-object-screen-x',
+          screenX.toFixed(0), STATUS_COLORS.camera)
+        
+        updateElement(this.elements, 'selected-object-screen-y',
+          screenY.toFixed(0), STATUS_COLORS.camera)
+        
+        // Style information
+        updateElement(this.elements, 'selected-object-style-color',
+          `#${selectedObject.style.color.toString(16).padStart(6, '0')}`, 'text-accent')
+        
+        updateElement(this.elements, 'selected-object-style-stroke-width',
+          selectedObject.style.strokeWidth.toString(), 'text-accent')
+        
+        // Dragging state (when implemented)
+        const isDragging = gameStore_3b.dragging?.dragObjectId === selectedId
+        updateElement(this.elements, 'selected-object-dragging-state',
+          getBooleanStatusText(isDragging), getBooleanStatusClass(isDragging))
+        
+      } else {
+        // No selection
+        updateElement(this.elements, 'selected-object-id', 'none', 'text-muted')
+        updateElement(this.elements, 'selected-object-type', 'none', 'text-muted')
+        updateElement(this.elements, 'selected-object-pixeloid-x', '-', 'text-muted')
+        updateElement(this.elements, 'selected-object-pixeloid-y', '-', 'text-muted')
+        updateElement(this.elements, 'selected-object-vertex-x', '-', 'text-muted')
+        updateElement(this.elements, 'selected-object-vertex-y', '-', 'text-muted')
+        updateElement(this.elements, 'selected-object-screen-x', '-', 'text-muted')
+        updateElement(this.elements, 'selected-object-screen-y', '-', 'text-muted')
+        updateElement(this.elements, 'selected-object-style-color', '-', 'text-muted')
+        updateElement(this.elements, 'selected-object-style-stroke-width', '-', 'text-muted')
+        updateElement(this.elements, 'selected-object-dragging-state', 'false', 'status-inactive')
+      }
+    } catch (error) {
+      console.warn('StorePanel_3b: Error updating selected object values:', error)
+    }
+  }
+  
+  /**
    * Update only mouse-related elements
    */
   private updateMouseValues(): void {
@@ -384,6 +494,48 @@ export class StorePanel_3b {
       console.warn('StorePanel_3b: Error updating geometry values:', error)
     }
   }
+  /**
+   * ✅ NEW: Update drag state values for debugging
+   */
+  private updateDragValues(): void {
+    try {
+      // Drag state
+      updateElement(this.elements, 'drag-state-is-dragging',
+        getBooleanStatusText(gameStore_3b.dragging.isDragging),
+        getBooleanStatusClass(gameStore_3b.dragging.isDragging))
+      
+      updateElement(this.elements, 'drag-state-object-id',
+        gameStore_3b.dragging.dragObjectId || 'none',
+        gameStore_3b.dragging.dragObjectId ? 'text-info' : 'text-muted')
+      
+      const clickPos = gameStore_3b.dragging.clickPosition
+      updateElement(this.elements, 'drag-state-click-position',
+        clickPos ? `${clickPos.x.toFixed(1)}, ${clickPos.y.toFixed(1)}` : 'none',
+        clickPos ? 'text-primary' : 'text-muted')
+      
+      updateElement(this.elements, 'drag-state-vertex-offsets-count',
+        gameStore_3b.dragging.vertexOffsets.length.toString(),
+        gameStore_3b.dragging.vertexOffsets.length > 0 ? 'text-success' : 'text-muted')
+      
+      // Drag preview state
+      updateElement(this.elements, 'drag-preview-is-active',
+        getBooleanStatusText(gameStore_3b.dragPreview.isActive),
+        getBooleanStatusClass(gameStore_3b.dragPreview.isActive))
+      
+      const mousePos = gameStore_3b.dragPreview.currentMousePosition
+      updateElement(this.elements, 'drag-preview-mouse-position',
+        mousePos ? `${mousePos.x.toFixed(1)}, ${mousePos.y.toFixed(1)}` : 'none',
+        mousePos ? 'text-warning' : 'text-muted')
+      
+      updateElement(this.elements, 'drag-preview-vertices-count',
+        gameStore_3b.dragPreview.previewVertices.length.toString(),
+        gameStore_3b.dragPreview.previewVertices.length > 0 ? 'text-success' : 'text-muted')
+        
+    } catch (error) {
+      console.warn('StorePanel_3b: Error updating drag values:', error)
+    }
+  }
+
   
   /**
    * Toggle panel visibility

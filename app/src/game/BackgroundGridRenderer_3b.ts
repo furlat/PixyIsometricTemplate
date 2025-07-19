@@ -98,6 +98,28 @@ export class BackgroundGridRenderer_3b {
       this.handleGeometryInput('up', vertexCoord, event)
     })
     
+    // ✅ NEW: Right-click handling
+    mesh.on('rightclick', (event) => {
+      const localPos = event.getLocalPosition(mesh)
+      const vertexCoord = this.meshManager.screenToVertex(localPos.x, localPos.y)
+      
+      console.log(`BackgroundGridRenderer_3b: Right-click at vertex (${vertexCoord.x}, ${vertexCoord.y})`)
+      
+      // Convert to pixeloid coordinates and handle as right-click
+      const pixeloidCoord = {
+        x: vertexCoord.x + gameStore_3b.navigation.offset.x,
+        y: vertexCoord.y + gameStore_3b.navigation.offset.y
+      }
+      
+      // Create a modified event with right-click info
+      const rightClickEvent = { ...event, button: 2 }
+      
+      // Handle right-click through geometry renderer
+      if (this.geometryRenderer) {
+        this.geometryRenderer.handleDrawingInput('down', pixeloidCoord, rightClickEvent)
+      }
+    })
+    
     // Debug logging for mouse events
     mesh.on('globalpointermove', (event) => {
       if (Math.random() < 0.01) { // Log 1% of events to avoid spam
