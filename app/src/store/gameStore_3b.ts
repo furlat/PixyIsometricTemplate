@@ -1519,43 +1519,24 @@ export const gameStore_3b_methods = {
         case 'point':
           const pointCenter = { x: formData.point!.centerX, y: formData.point!.centerY }
           previewVertices = GeometryVertexGenerators.generatePointFromProperties(pointCenter)
-          // ✅ FIXED: Use form data as authoritative properties (NO RECALCULATION!)
-          previewProperties = {
-            type: 'point' as const,
-            center: pointCenter
-          }
+          // ✅ FIXED: Use VERTEX AUTHORITY - calculate properties from generated vertices
+          previewProperties = GeometryPropertyCalculators.calculatePointProperties(previewVertices)
           break
 
         case 'line':
           const lineStart = { x: formData.line!.startX, y: formData.line!.startY }
           const lineEnd = { x: formData.line!.endX, y: formData.line!.endY }
           previewVertices = GeometryVertexGenerators.generateLineFromProperties(lineStart, lineEnd)
-          // ✅ FIXED: Use form data as authoritative properties (NO RECALCULATION!)
-          const dx = lineEnd.x - lineStart.x
-          const dy = lineEnd.y - lineStart.y
-          previewProperties = {
-            type: 'line' as const,
-            startPoint: lineStart,
-            endPoint: lineEnd,
-            midpoint: { x: (lineStart.x + lineEnd.x) / 2, y: (lineStart.y + lineEnd.y) / 2 },
-            length: Math.sqrt(dx * dx + dy * dy),
-            angle: Math.atan2(dy, dx)
-          }
+          // ✅ FIXED: Use VERTEX AUTHORITY - calculate properties from generated vertices
+          previewProperties = GeometryPropertyCalculators.calculateLineProperties(previewVertices)
           break
 
         case 'circle':
           const circleCenter = { x: formData.circle!.centerX, y: formData.circle!.centerY }
           const circleRadius = formData.circle!.radius
           previewVertices = GeometryVertexGenerators.generateCircleFromProperties(circleCenter, circleRadius)
-          // ✅ FIXED: Use form data as authoritative properties (NO RECALCULATION!)
-          previewProperties = {
-            type: 'circle' as const,
-            center: circleCenter,
-            radius: circleRadius,  // Use form radius, not calculated
-            diameter: circleRadius * 2,
-            circumference: 2 * Math.PI * circleRadius,
-            area: Math.PI * circleRadius * circleRadius
-          }
+          // ✅ FIXED: Use VERTEX AUTHORITY - calculate properties from generated vertices
+          previewProperties = GeometryPropertyCalculators.calculateCircleProperties(previewVertices)
           break
 
         case 'rectangle':
@@ -1563,17 +1544,8 @@ export const gameStore_3b_methods = {
           const rectWidth = formData.rectangle!.width
           const rectHeight = formData.rectangle!.height
           previewVertices = GeometryVertexGenerators.generateRectangleFromProperties(rectCenter, rectWidth, rectHeight)
-          // ✅ FIXED: Use form data as authoritative properties (NO RECALCULATION!)
-          previewProperties = {
-            type: 'rectangle' as const,
-            center: rectCenter,
-            width: rectWidth,
-            height: rectHeight,
-            topLeft: { x: rectCenter.x - rectWidth/2, y: rectCenter.y - rectHeight/2 },
-            bottomRight: { x: rectCenter.x + rectWidth/2, y: rectCenter.y + rectHeight/2 },
-            area: rectWidth * rectHeight,
-            perimeter: 2 * (rectWidth + rectHeight)
-          }
+          // ✅ FIXED: Use VERTEX AUTHORITY - calculate properties from generated vertices
+          previewProperties = GeometryPropertyCalculators.calculateRectangleProperties(previewVertices)
           break
 
         case 'diamond':
@@ -1581,19 +1553,8 @@ export const gameStore_3b_methods = {
           const diamondWidth = formData.diamond!.width
           const diamondHeight = formData.diamond!.height
           previewVertices = GeometryVertexGenerators.generateDiamondFromProperties(diamondCenter, diamondWidth, diamondHeight)
-          // ✅ FIXED: Use form data as authoritative properties (NO RECALCULATION!)
-          previewProperties = {
-            type: 'diamond' as const,
-            center: diamondCenter,
-            width: diamondWidth,
-            height: diamondHeight,
-            west: { x: diamondCenter.x - diamondWidth/2, y: diamondCenter.y },
-            north: { x: diamondCenter.x, y: diamondCenter.y - diamondHeight/2 },
-            east: { x: diamondCenter.x + diamondWidth/2, y: diamondCenter.y },
-            south: { x: diamondCenter.x, y: diamondCenter.y + diamondHeight/2 },
-            area: (diamondWidth * diamondHeight) / 2,
-            perimeter: 2 * Math.sqrt(Math.pow(diamondWidth/2, 2) + Math.pow(diamondHeight/2, 2))
-          }
+          // ✅ FIXED: Use VERTEX AUTHORITY - calculate properties from generated vertices
+          previewProperties = GeometryPropertyCalculators.calculateDiamondProperties(previewVertices)
           break
 
         default:

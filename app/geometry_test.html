@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Geometry Transform Test</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #1a1a1a;
+            color: #00ff00;
+        }
+        .test-output {
+            background-color: #000;
+            padding: 20px;
+            border-radius: 8px;
+            white-space: pre-wrap;
+            overflow-x: auto;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+        .pass { color: #00ff00; }
+        .fail { color: #ff0000; }
+        .info { color: #00aaff; }
+        .warn { color: #ffaa00; }
+        h1 { color: #ffffff; }
+        button {
+            background-color: #0066cc;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        button:hover {
+            background-color: #0088ff;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Geometry Transform Invertibility Test</h1>
+    <button onclick="runTests()">Run Tests</button>
+    <div id="output" class="test-output">Click "Run Tests" to start...</div>
+
+    <script>
+        // ================================
+        // TYPES (JavaScript approximation)
+        // ================================
+
+        // ================================
+        // FORWARD TRANSFORMS: vertices → properties
+        // ================================
+
+        /**
+         * Compute circle properties from vertices (8 circumference points)
+         */
+        function computeCircleProperties(vertices) {
+            if (vertices.length < 8) {
+                throw new Error('Circle requires 8 vertices')
+            }
+            
+            // Use simple centroid for center (more stable than circumcenter)
+            const center = {
+                x: vertices.reduce((sum, v) => sum + v.x, 0) / vertices.length,
+                y: vertices.reduce((sum, v) => sum + v.y, 0) / vertices.length
+            }
+            
+            // Calculate radius as average distance from center to all vertices
+            const distances = vertices.map(v => 
+                Math.sqrt(Math.pow(v.x - center.x, 2) + Math.pow(v.y - center.y, 2))
+            )
+            const radius = distances.reduce((sum, d) => sum + d, 0) / distances.length
+            
+            return {
+                center,
+                radius,
+                diameter: radius * 2,
+                circumference: 2 * Math.PI * radius,
+                area: Math.PI * radius * radius
+            }
+        }
+
+        /**
+         * Compute rectangle properties from 4 corner vertices
+         */
+        function computeRectangleProperties(vertices) {
+            if (vertices.length !== 4) {
+                throw new Error('Rectangle requires 4 vertices')
+            }
+            
+            // Find min/max coordinates
+            const xs = vertices.map(v => v.x)
+            const ys = vertices.map(v => v.y)
+            const minX = Math.min(...xs)
+            const maxX = Math.max(...xs)
+            const minY = Math.min(...ys)
+            const maxY = Math.max(...ys)
+            
+            const topLeft = { x: minX, y: minY }
+            const bottomRight = { x: maxX, y: maxY }
+            const width = maxX - minX
+            const height = maxY - minY
+            const center = {
+                x: minX + width / 2,
+                y: minY + height / 2
+            }
+            
+            return {
+                center,
+                width,
+                height,
+                topLeft,
+                bottomRight,
+                area: width * height,
+                perimeter: 2 * (width + height)
+            }
+        }
+
+        /**
+         * Compute diamond properties from 4 cardinal vertices [west, north, east, south]
+         */
+        function computeDiamondProperties(vertices) {
+            if (vertices.length !== 4) {
+                throw new Error('Diamond requires 4 vertices')
+            }
+            
+            const [west, north, east, south] = vertices
+            
+            const center = {
+                x: (west.x + east.x) / 2,
+                y: (north.y + south.y) / 2
+            }
+            
+            const width = east.x - west.x
+            const height = south.y - north.y
+            
+            return {
+                center,
+                width,
+                height,
+                west,
+                north,
+                east,
+                south,
+                area: (width * height) / 2, // Diamond area formula
+                perimeter: 2 * Math.sqrt(Math.pow(width/2, 2) + Math.pow(height/2, 2))
+            }
+        }
+
+        // ================================
+        // BACKWARD TRANSFORMS: properties → vertices
+        // ================================
+
+        /**
+         * Generate circle vertices from properties (8 circumference points)
+         */
+        function computeCircleVertices(props) {
+            const { center, radius } = props
+            const vertices = []
+            
+            for (let i = 0; i < 8; i++) {
+                const angle = (i * Math.PI * 2) / 8
+                vertices.push({
+                    x: center.x + Math.cos(angle) * radius,
+                    y: center.y + Math.sin(angle) * radius
+                })
+            }
+            
+            return vertices
+        }
+
+        /**
+         * Generate rectangle vertices from properties [topLeft, topRight, bottomRight, bottomLeft]
+         */
+        function computeRectangleVertices(props) {
+            const { center, width, height } = props
+            const halfWidth = width / 2
+            const halfHeight = height / 2
+            
+            return [
+                { x: center.x - halfWidth, y: center.y - halfHeight }, // top-left
+                { x: center.x + halfWidth, y: center.y - halfHeight }, // top-right
+                { x: center.x + halfWidth, y: center.y + halfHeight }, // bottom-right
+                { x: center.x - halfWidth, y: center.y + halfHeight }  // bottom-left
+            ]
+        }
+
+        /**
+         * Generate diamond vertices from properties [west, north, east, south]
+         */
+        function computeDiamondVertices(props) {
+            const { center, width, height } = props
+            const halfWidth = width / 2
+            const halfHeight = height / 2
+            
+            return [
+                { x: center.x - halfWidth, y: center.y },             // west
+                { x: center.x, y: center.y - halfHeight },            // north  
+                { x: center.x + halfWidth, y: center.y },             // east
+                { x: center.x, y: center.y + halfHeight }             // south
+            ]
+        }
+
+        // ================================
+        // TESTING UTILITIES
+        // ================================
+
+        function coordinatesEqual(a, b, tolerance = 0.001) {
+            return Math.abs(a.x - b.x) < tolerance && Math.abs(a.y - b.y) < tolerance
+        }
+
+        function verticesEqual(a, b, tolerance = 0.001) {
+            if (a.length !== b.length) return false
+            return a.every((coord, i) => coordinatesEqual(coord, b[i], tolerance))
+        }
+
+        function propertiesEqual(a, b, tolerance = 0.001) {
+            for (const key in a) {
+                if (typeof a[key] === 'object' && a[key] !== null) {
+                    if (!coordinatesEqual(a[key], b[key], tolerance)) return false
+                } else if (typeof a[key] === 'number') {
+                    if (Math.abs(a[key] - b[key]) >= tolerance) return false
+                }
+            }
+            return true
+        }
+
+        // ================================
+        // OUTPUT UTILITIES
+        // ================================
+
+        let output = ''
+        
+        function log(message, className = '') {
+            const line = message + '\n'
+            output += line
+            console.log(message)
+            
+            // Update DOM if available
+            const outputDiv = document.getElementById('output')
+            if (outputDiv) {
+                if (className) {
+                    outputDiv.innerHTML += `<span class="${className}">${message}</span>\n`
+                } else {
+                    outputDiv.innerHTML += message + '\n'
+                }
+                outputDiv.scrollTop = outputDiv.scrollHeight
+            }
+        }
+
+        function logObject(obj, indent = 0) {
+            const spaces = '  '.repeat(indent)
+            if (typeof obj === 'object' && obj !== null) {
+                for (const [key, value] of Object.entries(obj)) {
+                    if (typeof value === 'object' && value !== null) {
+                        log(`${spaces}${key}:`)
+                        logObject(value, indent + 1)
+                    } else if (typeof value === 'number') {
+                        log(`${spaces}${key}: ${value.toFixed(3)}`)
+                    } else {
+                        log(`${spaces}${key}: ${value}`)
+                    }
+                }
+            }
+        }
+
+        // ================================
+        // TEST FUNCTIONS
+        // ================================
+
+        function testCircle(testName, properties) {
+            log(`\n=== TESTING CIRCLE: ${testName} ===`, 'info')
+            
+            log('Input properties:')
+            logObject(properties, 1)
+            
+            // Forward: properties → vertices
+            const vertices = computeCircleVertices(properties)
+            log('Generated vertices:')
+            vertices.forEach((v, i) => {
+                log(`  [${i}]: (${v.x.toFixed(3)}, ${v.y.toFixed(3)})`)
+            })
+            
+            // Backward: vertices → properties
+            const recomputed = computeCircleProperties(vertices)
+            log('Recomputed properties:')
+            logObject(recomputed, 1)
+            
+            // Check invertibility
+            const isInvertible = propertiesEqual(properties, recomputed, 0.001)
+            
+            log(`✓ Test Result: ${isInvertible ? 'PASS' : 'FAIL'}`, isInvertible ? 'pass' : 'fail')
+            if (!isInvertible) {
+                log('❌ Properties do not match!', 'fail')
+                log(`Original center: (${properties.center.x}, ${properties.center.y})`, 'warn')
+                log(`Recomputed center: (${recomputed.center.x.toFixed(6)}, ${recomputed.center.y.toFixed(6)})`, 'warn')
+                log(`Original radius: ${properties.radius}`, 'warn')
+                log(`Recomputed radius: ${recomputed.radius.toFixed(6)}`, 'warn')
+                log(`Radius difference: ${Math.abs(properties.radius - recomputed.radius).toFixed(6)}`, 'warn')
+            }
+            
+            return isInvertible
+        }
+
+        function testRectangle(testName, properties) {
+            log(`\n=== TESTING RECTANGLE: ${testName} ===`, 'info')
+            
+            log('Input properties:')
+            logObject(properties, 1)
+            
+            // Forward: properties → vertices
+            const vertices = computeRectangleVertices(properties)
+            log('Generated vertices:')
+            vertices.forEach((v, i) => {
+                log(`  [${i}]: (${v.x.toFixed(3)}, ${v.y.toFixed(3)})`)
+            })
+            
+            // Backward: vertices → properties  
+            const recomputed = computeRectangleProperties(vertices)
+            log('Recomputed properties:')
+            logObject(recomputed, 1)
+            
+            // Check invertibility
+            const isInvertible = propertiesEqual(properties, recomputed, 0.001)
+            
+            log(`✓ Test Result: ${isInvertible ? 'PASS' : 'FAIL'}`, isInvertible ? 'pass' : 'fail')
+            if (!isInvertible) {
+                log('❌ Properties do not match!', 'fail')
+            }
+            
+            return isInvertible
+        }
+
+        function testDiamond(testName, properties) {
+            log(`\n=== TESTING DIAMOND: ${testName} ===`, 'info')
+            
+            log('Input properties:')
+            logObject(properties, 1)
+            
+            // Forward: properties → vertices
+            const vertices = computeDiamondVertices(properties)
+            log('Generated vertices:')
+            vertices.forEach((v, i) => {
+                log(`  [${i}]: (${v.x.toFixed(3)}, ${v.y.toFixed(3)})`)
+            })
+            
+            // Backward: vertices → properties
+            const recomputed = computeDiamondProperties(vertices)
+            log('Recomputed properties:')
+            logObject(recomputed, 1)
+            
+            // Check invertibility
+            const isInvertible = propertiesEqual(properties, recomputed, 0.001)
+            
+            log(`✓ Test Result: ${isInvertible ? 'PASS' : 'FAIL'}`, isInvertible ? 'pass' : 'fail')
+            if (!isInvertible) {
+                log('❌ Properties do not match!', 'fail')
+            }
+            
+            return isInvertible
+        }
+
+        // ================================
+        // RUN ALL TESTS
+        // ================================
+
+        function runTests() {
+            // Clear output
+            output = ''
+            const outputDiv = document.getElementById('output')
+            if (outputDiv) {
+                outputDiv.innerHTML = ''
+            }
+            
+            log('🧪 GEOMETRY TRANSFORM INVERTIBILITY TESTS', 'info')
+            log('==========================================', 'info')
+            
+            let totalTests = 0
+            let passedTests = 0
+            
+            // Circle tests
+            totalTests++
+            if (testCircle('Basic Circle', {
+                center: { x: 100, y: 100 },
+                radius: 50,
+                diameter: 100,
+                circumference: 2 * Math.PI * 50,
+                area: Math.PI * 50 * 50
+            })) passedTests++
+            
+            totalTests++
+            if (testCircle('Bug Case - Radius 100→78', {
+                center: { x: 0, y: 0 },
+                radius: 100,
+                diameter: 200,
+                circumference: 2 * Math.PI * 100,
+                area: Math.PI * 100 * 100
+            })) passedTests++
+            
+            totalTests++
+            if (testCircle('Small Circle', {
+                center: { x: 25, y: 25 },
+                radius: 10,
+                diameter: 20,
+                circumference: 2 * Math.PI * 10,
+                area: Math.PI * 10 * 10
+            })) passedTests++
+            
+            // Rectangle tests
+            totalTests++
+            if (testRectangle('Basic Rectangle', {
+                center: { x: 50, y: 50 },
+                width: 100,
+                height: 60,
+                topLeft: { x: 0, y: 20 },
+                bottomRight: { x: 100, y: 80 },
+                area: 100 * 60,
+                perimeter: 2 * (100 + 60)
+            })) passedTests++
+            
+            totalTests++
+            if (testRectangle('Bug Case - Flying Rectangle', {
+                center: { x: 0, y: 0 },
+                width: 50,
+                height: 30,
+                topLeft: { x: -25, y: -15 },
+                bottomRight: { x: 25, y: 15 },
+                area: 50 * 30,
+                perimeter: 2 * (50 + 30)
+            })) passedTests++
+            
+            // Diamond tests
+            totalTests++
+            if (testDiamond('Basic Diamond', {
+                center: { x: 0, y: 0 },
+                width: 40,
+                height: 20,
+                west: { x: -20, y: 0 },
+                north: { x: 0, y: -10 },
+                east: { x: 20, y: 0 },
+                south: { x: 0, y: 10 },
+                area: (40 * 20) / 2,
+                perimeter: 2 * Math.sqrt(Math.pow(20, 2) + Math.pow(10, 2))
+            })) passedTests++
+            
+            totalTests++
+            if (testDiamond('Bug Case - Isometric Ratios', {
+                center: { x: 100, y: 100 },
+                width: 60,
+                height: 30, // 2:1 isometric ratio
+                west: { x: 70, y: 100 },
+                north: { x: 100, y: 85 },
+                east: { x: 130, y: 100 },
+                south: { x: 100, y: 115 },
+                area: (60 * 30) / 2,
+                perimeter: 2 * Math.sqrt(Math.pow(30, 2) + Math.pow(15, 2))
+            })) passedTests++
+            
+            // Final results
+            log('\n🎯 FINAL RESULTS', 'info')
+            log('================', 'info')
+            log(`✅ Tests passed: ${passedTests}/${totalTests}`, passedTests === totalTests ? 'pass' : 'info')
+            log(`❌ Tests failed: ${totalTests - passedTests}/${totalTests}`, totalTests - passedTests === 0 ? 'info' : 'fail')
+            
+            if (passedTests === totalTests) {
+                log('\n🎉 ALL TESTS PASSED!', 'pass')
+                log('✅ Geometry transforms are perfectly invertible', 'pass')
+                log('✅ The bug is NOT in the geometry math', 'pass')
+                log('✅ The bug is in how the store/UI uses these transforms', 'pass')
+            } else {
+                log('\n💥 TESTS FAILED!', 'fail')
+                log('❌ Geometry transforms have invertibility issues', 'fail')
+                log('❌ The bug IS in the geometry math', 'fail')
+                log('❌ Need to fix the transform algorithms', 'fail')
+            }
+        }
+    </script>
+</body>
+</html>

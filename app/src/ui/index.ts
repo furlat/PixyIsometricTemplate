@@ -1,8 +1,9 @@
-export { StorePanel } from './StorePanel';
-export { UIControlBar } from './UIControlBar';
-export { GeometryPanel } from './GeometryPanel';
-export { LayerToggleBar } from './LayerToggleBar';
-export { ObjectEditPanel } from './ObjectEditPanel';
+// Phase 3B UI Panels
+export { StorePanel_3b } from './StorePanel_3b';
+export { UIControlBar_3b } from './UIControlBar_3b';
+export { GeometryPanel_3b } from './GeometryPanel_3b';
+export { LayerToggleBar_3b } from './LayerToggleBar_3b';
+export { ObjectEditPanel_3b } from './ObjectEditPanel_3b';
 export { StoreExplorer } from './StoreExplorer';
 export { Workspace } from './Workspace';
 
