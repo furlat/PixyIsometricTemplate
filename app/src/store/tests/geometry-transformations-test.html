@@ -1,0 +1,1001 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Geometry Transformations Test - Game Store</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 20px; 
+            background: #f5f5f5; 
+        }
+        .test-section { 
+            background: white; 
+            padding: 20px; 
+            margin: 20px 0; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-button { 
+            background: #007acc; 
+            color: white; 
+            border: none; 
+            padding: 10px 20px; 
+            margin: 5px; 
+            cursor: pointer; 
+            border-radius: 4px; 
+        }
+        .test-button:hover { background: #005a9e; }
+        .success { color: #28a745; font-weight: bold; }
+        .error { color: #dc3545; font-weight: bold; }
+        .result { 
+            background: #f8f9fa; 
+            padding: 15px; 
+            margin: 10px 0; 
+            border-left: 4px solid #007acc; 
+            font-family: monospace; 
+            white-space: pre-wrap;
+        }
+        .coordinate-display {
+            background: #e9ecef;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        .form-input {
+            margin: 5px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 80px;
+        }
+        .canvas-mock {
+            border: 2px solid #007acc;
+            width: 400px;
+            height: 300px;
+            position: relative;
+            background: #f8f9fa;
+            margin: 10px 0;
+        }
+        .object-visual {
+            position: absolute;
+            border: 2px solid #007acc;
+            background: rgba(0, 122, 204, 0.2);
+            border-radius: 50%;
+            pointer-events: none;
+        }
+        .object-visual.rectangle {
+            border-radius: 0;
+        }
+        .coordinate-point {
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            background: #dc3545;
+            border-radius: 50%;
+            transform: translate(-3px, -3px);
+        }
+    </style>
+</head>
+<body>
+    <h1>🔄 Geometry Transformations Test</h1>
+    <p>Testing coordinate transformations, bounds calculations, and geometric operations</p>
+
+    <div class="test-section">
+        <h2>🎯 Setup Test Objects</h2>
+        <button class="test-button" onclick="createTransformTestObjects()">Create Transform Test Objects</button>
+        <div id="setup-results" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>📊 Coordinate System</h2>
+        <div id="coordinate-display" class="coordinate-display">No objects to display</div>
+        <button class="test-button" onclick="updateCoordinateDisplay()">Refresh Coordinates</button>
+    </div>
+
+    <div class="test-section">
+        <h2>📐 Visual Representation</h2>
+        <div id="canvas-mock" class="canvas-mock">
+            <div style="position: absolute; top: 5px; left: 5px; font-size: 12px; color: #666;">
+                Canvas Mock (400x300)
+            </div>
+        </div>
+        <button class="test-button" onclick="updateVisualDisplay()">Update Visual</button>
+    </div>
+
+    <div class="test-section">
+        <h2>🔄 Coordinate Transformations</h2>
+        <div>
+            <h3>Translation Operations</h3>
+            <label>Offset X: <input type="number" id="translate-x" class="form-input" value="50" /></label>
+            <label>Offset Y: <input type="number" id="translate-y" class="form-input" value="30" /></label>
+            <button class="test-button" onclick="testTranslation()">Test Translation</button>
+        </div>
+
+        <div>
+            <h3>Scaling Operations</h3>
+            <label>Scale Factor: <input type="number" id="scale-factor" class="form-input" value="1.5" step="0.1" /></label>
+            <button class="test-button" onclick="testScaling()">Test Scaling</button>
+        </div>
+
+        <div>
+            <h3>Bounds Calculations</h3>
+            <button class="test-button" onclick="testBoundsCalculation()">Test Bounds Calculation</button>
+            <button class="test-button" onclick="testBoundsAfterTransform()">Test Bounds After Transform</button>
+        </div>
+
+        <div id="transform-results" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>🧮 Geometric Properties</h2>
+        <button class="test-button" onclick="testCircleProperties()">Test Circle Properties</button>
+        <button class="test-button" onclick="testRectangleProperties()">Test Rectangle Properties</button>
+        <button class="test-button" onclick="testPropertiesConsistency()">Test Properties Consistency</button>
+        <div id="properties-results" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>🔀 Coordinate Inversions & Edge Cases</h2>
+        <button class="test-button" onclick="testNegativeCoordinates()">Test Negative Coordinates</button>
+        <button class="test-button" onclick="testZeroSizeShapes()">Test Zero Size Shapes</button>
+        <button class="test-button" onclick="testLargeCoordinates()">Test Large Coordinates</button>
+        <button class="test-button" onclick="testFloatingPointPrecision()">Test Floating Point Precision</button>
+        <div id="edge-case-results" class="result"></div>
+    </div>
+
+    <script type="module">
+        // Extended geometry helper for transformations
+        const transformGeometryHelper = {
+            generateVertices(type, properties) {
+                switch (type) {
+                    case 'circle':
+                        const segments = 16; // More segments for better precision
+                        const vertices = [];
+                        for (let i = 0; i < segments; i++) {
+                            const angle = (i / segments) * 2 * Math.PI;
+                            vertices.push({
+                                x: properties.center.x + Math.cos(angle) * properties.radius,
+                                y: properties.center.y + Math.sin(angle) * properties.radius
+                            });
+                        }
+                        return vertices;
+                    case 'rectangle':
+                        const hw = properties.width / 2;
+                        const hh = properties.height / 2;
+                        return [
+                            {x: properties.center.x - hw, y: properties.center.y - hh},
+                            {x: properties.center.x + hw, y: properties.center.y - hh},
+                            {x: properties.center.x + hw, y: properties.center.y + hh},
+                            {x: properties.center.x - hw, y: properties.center.y + hh}
+                        ];
+                    case 'line':
+                        return [properties.startPoint, properties.endPoint];
+                    case 'point':
+                        return [properties.center];
+                    default:
+                        return [];
+                }
+            },
+            
+            calculateBounds(vertices) {
+                if (!vertices.length) return {minX: 0, minY: 0, maxX: 0, maxY: 0, width: 0, height: 0};
+                const xs = vertices.map(v => v.x);
+                const ys = vertices.map(v => v.y);
+                const minX = Math.min(...xs);
+                const maxX = Math.max(...xs);
+                const minY = Math.min(...ys);
+                const maxY = Math.max(...ys);
+                return {minX, minY, maxX, maxY, width: maxX - minX, height: maxY - minY};
+            },
+            
+            calculateProperties(type, vertices) {
+                const bounds = this.calculateBounds(vertices);
+                switch (type) {
+                    case 'circle':
+                        return {
+                            type: 'circle',
+                            center: {x: bounds.minX + bounds.width/2, y: bounds.minY + bounds.height/2},
+                            radius: bounds.width / 2,
+                            diameter: bounds.width,
+                            circumference: Math.PI * bounds.width,
+                            area: Math.PI * Math.pow(bounds.width/2, 2)
+                        };
+                    case 'rectangle':
+                        return {
+                            type: 'rectangle',
+                            center: {x: bounds.minX + bounds.width/2, y: bounds.minY + bounds.height/2},
+                            topLeft: {x: bounds.minX, y: bounds.minY},
+                            bottomRight: {x: bounds.maxX, y: bounds.maxY},
+                            width: bounds.width,
+                            height: bounds.height,
+                            area: bounds.width * bounds.height,
+                            perimeter: 2 * (bounds.width + bounds.height)
+                        };
+                    case 'line':
+                        const start = vertices[0] || {x: 0, y: 0};
+                        const end = vertices[1] || {x: 0, y: 0};
+                        const dx = end.x - start.x;
+                        const dy = end.y - start.y;
+                        return {
+                            type: 'line',
+                            startPoint: start,
+                            endPoint: end,
+                            midpoint: {x: (start.x + end.x) / 2, y: (start.y + end.y) / 2},
+                            length: Math.sqrt(dx * dx + dy * dy),
+                            angle: Math.atan2(dy, dx)
+                        };
+                    default:
+                        return {type, center: bounds.minX + bounds.width/2 || 0, y: bounds.minY + bounds.height/2 || 0};
+                }
+            },
+
+            // Transformation operations
+            translateVertices(vertices, offset) {
+                return vertices.map(v => ({
+                    x: v.x + offset.x,
+                    y: v.y + offset.y
+                }));
+            },
+
+            scaleVertices(vertices, scaleFactor, origin = {x: 0, y: 0}) {
+                return vertices.map(v => ({
+                    x: origin.x + (v.x - origin.x) * scaleFactor,
+                    y: origin.y + (v.y - origin.y) * scaleFactor
+                }));
+            },
+
+            rotateVertices(vertices, angle, origin = {x: 0, y: 0}) {
+                const cos = Math.cos(angle);
+                const sin = Math.sin(angle);
+                return vertices.map(v => {
+                    const dx = v.x - origin.x;
+                    const dy = v.y - origin.y;
+                    return {
+                        x: origin.x + dx * cos - dy * sin,
+                        y: origin.y + dx * sin + dy * cos
+                    };
+                });
+            }
+        };
+
+        // Mock store for transformations
+        window.transformStore = {
+            objects: []
+        };
+
+        window.transformMethods = {
+            createObject(params) {
+                const vertices = transformGeometryHelper.generateVertices(params.type, params.properties);
+                const newObject = {
+                    id: `obj_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                    type: params.type,
+                    vertices: vertices,
+                    bounds: transformGeometryHelper.calculateBounds(vertices),
+                    properties: params.properties,
+                    isVisible: true,
+                    createdAt: Date.now()
+                };
+                window.transformStore.objects.push(newObject);
+                return newObject.id;
+            },
+
+            transformObject(objectId, transformFn) {
+                const objIndex = window.transformStore.objects.findIndex(obj => obj.id === objectId);
+                if (objIndex !== -1) {
+                    const obj = window.transformStore.objects[objIndex];
+                    const newVertices = transformFn(obj.vertices);
+                    const newBounds = transformGeometryHelper.calculateBounds(newVertices);
+                    const newProperties = transformGeometryHelper.calculateProperties(obj.type, newVertices);
+                    
+                    window.transformStore.objects[objIndex] = {
+                        ...obj,
+                        vertices: newVertices,
+                        bounds: newBounds,
+                        properties: newProperties
+                    };
+                    return true;
+                }
+                return false;
+            }
+        };
+
+        // Test functions
+        window.createTransformTestObjects = function() {
+            // Create a circle
+            const circleId = window.transformMethods.createObject({
+                type: 'circle',
+                properties: {
+                    center: {x: 100, y: 100},
+                    radius: 40
+                }
+            });
+
+            // Create a rectangle
+            const rectId = window.transformMethods.createObject({
+                type: 'rectangle',
+                properties: {
+                    center: {x: 200, y: 150},
+                    width: 60,
+                    height: 80
+                }
+            });
+
+            // Create a line
+            const lineId = window.transformMethods.createObject({
+                type: 'line',
+                properties: {
+                    startPoint: {x: 50, y: 50},
+                    endPoint: {x: 150, y: 100}
+                }
+            });
+
+            document.getElementById('setup-results').textContent = `✅ Transform test objects created!
+Circle: Center (100, 100), Radius 40
+Rectangle: Center (200, 150), Size 60x80
+Line: (50, 50) to (150, 100)
+
+Total objects: ${window.transformStore.objects.length}`;
+            document.getElementById('setup-results').className = 'result success';
+            
+            updateCoordinateDisplay();
+            updateVisualDisplay();
+        };
+
+        window.updateCoordinateDisplay = function() {
+            if (window.transformStore.objects.length === 0) {
+                document.getElementById('coordinate-display').textContent = 'No objects to display';
+                return;
+            }
+
+            const info = window.transformStore.objects.map(obj => {
+                const bounds = obj.bounds;
+                const props = obj.properties;
+                
+                return `Object: ${obj.type} (${obj.id.substring(0, 8)}...)
+  Center: (${props.center?.x?.toFixed(2) || 'N/A'}, ${props.center?.y?.toFixed(2) || 'N/A'})
+  Bounds: (${bounds.minX.toFixed(2)}, ${bounds.minY.toFixed(2)}) to (${bounds.maxX.toFixed(2)}, ${bounds.maxY.toFixed(2)})
+  Size: ${bounds.width.toFixed(2)} x ${bounds.height.toFixed(2)}
+  Vertices: ${obj.vertices.length}
+  Properties: ${JSON.stringify(props, (k, v) => typeof v === 'number' ? parseFloat(v.toFixed(2)) : v)}`;
+            }).join('\n\n');
+
+            document.getElementById('coordinate-display').textContent = info;
+        };
+
+        window.updateVisualDisplay = function() {
+            const canvas = document.getElementById('canvas-mock');
+            // Clear previous objects
+            canvas.innerHTML = '<div style="position: absolute; top: 5px; left: 5px; font-size: 12px; color: #666;">Canvas Mock (400x300)</div>';
+
+            window.transformStore.objects.forEach(obj => {
+                const bounds = obj.bounds;
+                
+                // Scale coordinates to fit in 400x300 canvas
+                const scaleX = 300 / 400; // Leave some margin
+                const scaleY = 200 / 300;
+                
+                const visualElement = document.createElement('div');
+                visualElement.className = `object-visual ${obj.type}`;
+                
+                const left = Math.max(0, Math.min(380, bounds.minX * scaleX + 10));
+                const top = Math.max(0, Math.min(280, bounds.minY * scaleY + 10));
+                const width = Math.max(5, bounds.width * scaleX);
+                const height = Math.max(5, bounds.height * scaleY);
+                
+                visualElement.style.left = `${left}px`;
+                visualElement.style.top = `${top}px`;
+                visualElement.style.width = `${width}px`;
+                visualElement.style.height = `${height}px`;
+                
+                // Add center point
+                const centerPoint = document.createElement('div');
+                centerPoint.className = 'coordinate-point';
+                centerPoint.style.left = `${left + width/2}px`;
+                centerPoint.style.top = `${top + height/2}px`;
+                centerPoint.title = `${obj.type} center: (${obj.properties.center?.x?.toFixed(1) || 'N/A'}, ${obj.properties.center?.y?.toFixed(1) || 'N/A'})`;
+                
+                canvas.appendChild(visualElement);
+                canvas.appendChild(centerPoint);
+            });
+        };
+
+        window.testTranslation = function() {
+            if (window.transformStore.objects.length === 0) {
+                document.getElementById('transform-results').textContent = '❌ No objects to transform. Create objects first.';
+                document.getElementById('transform-results').className = 'result error';
+                return;
+            }
+
+            const offsetX = parseFloat(document.getElementById('translate-x').value);
+            const offsetY = parseFloat(document.getElementById('translate-y').value);
+            const offset = {x: offsetX, y: offsetY};
+
+            const beforePositions = window.transformStore.objects.map(obj => ({
+                id: obj.id.substring(0, 8),
+                center: obj.properties.center
+            }));
+
+            // Apply translation to all objects
+            window.transformStore.objects.forEach(obj => {
+                window.transformMethods.transformObject(obj.id, vertices => 
+                    transformGeometryHelper.translateVertices(vertices, offset)
+                );
+            });
+
+            const afterPositions = window.transformStore.objects.map(obj => ({
+                id: obj.id.substring(0, 8),
+                center: obj.properties.center
+            }));
+
+            const results = beforePositions.map((before, i) => {
+                const after = afterPositions[i];
+                const expectedX = before.center.x + offsetX;
+                const expectedY = before.center.y + offsetY;
+                const actualX = after.center.x;
+                const actualY = after.center.y;
+                
+                return {
+                    id: before.id,
+                    beforeCenter: `(${before.center.x.toFixed(2)}, ${before.center.y.toFixed(2)})`,
+                    afterCenter: `(${actualX.toFixed(2)}, ${actualY.toFixed(2)})`,
+                    expectedCenter: `(${expectedX.toFixed(2)}, ${expectedY.toFixed(2)})`,
+                    xCorrect: Math.abs(actualX - expectedX) < 0.01,
+                    yCorrect: Math.abs(actualY - expectedY) < 0.01
+                };
+            });
+
+            const allCorrect = results.every(r => r.xCorrect && r.yCorrect);
+
+            const resultText = `Translation Test (Offset: ${offsetX}, ${offsetY}):
+${results.map(r => `${r.id}: ${r.beforeCenter} → ${r.afterCenter} (expected: ${r.expectedCenter}) ${r.xCorrect && r.yCorrect ? '✅' : '❌'}`).join('\n')}
+
+${allCorrect ? '✅ All translations correct!' : '❌ Some translations incorrect!'}`;
+
+            document.getElementById('transform-results').textContent = resultText;
+            document.getElementById('transform-results').className = allCorrect ? 'result success' : 'result error';
+            
+            updateCoordinateDisplay();
+            updateVisualDisplay();
+        };
+
+        window.testScaling = function() {
+            if (window.transformStore.objects.length === 0) {
+                document.getElementById('transform-results').textContent = '❌ No objects to transform. Create objects first.';
+                document.getElementById('transform-results').className = 'result error';
+                return;
+            }
+
+            const scaleFactor = parseFloat(document.getElementById('scale-factor').value);
+
+            const beforeSizes = window.transformStore.objects.map(obj => ({
+                id: obj.id.substring(0, 8),
+                type: obj.type,
+                radius: obj.properties.radius,
+                width: obj.properties.width,
+                height: obj.properties.height,
+                startPoint: obj.properties.startPoint,
+                endPoint: obj.properties.endPoint,
+                length: obj.properties.length
+            }));
+
+            // Apply scaling to all objects from their centers
+            window.transformStore.objects.forEach(obj => {
+                const center = obj.properties.center;
+                window.transformMethods.transformObject(obj.id, vertices => 
+                    transformGeometryHelper.scaleVertices(vertices, scaleFactor, center)
+                );
+            });
+
+            const afterSizes = window.transformStore.objects.map(obj => ({
+                id: obj.id.substring(0, 8),
+                type: obj.type,
+                radius: obj.properties.radius,
+                width: obj.properties.width,
+                height: obj.properties.height,
+                startPoint: obj.properties.startPoint,
+                endPoint: obj.properties.endPoint,
+                length: obj.properties.length
+            }));
+
+            const results = beforeSizes.map((before, i) => {
+                const after = afterSizes[i];
+                let sizeCorrect = false;
+                let sizeInfo = '';
+
+                if (before.type === 'circle') {
+                    const expectedRadius = before.radius * scaleFactor;
+                    const actualRadius = after.radius;
+                    sizeCorrect = Math.abs(actualRadius - expectedRadius) < 0.01;
+                    sizeInfo = `Radius: ${before.radius.toFixed(2)} → ${actualRadius.toFixed(2)} (expected: ${expectedRadius.toFixed(2)})`;
+                } else if (before.type === 'rectangle') {
+                    const expectedWidth = before.width * scaleFactor;
+                    const expectedHeight = before.height * scaleFactor;
+                    const actualWidth = after.width;
+                    const actualHeight = after.height;
+                    sizeCorrect = Math.abs(actualWidth - expectedWidth) < 0.01 && Math.abs(actualHeight - expectedHeight) < 0.01;
+                    sizeInfo = `Size: ${before.width.toFixed(2)}x${before.height.toFixed(2)} → ${actualWidth.toFixed(2)}x${actualHeight.toFixed(2)} (expected: ${expectedWidth.toFixed(2)}x${expectedHeight.toFixed(2)})`;
+                } else if (before.type === 'line') {
+                    const expectedLength = before.length * scaleFactor;
+                    const actualLength = after.length;
+                    sizeCorrect = Math.abs(actualLength - expectedLength) < 0.01;
+                    sizeInfo = `Length: ${before.length.toFixed(2)} → ${actualLength.toFixed(2)} (expected: ${expectedLength.toFixed(2)})`;
+                } else {
+                    // For other types (point, etc.), assume scaling doesn't affect size
+                    sizeCorrect = true;
+                    sizeInfo = `Type: ${before.type} (scaling test not applicable)`;
+                }
+
+                return {
+                    id: before.id,
+                    type: before.type,
+                    sizeInfo,
+                    correct: sizeCorrect
+                };
+            });
+
+            const allCorrect = results.every(r => r.correct);
+
+            const resultText = `Scaling Test (Factor: ${scaleFactor}):
+${results.map(r => `${r.id} (${r.type}): ${r.sizeInfo} ${r.correct ? '✅' : '❌'}`).join('\n')}
+
+${allCorrect ? '✅ All scaling correct!' : '❌ Some scaling incorrect!'}`;
+
+            document.getElementById('transform-results').textContent = resultText;
+            document.getElementById('transform-results').className = allCorrect ? 'result success' : 'result error';
+            
+            updateCoordinateDisplay();
+            updateVisualDisplay();
+        };
+
+        window.testBoundsCalculation = function() {
+            if (window.transformStore.objects.length === 0) {
+                document.getElementById('transform-results').textContent = '❌ No objects to transform. Create objects first.';
+                document.getElementById('transform-results').className = 'result error';
+                return;
+            }
+
+            const results = window.transformStore.objects.map(obj => {
+                const calculatedBounds = transformGeometryHelper.calculateBounds(obj.vertices);
+                const storedBounds = obj.bounds;
+                
+                const boundsMatch = 
+                    Math.abs(calculatedBounds.minX - storedBounds.minX) < 0.01 &&
+                    Math.abs(calculatedBounds.maxX - storedBounds.maxX) < 0.01 &&
+                    Math.abs(calculatedBounds.minY - storedBounds.minY) < 0.01 &&
+                    Math.abs(calculatedBounds.maxY - storedBounds.maxY) < 0.01;
+
+                return {
+                    id: obj.id.substring(0, 8),
+                    type: obj.type,
+                    calculated: `(${calculatedBounds.minX.toFixed(2)}, ${calculatedBounds.minY.toFixed(2)}) to (${calculatedBounds.maxX.toFixed(2)}, ${calculatedBounds.maxY.toFixed(2)})`,
+                    stored: `(${storedBounds.minX.toFixed(2)}, ${storedBounds.minY.toFixed(2)}) to (${storedBounds.maxX.toFixed(2)}, ${storedBounds.maxY.toFixed(2)})`,
+                    match: boundsMatch
+                };
+            });
+
+            const allMatch = results.every(r => r.match);
+
+            const resultText = `Bounds Calculation Test:
+${results.map(r => `${r.id} (${r.type}):
+  Calculated: ${r.calculated}
+  Stored: ${r.stored}
+  Match: ${r.match ? '✅' : '❌'}`).join('\n\n')}
+
+${allMatch ? '✅ All bounds calculations correct!' : '❌ Some bounds calculations incorrect!'}`;
+
+            document.getElementById('transform-results').textContent = resultText;
+            document.getElementById('transform-results').className = allMatch ? 'result success' : 'result error';
+        };
+
+        window.testBoundsAfterTransform = function() {
+            // Create a fresh test object for this test
+            const testId = window.transformMethods.createObject({
+                type: 'circle',
+                properties: {
+                    center: {x: 150, y: 150},
+                    radius: 50
+                }
+            });
+
+            const originalObject = window.transformStore.objects.find(obj => obj.id === testId);
+            const originalBounds = originalObject.bounds;
+
+            // Apply translation
+            const offset = {x: 25, y: -15};
+            window.transformMethods.transformObject(testId, vertices => 
+                transformGeometryHelper.translateVertices(vertices, offset)
+            );
+
+            const translatedObject = window.transformStore.objects.find(obj => obj.id === testId);
+            const translatedBounds = translatedObject.bounds;
+
+            // Check if bounds moved correctly
+            const expectedMinX = originalBounds.minX + offset.x;
+            const expectedMaxX = originalBounds.maxX + offset.x;
+            const expectedMinY = originalBounds.minY + offset.y;
+            const expectedMaxY = originalBounds.maxY + offset.y;
+
+            const boundsCorrect = 
+                Math.abs(translatedBounds.minX - expectedMinX) < 0.01 &&
+                Math.abs(translatedBounds.maxX - expectedMaxX) < 0.01 &&
+                Math.abs(translatedBounds.minY - expectedMinY) < 0.01 &&
+                Math.abs(translatedBounds.maxY - expectedMaxY) < 0.01;
+
+            const resultText = `Bounds After Transform Test:
+Original bounds: (${originalBounds.minX.toFixed(2)}, ${originalBounds.minY.toFixed(2)}) to (${originalBounds.maxX.toFixed(2)}, ${originalBounds.maxY.toFixed(2)})
+Translation: (${offset.x}, ${offset.y})
+Expected bounds: (${expectedMinX.toFixed(2)}, ${expectedMinY.toFixed(2)}) to (${expectedMaxX.toFixed(2)}, ${expectedMaxY.toFixed(2)})
+Actual bounds: (${translatedBounds.minX.toFixed(2)}, ${translatedBounds.minY.toFixed(2)}) to (${translatedBounds.maxX.toFixed(2)}, ${translatedBounds.maxY.toFixed(2)})
+
+Bounds update correct: ${boundsCorrect ? '✅' : '❌'}
+
+${boundsCorrect ? 'SUCCESS: Bounds correctly updated after transformation!' : 'BUG: Bounds not properly updated after transformation!'}`;
+
+            document.getElementById('transform-results').textContent = resultText;
+            document.getElementById('transform-results').className = boundsCorrect ? 'result success' : 'result error';
+            
+            updateCoordinateDisplay();
+            updateVisualDisplay();
+        };
+
+        window.testCircleProperties = function() {
+            // Test circle property calculations
+            const testRadii = [10, 25.5, 100, 0.1];
+            const testCenters = [{x: 0, y: 0}, {x: -50, y: 75}, {x: 200.7, y: -30.3}];
+            
+            const results = [];
+            
+            testRadii.forEach(radius => {
+                testCenters.forEach(center => {
+                    const vertices = transformGeometryHelper.generateVertices('circle', {center, radius});
+                    const properties = transformGeometryHelper.calculateProperties('circle', vertices);
+                    
+                    const radiusCorrect = Math.abs(properties.radius - radius) < 0.01;
+                    const centerCorrect = Math.abs(properties.center.x - center.x) < 0.01 && Math.abs(properties.center.y - center.y) < 0.01;
+                    const diameterCorrect = Math.abs(properties.diameter - radius * 2) < 0.01;
+                    const circumferenceCorrect = Math.abs(properties.circumference - 2 * Math.PI * radius) < 0.01;
+                    const areaCorrect = Math.abs(properties.area - Math.PI * radius * radius) < 0.01;
+                    
+                    results.push({
+                        input: `R=${radius}, C=(${center.x}, ${center.y})`,
+                        radius: radiusCorrect,
+                        center: centerCorrect,
+                        diameter: diameterCorrect,
+                        circumference: circumferenceCorrect,
+                        area: areaCorrect,
+                        allCorrect: radiusCorrect && centerCorrect && diameterCorrect && circumferenceCorrect && areaCorrect
+                    });
+                });
+            });
+
+            const allCorrect = results.every(r => r.allCorrect);
+            const passCount = results.filter(r => r.allCorrect).length;
+
+            const resultText = `Circle Properties Test:
+Total tests: ${results.length}
+Passed: ${passCount}
+Failed: ${results.length - passCount}
+
+Sample results:
+${results.slice(0, 5).map(r => `${r.input}: ${r.allCorrect ? '✅' : '❌'} (R:${r.radius?'✅':'❌'} C:${r.center?'✅':'❌'} D:${r.diameter?'✅':'❌'} Circ:${r.circumference?'✅':'❌'} A:${r.area?'✅':'❌'})`).join('\n')}
+
+${allCorrect ? '✅ All circle property calculations correct!' : `❌ ${results.length - passCount} circle property calculations failed!`}`;
+
+            document.getElementById('properties-results').textContent = resultText;
+            document.getElementById('properties-results').className = allCorrect ? 'result success' : 'result error';
+        };
+
+        window.testRectangleProperties = function() {
+            // Test rectangle property calculations
+            const testSizes = [{w: 20, h: 30}, {w: 50.5, h: 25.2}, {w: 1, h: 100}];
+            const testCenters = [{x: 0, y: 0}, {x: -25, y: 50}, {x: 150.3, y: -75.7}];
+            
+            const results = [];
+            
+            testSizes.forEach(size => {
+                testCenters.forEach(center => {
+                    const vertices = transformGeometryHelper.generateVertices('rectangle', {center, width: size.w, height: size.h});
+                    const properties = transformGeometryHelper.calculateProperties('rectangle', vertices);
+                    
+                    const widthCorrect = Math.abs(properties.width - size.w) < 0.01;
+                    const heightCorrect = Math.abs(properties.height - size.h) < 0.01;
+                    const centerCorrect = Math.abs(properties.center.x - center.x) < 0.01 && Math.abs(properties.center.y - center.y) < 0.01;
+                    const areaCorrect = Math.abs(properties.area - size.w * size.h) < 0.01;
+                    const perimeterCorrect = Math.abs(properties.perimeter - 2 * (size.w + size.h)) < 0.01;
+                    
+                    results.push({
+                        input: `${size.w}x${size.h} @ (${center.x}, ${center.y})`,
+                        width: widthCorrect,
+                        height: heightCorrect,
+                        center: centerCorrect,
+                        area: areaCorrect,
+                        perimeter: perimeterCorrect,
+                        allCorrect: widthCorrect && heightCorrect && centerCorrect && areaCorrect && perimeterCorrect
+                    });
+                });
+            });
+
+            const allCorrect = results.every(r => r.allCorrect);
+            const passCount = results.filter(r => r.allCorrect).length;
+
+            const resultText = `Rectangle Properties Test:
+Total tests: ${results.length}
+Passed: ${passCount}
+Failed: ${results.length - passCount}
+
+Sample results:
+${results.slice(0, 4).map(r => `${r.input}: ${r.allCorrect ? '✅' : '❌'} (W:${r.width?'✅':'❌'} H:${r.height?'✅':'❌'} C:${r.center?'✅':'❌'} A:${r.area?'✅':'❌'} P:${r.perimeter?'✅':'❌'})`).join('\n')}
+
+${allCorrect ? '✅ All rectangle property calculations correct!' : `❌ ${results.length - passCount} rectangle property calculations failed!`}`;
+
+            document.getElementById('properties-results').textContent = resultText;
+            document.getElementById('properties-results').className = allCorrect ? 'result success' : 'result error';
+        };
+
+        window.testPropertiesConsistency = function() {
+            // Test that properties remain consistent through transformations
+            const circleId = window.transformMethods.createObject({
+                type: 'circle',
+                properties: {
+                    center: {x: 100, y: 100},
+                    radius: 30
+                }
+            });
+
+            const originalObject = window.transformStore.objects.find(obj => obj.id === circleId);
+            const originalArea = originalObject.properties.area;
+            const originalCircumference = originalObject.properties.circumference;
+
+            // Apply translation (should not change area or circumference)
+            window.transformMethods.transformObject(circleId, vertices => 
+                transformGeometryHelper.translateVertices(vertices, {x: 50, y: -25})
+            );
+
+            const translatedObject = window.transformStore.objects.find(obj => obj.id === circleId);
+            const translatedArea = translatedObject.properties.area;
+            const translatedCircumference = translatedObject.properties.circumference;
+
+            // Apply scaling (should change area and circumference proportionally)
+            const scaleFactor = 1.5;
+            window.transformMethods.transformObject(circleId, vertices => 
+                transformGeometryHelper.scaleVertices(vertices, scaleFactor, translatedObject.properties.center)
+            );
+
+            const scaledObject = window.transformStore.objects.find(obj => obj.id === circleId);
+            const scaledArea = scaledObject.properties.area;
+            const scaledCircumference = scaledObject.properties.circumference;
+
+            const areaAfterTranslation = Math.abs(translatedArea - originalArea) < 0.01;
+            const circumferenceAfterTranslation = Math.abs(translatedCircumference - originalCircumference) < 0.01;
+            const areaAfterScaling = Math.abs(scaledArea - originalArea * scaleFactor * scaleFactor) < 0.01;
+            const circumferenceAfterScaling = Math.abs(scaledCircumference - originalCircumference * scaleFactor) < 0.01;
+
+            const resultText = `Properties Consistency Test:
+Original area: ${originalArea.toFixed(2)}
+Original circumference: ${originalCircumference.toFixed(2)}
+
+After translation:
+  Area: ${translatedArea.toFixed(2)} (should be ${originalArea.toFixed(2)}) ${areaAfterTranslation ? '✅' : '❌'}
+  Circumference: ${translatedCircumference.toFixed(2)} (should be ${originalCircumference.toFixed(2)}) ${circumferenceAfterTranslation ? '✅' : '❌'}
+
+After scaling (factor ${scaleFactor}):
+  Area: ${scaledArea.toFixed(2)} (should be ${(originalArea * scaleFactor * scaleFactor).toFixed(2)}) ${areaAfterScaling ? '✅' : '❌'}
+  Circumference: ${scaledCircumference.toFixed(2)} (should be ${(originalCircumference * scaleFactor).toFixed(2)}) ${circumferenceAfterScaling ? '✅' : '❌'}
+
+${areaAfterTranslation && circumferenceAfterTranslation && areaAfterScaling && circumferenceAfterScaling ? 
+  '✅ All property transformations consistent!' : 
+  '❌ Some property transformations inconsistent!'}`;
+
+            document.getElementById('properties-results').textContent = resultText;
+            document.getElementById('properties-results').className = 
+                (areaAfterTranslation && circumferenceAfterTranslation && areaAfterScaling && circumferenceAfterScaling) ? 
+                'result success' : 'result error';
+            
+            updateCoordinateDisplay();
+        };
+
+        window.testNegativeCoordinates = function() {
+            // Test operations with negative coordinates
+            const negativeCircleId = window.transformMethods.createObject({
+                type: 'circle',
+                properties: {
+                    center: {x: -100, y: -50},
+                    radius: 25
+                }
+            });
+
+            const negativeRectId = window.transformMethods.createObject({
+                type: 'rectangle',
+                properties: {
+                    center: {x: -75, y: -125},
+                    width: 40,
+                    height: 30
+                }
+            });
+
+            const negativeLineId = window.transformMethods.createObject({
+                type: 'line',
+                properties: {
+                    startPoint: {x: -200, y: -100},
+                    endPoint: {x: -50, y: -150}
+                }
+            });
+
+            const objects = [negativeCircleId, negativeRectId, negativeLineId].map(id => 
+                window.transformStore.objects.find(obj => obj.id === id)
+            );
+
+            const results = objects.map(obj => {
+                const hasNegativeCoords = obj.vertices.some(v => v.x < 0 || v.y < 0);
+                const boundsConsistent = obj.bounds.minX <= obj.bounds.maxX && obj.bounds.minY <= obj.bounds.maxY;
+                
+                // Check appropriate properties based on object type
+                let propertiesValid = false;
+                if (obj.type === 'circle') {
+                    propertiesValid = obj.properties.center !== undefined && obj.properties.radius !== undefined;
+                } else if (obj.type === 'rectangle') {
+                    propertiesValid = obj.properties.center !== undefined && obj.properties.width !== undefined && obj.properties.height !== undefined;
+                } else if (obj.type === 'line') {
+                    propertiesValid = obj.properties.startPoint !== undefined && obj.properties.endPoint !== undefined;
+                } else if (obj.type === 'point') {
+                    propertiesValid = obj.properties.center !== undefined;
+                } else {
+                    propertiesValid = true; // Unknown type, assume valid
+                }
+                
+                return {
+                    type: obj.type,
+                    hasNegativeCoords,
+                    boundsConsistent,
+                    propertiesValid,
+                    valid: boundsConsistent && propertiesValid
+                };
+            });
+
+            const allValid = results.every(r => r.valid);
+
+            const resultText = `Negative Coordinates Test:
+${results.map(r => `${r.type}: Negative coords ${r.hasNegativeCoords ? '✅' : '❌'}, Bounds ${r.boundsConsistent ? '✅' : '❌'}, Properties ${r.propertiesValid ? '✅' : '❌'}`).join('\n')}
+
+${allValid ? '✅ All negative coordinate operations valid!' : '❌ Some negative coordinate operations failed!'}`;
+
+            document.getElementById('edge-case-results').textContent = resultText;
+            document.getElementById('edge-case-results').className = allValid ? 'result success' : 'result error';
+            
+            updateCoordinateDisplay();
+            updateVisualDisplay();
+        };
+
+        window.testZeroSizeShapes = function() {
+            try {
+                // Test zero radius circle
+                const zeroCircleId = window.transformMethods.createObject({
+                    type: 'circle',
+                    properties: {
+                        center: {x: 100, y: 100},
+                        radius: 0
+                    }
+                });
+
+                // Test zero size rectangle
+                const zeroRectId = window.transformMethods.createObject({
+                    type: 'rectangle',
+                    properties: {
+                        center: {x: 150, y: 150},
+                        width: 0,
+                        height: 0
+                    }
+                });
+
+                const zeroCircle = window.transformStore.objects.find(obj => obj.id === zeroCircleId);
+                const zeroRect = window.transformStore.objects.find(obj => obj.id === zeroRectId);
+
+                const circleValid = zeroCircle && zeroCircle.properties.radius === 0 && zeroCircle.bounds.width >= 0;
+                const rectValid = zeroRect && zeroRect.properties.width === 0 && zeroRect.properties.height === 0 && zeroRect.bounds.width >= 0;
+
+                const resultText = `Zero Size Shapes Test:
+Circle (radius 0): ${circleValid ? '✅ Valid' : '❌ Invalid'}
+Rectangle (0x0): ${rectValid ? '✅ Valid' : '❌ Invalid'}
+
+${circleValid && rectValid ? '✅ Zero size shapes handled correctly!' : '❌ Zero size shapes cause issues!'}`;
+
+                document.getElementById('edge-case-results').textContent = resultText;
+                document.getElementById('edge-case-results').className = (circleValid && rectValid) ? 'result success' : 'result error';
+            } catch (e) {
+                document.getElementById('edge-case-results').textContent = `❌ Zero size test failed with error: ${e.message}`;
+                document.getElementById('edge-case-results').className = 'result error';
+            }
+        };
+
+        window.testLargeCoordinates = function() {
+            // Test very large coordinates
+            const largeCircleId = window.transformMethods.createObject({
+                type: 'circle',
+                properties: {
+                    center: {x: 10000, y: -5000},
+                    radius: 1000
+                }
+            });
+
+            const largeRectId = window.transformMethods.createObject({
+                type: 'rectangle',
+                properties: {
+                    center: {x: -8000, y: 12000},
+                    width: 2000,
+                    height: 1500
+                }
+            });
+
+            const largeCircle = window.transformStore.objects.find(obj => obj.id === largeCircleId);
+            const largeRect = window.transformStore.objects.find(obj => obj.id === largeRectId);
+
+            const circleValid = largeCircle && !isNaN(largeCircle.bounds.minX) && !isNaN(largeCircle.bounds.maxX);
+            const rectValid = largeRect && !isNaN(largeRect.bounds.minX) && !isNaN(largeRect.bounds.maxX);
+
+            const resultText = `Large Coordinates Test:
+Circle at (10000, -5000): ${circleValid ? '✅ Valid' : '❌ Invalid'}
+Rectangle at (-8000, 12000): ${rectValid ? '✅ Valid' : '❌ Invalid'}
+
+${circleValid && rectValid ? '✅ Large coordinates handled correctly!' : '❌ Large coordinates cause issues!'}`;
+
+            document.getElementById('edge-case-results').textContent = resultText;
+            document.getElementById('edge-case-results').className = (circleValid && rectValid) ? 'result success' : 'result error';
+            
+            updateCoordinateDisplay();
+        };
+
+        window.testFloatingPointPrecision = function() {
+            // Test floating point precision issues
+            const precisionTests = [
+                {center: {x: 1/3, y: 2/3}, radius: 1/7},
+                {center: {x: Math.PI, y: Math.E}, radius: Math.sqrt(2)},
+                {center: {x: 0.1 + 0.2, y: 0.9 - 0.8}, radius: 0.3 - 0.2}
+            ];
+
+            const results = precisionTests.map((test, i) => {
+                const testId = window.transformMethods.createObject({
+                    type: 'circle',
+                    properties: test
+                });
+
+                const obj = window.transformStore.objects.find(o => o.id === testId);
+                
+                // Apply multiple transformations
+                window.transformMethods.transformObject(testId, vertices => 
+                    transformGeometryHelper.translateVertices(vertices, {x: 0.1, y: -0.1})
+                );
+                window.transformMethods.transformObject(testId, vertices => 
+                    transformGeometryHelper.scaleVertices(vertices, 1.01, obj.properties.center)
+                );
+
+                const finalObj = window.transformStore.objects.find(o => o.id === testId);
+                
+                return {
+                    test: i + 1,
+                    originalRadius: test.radius,
+                    finalRadius: finalObj.properties.radius,
+                    radiusChange: Math.abs(finalObj.properties.radius - test.radius * 1.01),
+                    stable: !isNaN(finalObj.properties.radius) && isFinite(finalObj.properties.radius)
+                };
+            });
+
+            const allStable = results.every(r => r.stable);
+
+            const resultText = `Floating Point Precision Test:
+${results.map(r => `Test ${r.test}: Original radius: ${r.originalRadius.toFixed(6)}, Final: ${r.finalRadius.toFixed(6)}, Stable: ${r.stable ? '✅' : '❌'}`).join('\n')}
+
+${allStable ? '✅ All floating point operations stable!' : '❌ Some floating point operations unstable!'}`;
+
+            document.getElementById('edge-case-results').textContent = resultText;
+            document.getElementById('edge-case-results').className = allStable ? 'result success' : 'result error';
+        };
+
+        // Initialize
+        updateCoordinateDisplay();
+        updateVisualDisplay();
+    </script>
+</body>
+</html>

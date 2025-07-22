@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Drawing System Test - Game Store</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 20px; 
+            background: #f5f5f5; 
+        }
+        .test-section { 
+            background: white; 
+            padding: 20px; 
+            margin: 20px 0; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-button { 
+            background: #007acc; 
+            color: white; 
+            border: none; 
+            padding: 10px 20px; 
+            margin: 5px; 
+            cursor: pointer; 
+            border-radius: 4px; 
+        }
+        .test-button:hover { background: #005a9e; }
+        .drawing-button { background: #28a745; }
+        .drawing-button:hover { background: #1e7e34; }
+        .success { color: #28a745; font-weight: bold; }
+        .error { color: #dc3545; font-weight: bold; }
+        .result { 
+            background: #f8f9fa; 
+            padding: 15px; 
+            margin: 10px 0; 
+            border-left: 4px solid #007acc; 
+            font-family: monospace; 
+            white-space: pre-wrap;
+        }
+        .drawing-state {
+            background: #d4edda;
+            padding: 15px;
+            margin: 10px 0;
+            border-left: 4px solid #28a745;
+            font-family: monospace;
+        }
+        .coordinate-input {
+            margin: 5px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 80px;
+        }
+        .drawing-mode-selector {
+            display: inline-block;
+            margin: 5px;
+            padding: 8px 16px;
+            background: #e9ecef;
+            border: 2px solid #dee2e6;
+            border-radius: 4px;
+            cursor: pointer;
+            user-select: none;
+        }
+        .drawing-mode-selector.active {
+            background: #007acc;
+            color: white;
+            border-color: #005a9e;
+        }
+        .drawing-mode-selector:hover {
+            background: #dee2e6;
+        }
+        .drawing-mode-selector.active:hover {
+            background: #005a9e;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎨 Drawing System Test</h1>
+    <p>Testing the unified drawing system and finishDrawing operations</p>
+
+    <div class="test-section">
+        <h2>🎯 Drawing Mode Selection</h2>
+        <div id="drawing-modes">
+            <div class="drawing-mode-selector" data-mode="none">None</div>
+            <div class="drawing-mode-selector" data-mode="point">Point</div>
+            <div class="drawing-mode-selector" data-mode="line">Line</div>
+            <div class="drawing-mode-selector" data-mode="circle">Circle</div>
+            <div class="drawing-mode-selector" data-mode="rectangle">Rectangle</div>
+            <div class="drawing-mode-selector" data-mode="diamond">Diamond</div>
+        </div>
+        <div id="mode-results" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>📊 Current Drawing State</h2>
+        <div id="drawing-state" class="drawing-state">No drawing mode selected</div>
+        <button class="test-button" onclick="updateDrawingState()">Refresh Drawing State</button>
+    </div>
+
+    <div class="test-section">
+        <h2>🖱️ Drawing Operations</h2>
+        <div>
+            <h3>Manual Drawing Coordinates</h3>
+            <label>Start X: <input type="number" id="start-x" class="coordinate-input" value="50" /></label>
+            <label>Start Y: <input type="number" id="start-y" class="coordinate-input" value="50" /></label>
+            <label>End X: <input type="number" id="end-x" class="coordinate-input" value="150" /></label>
+            <label>End Y: <input type="number" id="end-y" class="coordinate-input" value="100" /></label>
+            <br><br>
+            <button class="drawing-button" onclick="startDrawingOperation()">Start Drawing</button>
+            <button class="drawing-button" onclick="finishDrawingOperation()">Finish Drawing</button>
+            <button class="test-button" onclick="cancelDrawingOperation()">Cancel Drawing</button>
+        </div>
+
+        <div>
+            <h3>Quick Drawing Tests</h3>
+            <button class="test-button" onclick="testQuickCircle()">Quick Circle</button>
+            <button class="test-button" onclick="testQuickRectangle()">Quick Rectangle</button>
+            <button class="test-button" onclick="testQuickLine()">Quick Line</button>
+            <button class="test-button" onclick="testQuickDiamond()">Quick Diamond</button>
+        </div>
+
+        <div id="drawing-results" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>🧪 Drawing Consistency Tests</h2>
+        <button class="test-button" onclick="testDrawingCalculations()">Test Drawing Property Calculations</button>
+        <button class="test-button" onclick="testDrawingToObjectConsistency()">Test Drawing → Object Consistency</button>
+        <button class="test-button" onclick="testMultipleDrawingModes()">Test All Drawing Modes</button>
+        <div id="consistency-results" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>📐 Drawing Precision Tests</h2>
+        <button class="test-button" onclick="testDrawingPrecision()">Test Drawing Precision</button>
+        <button class="test-button" onclick="testDrawingBoundsCalculation()">Test Drawing Bounds</button>
+        <button class="test-button" onclick="testDrawingWithDefaultStyle()">Test Drawing with Default Style</button>
+        <div id="precision-results" class="result"></div>
+    </div>
+
+    <script type="module">
+        // Mock geometry helper for drawing
+        const drawingGeometryHelper = {
+            generateVertices(type, properties) {
+                switch (type) {
+                    case 'circle':
+                        const segments = 16;
+                        const vertices = [];
+                        for (let i = 0; i < segments; i++) {
+                            const angle = (i / segments) * 2 * Math.PI;
+                            vertices.push({
+                                x: properties.center.x + Math.cos(angle) * properties.radius,
+                                y: properties.center.y + Math.sin(angle) * properties.radius
+                            });
+                        }
+                        return vertices;
+                    case 'rectangle':
+                        const hw = properties.width / 2;
+                        const hh = properties.height / 2;
+                        return [
+                            {x: properties.center.x - hw, y: properties.center.y - hh},
+                            {x: properties.center.x + hw, y: properties.center.y - hh},
+                            {x: properties.center.x + hw, y: properties.center.y + hh},
+                            {x: properties.center.x - hw, y: properties.center.y + hh}
+                        ];
+                    case 'line':
+                        return [properties.startPoint, properties.endPoint];
+                    case 'point':
+                        return [properties.center];
+                    case 'diamond':
+                        const dhw = properties.width / 2;
+                        const dhh = properties.height / 2;
+                        return [
+                            {x: properties.center.x, y: properties.center.y - dhh},
+                            {x: properties.center.x + dhw, y: properties.center.y},
+                            {x: properties.center.x, y: properties.center.y + dhh},
+                            {x: properties.center.x - dhw, y: properties.center.y}
+                        ];
+                    default:
+                        return [];
+                }
+            },
+            
+            calculateBounds(vertices) {
+                if (!vertices.length) return {minX: 0, minY: 0, maxX: 0, maxY: 0, width: 0, height: 0};
+                const xs = vertices.map(v => v.x);
+                const ys = vertices.map(v => v.y);
+                const minX = Math.min(...xs);
+                const maxX = Math.max(...xs);
+                const minY = Math.min(...ys);
+                const maxY = Math.max(...ys);
+                return {minX, minY, maxX, maxY, width: maxX - minX, height: maxY - minY};
+            },
+
+            calculateDrawingProperties(mode, startPoint, endPoint) {
+                switch (mode) {
+                    case 'circle':
+                        const center = {
+                            x: (startPoint.x + endPoint.x) / 2,
+                            y: (startPoint.y + endPoint.y) / 2
+                        };
+                        const radius = Math.sqrt(
+                            Math.pow(endPoint.x - startPoint.x, 2) + 
+                            Math.pow(endPoint.y - startPoint.y, 2)
+                        ) / 2;
+                        return { center, radius };
+                        
+                    case 'rectangle':
+                        const rectCenter = {
+                            x: (startPoint.x + endPoint.x) / 2,
+                            y: (startPoint.y + endPoint.y) / 2
+                        };
+                        return {
+                            center: rectCenter,
+                            width: Math.abs(endPoint.x - startPoint.x),
+                            height: Math.abs(endPoint.y - startPoint.y)
+                        };
+                        
+                    case 'line':
+                        return { startPoint, endPoint };
+                        
+                    case 'point':
+                        return { center: startPoint };
+                        
+                    case 'diamond':
+                        const diamondCenter = {
+                            x: (startPoint.x + endPoint.x) / 2,
+                            y: (startPoint.y + endPoint.y) / 2
+                        };
+                        return {
+                            center: diamondCenter,
+                            width: Math.abs(endPoint.x - startPoint.x),
+                            height: Math.abs(endPoint.y - startPoint.y)
+                        };
+                        
+                    default:
+                        throw new Error(`Drawing properties not implemented for ${mode}`);
+                }
+            }
+        };
+
+        // Mock store for drawing
+        window.drawingStore = {
+            objects: [],
+            drawing: {
+                mode: 'none',
+                isDrawing: false,
+                startPoint: null,
+                currentPoint: null
+            },
+            defaultStyle: {
+                color: 0x0066cc,
+                strokeWidth: 2,
+                fillColor: 0x0066cc,
+                fillEnabled: false,
+                strokeAlpha: 1.0,
+                fillAlpha: 0.3,
+                highlightColor: 0xff6600,
+                selectionColor: 0xff0000
+            }
+        };
+
+        window.drawingMethods = {
+            setDrawingMode(mode) {
+                window.drawingStore.drawing.mode = mode;
+                if (mode === 'none') {
+                    window.drawingStore.drawing.isDrawing = false;
+                    window.drawingStore.drawing.startPoint = null;
+                    window.drawingStore.drawing.currentPoint = null;
+                }
+            },
+
+            startDrawing(point) {
+                if (window.drawingStore.drawing.mode === 'none') return;
+                
+                window.drawingStore.drawing.isDrawing = true;
+                window.drawingStore.drawing.startPoint = point;
+                window.drawingStore.drawing.currentPoint = point;
+            },
+
+            updateDrawing(point) {
+                if (!window.drawingStore.drawing.isDrawing) return;
+                window.drawingStore.drawing.currentPoint = point;
+            },
+
+            finishDrawing(mode, startPoint, endPoint) {
+                const properties = drawingGeometryHelper.calculateDrawingProperties(mode, startPoint, endPoint);
+                
+                return this.createObject({
+                    type: mode,
+                    properties: properties,
+                    style: window.drawingStore.defaultStyle
+                });
+            },
+
+            createObject(params) {
+                const vertices = params.vertices || drawingGeometryHelper.generateVertices(params.type, params.properties);
+                const newObject = {
+                    id: `obj_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                    type: params.type,
+                    vertices: vertices,
+                    bounds: drawingGeometryHelper.calculateBounds(vertices),
+                    style: {
+                        color: params.style?.color || window.drawingStore.defaultStyle.color,
+                        strokeWidth: params.style?.strokeWidth || window.drawingStore.defaultStyle.strokeWidth,
+                        strokeAlpha: params.style?.strokeAlpha || window.drawingStore.defaultStyle.strokeAlpha,
+                        fillColor: params.style?.fillColor,
+                        fillAlpha: params.style?.fillAlpha
+                    },
+                    isVisible: true,
+                    createdAt: Date.now(),
+                    properties: params.properties
+                };
+                
+                window.drawingStore.objects.push(newObject);
+                return newObject.id;
+            },
+
+            cancelDrawing() {
+                window.drawingStore.drawing.isDrawing = false;
+                window.drawingStore.drawing.startPoint = null;
+                window.drawingStore.drawing.currentPoint = null;
+            }
+        };
+
+        // Setup drawing mode selection
+        document.addEventListener('DOMContentLoaded', function() {
+            const modeSelectors = document.querySelectorAll('.drawing-mode-selector');
+            modeSelectors.forEach(selector => {
+                selector.addEventListener('click', function() {
+                    // Remove active from all
+                    modeSelectors.forEach(s => s.classList.remove('active'));
+                    // Add active to clicked
+                    this.classList.add('active');
+                    
+                    const mode = this.dataset.mode;
+                    window.drawingMethods.setDrawingMode(mode);
+                    
+                    document.getElementById('mode-results').textContent = `✅ Drawing mode set to: ${mode}`;
+                    document.getElementById('mode-results').className = 'result success';
+                    updateDrawingState();
+                });
+            });
+
+            // Set default mode
+            document.querySelector('[data-mode="none"]').classList.add('active');
+        });
+
+        // Test functions
+        window.updateDrawingState = function() {
+            const drawing = window.drawingStore.drawing;
+            const stateText = `Drawing State:
+Mode: ${drawing.mode}
+Is Drawing: ${drawing.isDrawing}
+Start Point: ${drawing.startPoint ? `(${drawing.startPoint.x}, ${drawing.startPoint.y})` : 'None'}
+Current Point: ${drawing.currentPoint ? `(${drawing.currentPoint.x}, ${drawing.currentPoint.y})` : 'None'}
+Total Objects: ${window.drawingStore.objects.length}`;
+
+            document.getElementById('drawing-state').textContent = stateText;
+        };
+
+        window.startDrawingOperation = function() {
+            const startX = parseFloat(document.getElementById('start-x').value);
+            const startY = parseFloat(document.getElementById('start-y').value);
+            const startPoint = {x: startX, y: startY};
+
+            if (window.drawingStore.drawing.mode === 'none') {
+                document.getElementById('drawing-results').textContent = '❌ Select a drawing mode first.';
+                document.getElementById('drawing-results').className = 'result error';
+                return;
+            }
+
+            window.drawingMethods.startDrawing(startPoint);
+            
+            document.getElementById('drawing-results').textContent = `✅ Drawing started!\nMode: ${window.drawingStore.drawing.mode}\nStart point: (${startX}, ${startY})`;
+            document.getElementById('drawing-results').className = 'result success';
+            updateDrawingState();
+        };
+
+        window.finishDrawingOperation = function() {
+            if (!window.drawingStore.drawing.isDrawing) {
+                document.getElementById('drawing-results').textContent = '❌ No drawing in progress. Start drawing first.';
+                document.getElementById('drawing-results').className = 'result error';
+                return;
+            }
+
+            const endX = parseFloat(document.getElementById('end-x').value);
+            const endY = parseFloat(document.getElementById('end-y').value);
+            const endPoint = {x: endX, y: endY};
+            
+            const startPoint = window.drawingStore.drawing.startPoint;
+            const mode = window.drawingStore.drawing.mode;
+
+            const objectId = window.drawingMethods.finishDrawing(mode, startPoint, endPoint);
+            
+            // Clear drawing state
+            window.drawingMethods.cancelDrawing();
+
+            const createdObject = window.drawingStore.objects.find(obj => obj.id === objectId);
+            
+            document.getElementById('drawing-results').textContent = `✅ Drawing finished!
+Object ID: ${objectId.substring(0, 12)}...
+Type: ${createdObject.type}
+Start: (${startPoint.x}, ${startPoint.y})
+End: (${endPoint.x}, ${endPoint.y})
+Properties: ${JSON.stringify(createdObject.properties, null, 2)}`;
+            document.getElementById('drawing-results').className = 'result success';
+            updateDrawingState();
+        };
+
+        window.cancelDrawingOperation = function() {
+            window.drawingMethods.cancelDrawing();
+            
+            document.getElementById('drawing-results').textContent = '✅ Drawing cancelled.';
+            document.getElementById('drawing-results').className = 'result success';
+            updateDrawingState();
+        };
+
+        window.testQuickCircle = function() {
+            window.drawingMethods.setDrawingMode('circle');
+            const startPoint = {x: 100, y: 100};
+            const endPoint = {x: 180, y: 140};
+            
+            const objectId = window.drawingMethods.finishDrawing('circle', startPoint, endPoint);
+            const circle = window.drawingStore.objects.find(obj => obj.id === objectId);
+            
+            document.getElementById('drawing-results').textContent = `✅ Quick circle created!
+Center: (${circle.properties.center.x.toFixed(2)}, ${circle.properties.center.y.toFixed(2)})
+Radius: ${circle.properties.radius.toFixed(2)}
+Vertices: ${circle.vertices.length}`;
+            document.getElementById('drawing-results').className = 'result success';
+        };
+
+        window.testQuickRectangle = function() {
+            window.drawingMethods.setDrawingMode('rectangle');
+            const startPoint = {x: 200, y: 150};
+            const endPoint = {x: 280, y: 200};
+            
+            const objectId = window.drawingMethods.finishDrawing('rectangle', startPoint, endPoint);
+            const rect = window.drawingStore.objects.find(obj => obj.id === objectId);
+            
+            document.getElementById('drawing-results').textContent = `✅ Quick rectangle created!
+Center: (${rect.properties.center.x.toFixed(2)}, ${rect.properties.center.y.toFixed(2)})
+Size: ${rect.properties.width.toFixed(2)} x ${rect.properties.height.toFixed(2)}
+Vertices: ${rect.vertices.length}`;
+            document.getElementById('drawing-results').className = 'result success';
+        };
+
+        window.testQuickLine = function() {
+            window.drawingMethods.setDrawingMode('line');
+            const startPoint = {x: 50, y: 200};
+            const endPoint = {x: 120, y: 250};
+            
+            const objectId = window.drawingMethods.finishDrawing('line', startPoint, endPoint);
+            const line = window.drawingStore.objects.find(obj => obj.id === objectId);
+            
+            document.getElementById('drawing-results').textContent = `✅ Quick line created!
+Start: (${line.properties.startPoint.x}, ${line.properties.startPoint.y})
+End: (${line.properties.endPoint.x}, ${line.properties.endPoint.y})
+Length: ${line.properties.length.toFixed(2)}
+Angle: ${(line.properties.angle * 180 / Math.PI).toFixed(2)}°`;
+            document.getElementById('drawing-results').className = 'result success';
+        };
+
+        window.testQuickDiamond = function() {
+            window.drawingMethods.setDrawingMode('diamond');
+            const startPoint = {x: 300, y: 100};
+            const endPoint = {x: 360, y: 160};
+            
+            const objectId = window.drawingMethods.finishDrawing('diamond', startPoint, endPoint);
+            const diamond = window.drawingStore.objects.find(obj => obj.id === objectId);
+            
+            document.getElementById('drawing-results').textContent = `✅ Quick diamond created!
+Center: (${diamond.properties.center.x.toFixed(2)}, ${diamond.properties.center.y.toFixed(2)})
+Size: ${diamond.properties.width.toFixed(2)} x ${diamond.properties.height.toFixed(2)}
+Vertices: ${diamond.vertices.length}`;
+            document.getElementById('drawing-results').className = 'result success';
+        };
+
+        window.testDrawingCalculations = function() {
+            // Test drawing property calculations
+            const testCases = [
+                {mode: 'circle', start: {x: 100, y: 100}, end: {x: 140, y: 130}},
+                {mode: 'rectangle', start: {x: 50, y: 50}, end: {x: 100, y: 80}},
+                {mode: 'line', start: {x: 0, y: 0}, end: {x: 30, y: 40}},
+                {mode: 'diamond', start: {x: 200, y: 150}, end: {x: 250, y: 200}}
+            ];
+
+            const results = testCases.map(testCase => {
+                try {
+                    const properties = drawingGeometryHelper.calculateDrawingProperties(
+                        testCase.mode, testCase.start, testCase.end
+                    );
+                    
+                    let calculationCorrect = false;
+                    let details = '';
+
+                    switch (testCase.mode) {
+                        case 'circle':
+                            const expectedCenterX = (testCase.start.x + testCase.end.x) / 2;
+                            const expectedCenterY = (testCase.start.y + testCase.end.y) / 2;
+                            const dx = testCase.end.x - testCase.start.x;
+                            const dy = testCase.end.y - testCase.start.y;
+                            const expectedRadius = Math.sqrt(dx*dx + dy*dy) / 2;
+                            
+                            calculationCorrect = 
+                                Math.abs(properties.center.x - expectedCenterX) < 0.01 &&
+                                Math.abs(properties.center.y - expectedCenterY) < 0.01 &&
+                                Math.abs(properties.radius - expectedRadius) < 0.01;
+                            
+                            details = `Center: (${properties.center.x.toFixed(2)}, ${properties.center.y.toFixed(2)}), Radius: ${properties.radius.toFixed(2)}`;
+                            break;
+                            
+                        case 'rectangle':
+                            const expectedRectCenterX = (testCase.start.x + testCase.end.x) / 2;
+                            const expectedRectCenterY = (testCase.start.y + testCase.end.y) / 2;
+                            const expectedWidth = Math.abs(testCase.end.x - testCase.start.x);
+                            const expectedHeight = Math.abs(testCase.end.y - testCase.start.y);
+                            
+                            calculationCorrect = 
+                                Math.abs(properties.center.x - expectedRectCenterX) < 0.01 &&
+                                Math.abs(properties.center.y - expectedRectCenterY) < 0.01 &&
+                                Math.abs(properties.width - expectedWidth) < 0.01 &&
+                                Math.abs(properties.height - expectedHeight) < 0.01;
+                            
+                            details = `Center: (${properties.center.x.toFixed(2)}, ${properties.center.y.toFixed(2)}), Size: ${properties.width.toFixed(2)}x${properties.height.toFixed(2)}`;
+                            break;
+                            
+                        case 'line':
+                            calculationCorrect = 
+                                properties.startPoint.x === testCase.start.x &&
+                                properties.startPoint.y === testCase.start.y &&
+                                properties.endPoint.x === testCase.end.x &&
+                                properties.endPoint.y === testCase.end.y;
+                            
+                            details = `Start: (${properties.startPoint.x}, ${properties.startPoint.y}), End: (${properties.endPoint.x}, ${properties.endPoint.y})`;
+                            break;
+                            
+                        case 'diamond':
+                            const expectedDiamondCenterX = (testCase.start.x + testCase.end.x) / 2;
+                            const expectedDiamondCenterY = (testCase.start.y + testCase.end.y) / 2;
+                            const expectedDiamondWidth = Math.abs(testCase.end.x - testCase.start.x);
+                            const expectedDiamondHeight = Math.abs(testCase.end.y - testCase.start.y);
+                            
+                            calculationCorrect = 
+                                Math.abs(properties.center.x - expectedDiamondCenterX) < 0.01 &&
+                                Math.abs(properties.center.y - expectedDiamondCenterY) < 0.01 &&
+                                Math.abs(properties.width - expectedDiamondWidth) < 0.01 &&
+                                Math.abs(properties.height - expectedDiamondHeight) < 0.01;
+                            
+                            details = `Center: (${properties.center.x.toFixed(2)}, ${properties.center.y.toFixed(2)}), Size: ${properties.width.toFixed(2)}x${properties.height.toFixed(2)}`;
+                            break;
+                    }
+
+                    return {
+                        mode: testCase.mode,
+                        input: `(${testCase.start.x}, ${testCase.start.y}) to (${testCase.end.x}, ${testCase.end.y})`,
+                        details,
+                        correct: calculationCorrect
+                    };
+                } catch (e) {
+                    return {
+                        mode: testCase.mode,
+                        input: `(${testCase.start.x}, ${testCase.start.y}) to (${testCase.end.x}, ${testCase.end.y})`,
+                        details: `Error: ${e.message}`,
+                        correct: false
+                    };
+                }
+            });
+
+            const allCorrect = results.every(r => r.correct);
+
+            const resultText = `Drawing Calculations Test:
+${results.map(r => `${r.mode}: ${r.input} → ${r.details} ${r.correct ? '✅' : '❌'}`).join('\n')}
+
+${allCorrect ? '✅ All drawing calculations correct!' : '❌ Some drawing calculations failed!'}`;
+
+            document.getElementById('consistency-results').textContent = resultText;
+            document.getElementById('consistency-results').className = allCorrect ? 'result success' : 'result error';
+        };
+
+        window.testDrawingToObjectConsistency = function() {
+            // Test that drawing properties and final object properties match
+            const testDrawings = [
+                {mode: 'circle', start: {x: 100, y: 100}, end: {x: 160, y: 140}},
+                {mode: 'rectangle', start: {x: 200, y: 150}, end: {x: 280, y: 200}}
+            ];
+
+            const results = testDrawings.map(test => {
+                // Calculate drawing properties
+                const drawingProperties = drawingGeometryHelper.calculateDrawingProperties(
+                    test.mode, test.start, test.end
+                );
+
+                // Create object through drawing system
+                const objectId = window.drawingMethods.finishDrawing(test.mode, test.start, test.end);
+                const createdObject = window.drawingStore.objects.find(obj => obj.id === objectId);
+
+                // Compare properties
+                let propertiesMatch = false;
+                let comparison = '';
+
+                if (test.mode === 'circle') {
+                    const centerMatch = 
+                        Math.abs(drawingProperties.center.x - createdObject.properties.center.x) < 0.01 &&
+                        Math.abs(drawingProperties.center.y - createdObject.properties.center.y) < 0.01;
+                    const radiusMatch = Math.abs(drawingProperties.radius - createdObject.properties.radius) < 0.01;
+                    
+                    propertiesMatch = centerMatch && radiusMatch;
+                    comparison = `Drawing: C(${drawingProperties.center.x.toFixed(2)}, ${drawingProperties.center.y.toFixed(2)}) R${drawingProperties.radius.toFixed(2)}
+Object: C(${createdObject.properties.center.x.toFixed(2)}, ${createdObject.properties.center.y.toFixed(2)}) R${createdObject.properties.radius.toFixed(2)}`;
+                } else if (test.mode === 'rectangle') {
+                    const centerMatch = 
+                        Math.abs(drawingProperties.center.x - createdObject.properties.center.x) < 0.01 &&
+                        Math.abs(drawingProperties.center.y - createdObject.properties.center.y) < 0.01;
+                    const sizeMatch = 
+                        Math.abs(drawingProperties.width - createdObject.properties.width) < 0.01 &&
+                        Math.abs(drawingProperties.height - createdObject.properties.height) < 0.01;
+                    
+                    propertiesMatch = centerMatch && sizeMatch;
+                    comparison = `Drawing: C(${drawingProperties.center.x.toFixed(2)}, ${drawingProperties.center.y.toFixed(2)}) ${drawingProperties.width.toFixed(2)}x${drawingProperties.height.toFixed(2)}
+Object: C(${createdObject.properties.center.x.toFixed(2)}, ${createdObject.properties.center.y.toFixed(2)}) ${createdObject.properties.width.toFixed(2)}x${createdObject.properties.height.toFixed(2)}`;
+                }
+
+                return {
+                    mode: test.mode,
+                    comparison,
+                    match: propertiesMatch
+                };
+            });
+
+            const allMatch = results.every(r => r.match);
+
+            const resultText = `Drawing → Object Consistency Test:
+${results.map(r => `${r.mode}:
+${r.comparison}
+Match: ${r.match ? '✅' : '❌'}`).join('\n\n')}
+
+${allMatch ? '✅ Drawing and object properties are consistent!' : '❌ Drawing and object properties differ!'}`;
+
+            document.getElementById('consistency-results').textContent = resultText;
+            document.getElementById('consistency-results').className = allMatch ? 'result success' : 'result error';
+        };
+
+        window.testMultipleDrawingModes = function() {
+            // Test all drawing modes work correctly
+            const drawingModes = ['point', 'line', 'circle', 'rectangle', 'diamond'];
+            const objectCountBefore = window.drawingStore.objects.length;
+            
+            const results = drawingModes.map(mode => {
+                try {
+                    // Use different coordinates for each mode
+                    const offset = drawingModes.indexOf(mode) * 100;
+                    const startPoint = {x: 50 + offset, y: 50};
+                    const endPoint = {x: 100 + offset, y: 100};
+
+                    const objectId = window.drawingMethods.finishDrawing(mode, startPoint, endPoint);
+                    const object = window.drawingStore.objects.find(obj => obj.id === objectId);
+
+                    return {
+                        mode,
+                        success: object !== undefined,
+                        type: object?.type,
+                        hasVertices: object?.vertices?.length > 0,
+                        hasBounds: object?.bounds !== undefined,
+                        hasProperties: object?.properties !== undefined
+                    };
+                } catch (e) {
+                    return {
+                        mode,
+                        success: false,
+                        error: e.message
+                    };
+                }
+            });
+
+            const objectCountAfter = window.drawingStore.objects.length;
+            const expectedObjectCount = objectCountBefore + drawingModes.length;
+            const objectCountCorrect = objectCountAfter === expectedObjectCount;
+
+            const allSuccess = results.every(r => r.success);
+
+            const resultText = `Multiple Drawing Modes Test:
+Object count: ${objectCountBefore} → ${objectCountAfter} (expected: ${expectedObjectCount}) ${objectCountCorrect ? '✅' : '❌'}
+
+${results.map(r => `${r.mode}: ${r.success ? '✅' : '❌'} ${r.error || ''} (Type: ${r.type || 'N/A'}, Vertices: ${r.hasVertices ? '✅' : '❌'}, Bounds: ${r.hasBounds ? '✅' : '❌'}, Props: ${r.hasProperties ? '✅' : '❌'})`).join('\n')}
+
+${allSuccess && objectCountCorrect ? '✅ All drawing modes work correctly!' : '❌ Some drawing modes failed!'}`;
+
+            document.getElementById('consistency-results').textContent = resultText;
+            document.getElementById('consistency-results').className = (allSuccess && objectCountCorrect) ? 'result success' : 'result error';
+        };
+
+        window.testDrawingPrecision = function() {
+            // Test precision with very small and very precise coordinates
+            const precisionTests = [
+                {
+                    name: 'Very small circle',
+                    mode: 'circle',
+                    start: {x: 100, y: 100},
+                    end: {x: 100.1, y: 100.1}
+                },
+                {
+                    name: 'Precise floating point',
+                    mode: 'rectangle',
+                    start: {x: 1/3, y: 2/3},
+                    end: {x: 4/3, y: 5/3}
+                },
+                {
+                    name: 'Large coordinates',
+                    mode: 'line',
+                    start: {x: 10000, y: -5000},
+                    end: {x: 10050, y: -4950}
+                }
+            ];
+
+            const results = precisionTests.map(test => {
+                try {
+                    const objectId = window.drawingMethods.finishDrawing(test.mode, test.start, test.end);
+                    const object = window.drawingStore.objects.find(obj => obj.id === objectId);
+                    
+                    const hasValidBounds = 
+                        !isNaN(object.bounds.minX) && !isNaN(object.bounds.maxX) &&
+                        !isNaN(object.bounds.minY) && !isNaN(object.bounds.maxY) &&
+                        isFinite(object.bounds.minX) && isFinite(object.bounds.maxX) &&
+                        isFinite(object.bounds.minY) && isFinite(object.bounds.maxY);
+
+                    const hasValidProperties = Object.values(object.properties).every(val => 
+                        typeof val === 'string' || typeof val === 'object' || (!isNaN(val) && isFinite(val))
+                    );
+
+                    return {
+                        name: test.name,
+                        mode: test.mode,
+                        validBounds: hasValidBounds,
+                        validProperties: hasValidProperties,
+                        success: hasValidBounds && hasValidProperties
+                    };
+                } catch (e) {
+                    return {
+                        name: test.name,
+                        mode: test.mode,
+                        validBounds: false,
+                        validProperties: false,
+                        success: false,
+                        error: e.message
+                    };
+                }
+            });
+
+            const allSuccess = results.every(r => r.success);
+
+            const resultText = `Drawing Precision Test:
+${results.map(r => `${r.name} (${r.mode}): ${r.success ? '✅' : '❌'} ${r.error || ''} (Bounds: ${r.validBounds ? '✅' : '❌'}, Props: ${r.validProperties ? '✅' : '❌'})`).join('\n')}
+
+${allSuccess ? '✅ All precision tests passed!' : '❌ Some precision tests failed!'}`;
+
+            document.getElementById('precision-results').textContent = resultText;
+            document.getElementById('precision-results').className = allSuccess ? 'result success' : 'result error';
+        };
+
+        window.testDrawingBoundsCalculation = function() {
+            // Test that bounds are correctly calculated for drawn objects
+            const boundsTests = [
+                {mode: 'circle', start: {x: 100, y: 100}, end: {x: 160, y: 140}},
+                {mode: 'rectangle', start: {x: 200, y: 150}, end: {x: 250, y: 200}}
+            ];
+
+            const results = boundsTests.map(test => {
+                const objectId = window.drawingMethods.finishDrawing(test.mode, test.start, test.end);
+                const object = window.drawingStore.objects.find(obj => obj.id === objectId);
+                
+                // Recalculate bounds from vertices
+                const calculatedBounds = drawingGeometryHelper.calculateBounds(object.vertices);
+                
+                const boundsMatch = 
+                    Math.abs(calculatedBounds.minX - object.bounds.minX) < 0.01 &&
+                    Math.abs(calculatedBounds.maxX - object.bounds.maxX) < 0.01 &&
+                    Math.abs(calculatedBounds.minY - object.bounds.minY) < 0.01 &&
+                    Math.abs(calculatedBounds.maxY - object.bounds.maxY) < 0.01;
+
+                return {
+                    mode: test.mode,
+                    stored: `(${object.bounds.minX.toFixed(2)}, ${object.bounds.minY.toFixed(2)}) to (${object.bounds.maxX.toFixed(2)}, ${object.bounds.maxY.toFixed(2)})`,
+                    calculated: `(${calculatedBounds.minX.toFixed(2)}, ${calculatedBounds.minY.toFixed(2)}) to (${calculatedBounds.maxX.toFixed(2)}, ${calculatedBounds.maxY.toFixed(2)})`,
+                    match: boundsMatch
+                };
+            });
+
+            const allMatch = results.every(r => r.match);
+
+            const resultText = `Drawing Bounds Calculation Test:
+${results.map(r => `${r.mode}:
+  Stored: ${r.stored}
+  Calculated: ${r.calculated}
+  Match: ${r.match ? '✅' : '❌'}`).join('\n\n')}
+
+${allMatch ? '✅ All bounds calculations correct!' : '❌ Some bounds calculations incorrect!'}`;
+
+            document.getElementById('precision-results').textContent = resultText;
+            document.getElementById('precision-results').className = allMatch ? 'result success' : 'result error';
+        };
+
+        window.testDrawingWithDefaultStyle = function() {
+            // Test that drawing uses default style correctly
+            const originalStyle = {...window.drawingStore.defaultStyle};
+            
+            // Change default style
+            window.drawingStore.defaultStyle.color = 0xff0000;
+            window.drawingStore.defaultStyle.strokeWidth = 5;
+            window.drawingStore.defaultStyle.fillEnabled = true;
+
+            // Create object with new style
+            const objectId = window.drawingMethods.finishDrawing('circle', {x: 300, y: 200}, {x: 350, y: 250});
+            const object = window.drawingStore.objects.find(obj => obj.id === objectId);
+
+            const styleCorrect = 
+                object.style.color === 0xff0000 &&
+                object.style.strokeWidth === 5;
+
+            // Restore original style
+            window.drawingStore.defaultStyle = originalStyle;
+
+            const resultText = `Drawing with Default Style Test:
+Expected color: ${0xff0000.toString(16)}
+Actual color: ${object.style.color.toString(16)}
+Expected stroke width: 5
+Actual stroke width: ${object.style.strokeWidth}
+
+Style applied correctly: ${styleCorrect ? '✅' : '❌'}
+
+${styleCorrect ? '✅ Default style correctly applied to drawn objects!' : '❌ Default style not applied correctly!'}`;
+
+            document.getElementById('precision-results').textContent = resultText;
+            document.getElementById('precision-results').className = styleCorrect ? 'result success' : 'result error';
+        };
+
+        // Initialize
+        updateDrawingState();
+    </script>
+</body>
+</html>

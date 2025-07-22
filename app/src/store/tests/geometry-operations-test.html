@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Geometry Operations Test - Game Store</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 20px; 
+            background: #f5f5f5; 
+        }
+        .test-section { 
+            background: white; 
+            padding: 20px; 
+            margin: 20px 0; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-button { 
+            background: #007acc; 
+            color: white; 
+            border: none; 
+            padding: 10px 20px; 
+            margin: 5px; 
+            cursor: pointer; 
+            border-radius: 4px; 
+        }
+        .test-button:hover { background: #005a9e; }
+        .success { color: #28a745; font-weight: bold; }
+        .error { color: #dc3545; font-weight: bold; }
+        .result { 
+            background: #f8f9fa; 
+            padding: 10px; 
+            margin: 10px 0; 
+            border-left: 4px solid #007acc; 
+            font-family: monospace; 
+            white-space: pre-wrap;
+        }
+        .store-state {
+            background: #e9ecef;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔧 Geometry Operations Test</h1>
+    <p>Testing all geometry operations from the unified game store</p>
+
+    <div class="test-section">
+        <h2>📊 Current Store State</h2>
+        <div id="store-display" class="store-state">Loading store...</div>
+        <button class="test-button" onclick="updateStoreDisplay()">Refresh Store State</button>
+    </div>
+
+    <div class="test-section">
+        <h2>🎯 Basic Shape Creation</h2>
+        <button class="test-button" onclick="testCreateCircle()">Create Circle</button>
+        <button class="test-button" onclick="testCreateRectangle()">Create Rectangle</button>
+        <button class="test-button" onclick="testCreateLine()">Create Line</button>
+        <button class="test-button" onclick="testCreatePoint()">Create Point</button>
+        <button class="test-button" onclick="testCreateDiamond()">Create Diamond</button>
+        <div id="creation-results" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>✏️ Object Manipulation</h2>
+        <button class="test-button" onclick="testSelectObject()">Select First Object</button>
+        <button class="test-button" onclick="testMoveObject()">Move Selected Object</button>
+        <button class="test-button" onclick="testResizeObject()">Resize Selected Object</button>
+        <button class="test-button" onclick="testRemoveObject()">Remove Selected Object</button>
+        <div id="manipulation-results" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>🎨 Style Operations</h2>
+        <button class="test-button" onclick="testChangeDefaultStyle()">Change Default Style</button>
+        <button class="test-button" onclick="testResetDefaultStyle()">Reset Default Style</button>
+        <div id="style-results" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>🧹 Utility Operations</h2>
+        <button class="test-button" onclick="testClearAll()">Clear All Objects</button>
+        <button class="test-button" onclick="testGetObjectById()">Test Get Object By ID</button>
+        <div id="utility-results" class="result"></div>
+    </div>
+
+    <script type="module">
+        // Mock the store modules for testing
+        // In real implementation, these would be imported from the actual files
+        
+        // Create mock objects that match our implemented structure
+        const mockGeometryHelper = {
+            generateVertices(type, properties) {
+                switch (type) {
+                    case 'circle':
+                        return [
+                            {x: properties.center.x, y: properties.center.y - properties.radius},
+                            {x: properties.center.x + properties.radius, y: properties.center.y},
+                            {x: properties.center.x, y: properties.center.y + properties.radius},
+                            {x: properties.center.x - properties.radius, y: properties.center.y}
+                        ];
+                    case 'rectangle':
+                        const hw = properties.width / 2;
+                        const hh = properties.height / 2;
+                        return [
+                            {x: properties.center.x - hw, y: properties.center.y - hh},
+                            {x: properties.center.x + hw, y: properties.center.y - hh},
+                            {x: properties.center.x + hw, y: properties.center.y + hh},
+                            {x: properties.center.x - hw, y: properties.center.y + hh}
+                        ];
+                    case 'line':
+                        return [properties.startPoint, properties.endPoint];
+                    case 'point':
+                        return [properties.center];
+                    case 'diamond':
+                        const dhw = properties.width / 2;
+                        const dhh = properties.height / 2;
+                        return [
+                            {x: properties.center.x, y: properties.center.y - dhh},
+                            {x: properties.center.x + dhw, y: properties.center.y},
+                            {x: properties.center.x, y: properties.center.y + dhh},
+                            {x: properties.center.x - dhw, y: properties.center.y}
+                        ];
+                    default:
+                        return [];
+                }
+            },
+            
+            calculateBounds(vertices) {
+                if (!vertices.length) return {minX: 0, minY: 0, maxX: 0, maxY: 0, width: 0, height: 0};
+                const xs = vertices.map(v => v.x);
+                const ys = vertices.map(v => v.y);
+                const minX = Math.min(...xs);
+                const maxX = Math.max(...xs);
+                const minY = Math.min(...ys);
+                const maxY = Math.max(...ys);
+                return {minX, minY, maxX, maxY, width: maxX - minX, height: maxY - minY};
+            },
+            
+            calculateProperties(type, vertices) {
+                const bounds = this.calculateBounds(vertices);
+                switch (type) {
+                    case 'circle':
+                        return {
+                            type: 'circle',
+                            center: {x: bounds.minX + bounds.width/2, y: bounds.minY + bounds.height/2},
+                            radius: bounds.width / 2,
+                            diameter: bounds.width,
+                            circumference: Math.PI * bounds.width,
+                            area: Math.PI * Math.pow(bounds.width/2, 2)
+                        };
+                    case 'rectangle':
+                        return {
+                            type: 'rectangle',
+                            center: {x: bounds.minX + bounds.width/2, y: bounds.minY + bounds.height/2},
+                            width: bounds.width,
+                            height: bounds.height,
+                            area: bounds.width * bounds.height,
+                            perimeter: 2 * (bounds.width + bounds.height)
+                        };
+                    default:
+                        return {type, center: {x: 0, y: 0}};
+                }
+            },
+
+            moveVertices(vertices, offset) {
+                return vertices.map(v => ({x: v.x + offset.x, y: v.y + offset.y}));
+            }
+        };
+
+        // Mock store matching our implementation
+        window.mockGameStore = {
+            objects: [],
+            selection: {selectedId: null, selectionBounds: null},
+            preview: {isActive: false, editingObjectId: null, originalObject: null, previewData: null, shouldShowPreview: true, previewOpacity: 0.8},
+            drawing: {mode: 'none', isDrawing: false, startPoint: null, currentPoint: null},
+            defaultStyle: {color: 0x0066cc, strokeWidth: 2, fillColor: 0x0066cc, fillEnabled: false, strokeAlpha: 1.0, fillAlpha: 0.3, highlightColor: 0xff6600, selectionColor: 0xff0000},
+            ui: {showGeometry: true, showGeometryPanel: false, showStorePanel: false, isEditPanelOpen: false},
+            mouse: {position: {x: 0, y: 0}, isOverObject: false, hoveredObjectId: null},
+            navigation: {offset: {x: 0, y: 0}, isDragging: false}
+        };
+
+        // Mock store methods matching our implementation
+        window.mockGameStoreMethods = {
+            createObject(params) {
+                const vertices = params.vertices || mockGeometryHelper.generateVertices(params.type, params.properties);
+                const newObject = {
+                    id: `obj_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                    type: params.type,
+                    vertices: vertices,
+                    bounds: mockGeometryHelper.calculateBounds(vertices),
+                    style: {
+                        color: params.style?.color || window.mockGameStore.defaultStyle.color,
+                        strokeWidth: params.style?.strokeWidth || window.mockGameStore.defaultStyle.strokeWidth,
+                        strokeAlpha: params.style?.strokeAlpha || window.mockGameStore.defaultStyle.strokeAlpha,
+                        fillColor: params.style?.fillColor,
+                        fillAlpha: params.style?.fillAlpha
+                    },
+                    isVisible: true,
+                    createdAt: Date.now(),
+                    properties: params.properties || mockGeometryHelper.calculateProperties(params.type, vertices)
+                };
+                window.mockGameStore.objects.push(newObject);
+                return newObject.id;
+            },
+
+            removeObject(objectId) {
+                const index = window.mockGameStore.objects.findIndex(obj => obj.id === objectId);
+                if (index !== -1) {
+                    window.mockGameStore.objects.splice(index, 1);
+                }
+                if (window.mockGameStore.selection.selectedId === objectId) {
+                    this.clearSelection();
+                }
+            },
+
+            selectObject(objectId) {
+                const obj = window.mockGameStore.objects.find(o => o.id === objectId);
+                if (obj) {
+                    window.mockGameStore.selection.selectedId = objectId;
+                    window.mockGameStore.selection.selectionBounds = obj.bounds;
+                }
+            },
+
+            clearSelection() {
+                window.mockGameStore.selection.selectedId = null;
+                window.mockGameStore.selection.selectionBounds = null;
+            },
+
+            moveObject(objectId, newVertices) {
+                const objIndex = window.mockGameStore.objects.findIndex(obj => obj.id === objectId);
+                if (objIndex !== -1) {
+                    const existingObject = window.mockGameStore.objects[objIndex];
+                    const newBounds = mockGeometryHelper.calculateBounds(newVertices);
+                    const newProperties = mockGeometryHelper.calculateProperties(existingObject.type, newVertices);
+                    
+                    window.mockGameStore.objects[objIndex] = {
+                        ...existingObject,
+                        vertices: newVertices,
+                        bounds: newBounds,
+                        properties: newProperties
+                    };
+
+                    if (window.mockGameStore.selection.selectedId === objectId) {
+                        window.mockGameStore.selection.selectionBounds = newBounds;
+                    }
+                }
+            },
+
+            resizeObject(objectId, newDimensions) {
+                const objIndex = window.mockGameStore.objects.findIndex(obj => obj.id === objectId);
+                if (objIndex !== -1) {
+                    const existingObject = window.mockGameStore.objects[objIndex];
+                    const newVertices = mockGeometryHelper.generateVertices(existingObject.type, newDimensions);
+                    this.moveObject(objectId, newVertices);
+                }
+            },
+
+            setDefaultStyle(style) {
+                Object.assign(window.mockGameStore.defaultStyle, style);
+            },
+
+            resetDefaultStyle() {
+                window.mockGameStore.defaultStyle = {
+                    color: 0x0066cc, strokeWidth: 2, fillColor: 0x0066cc, fillEnabled: false,
+                    strokeAlpha: 1.0, fillAlpha: 0.3, highlightColor: 0xff6600, selectionColor: 0xff0000
+                };
+            },
+
+            clearAllObjects() {
+                window.mockGameStore.objects = [];
+                this.clearSelection();
+            },
+
+            getObjectById(objectId) {
+                return window.mockGameStore.objects.find(obj => obj.id === objectId) || null;
+            },
+
+            getSelectedObject() {
+                return window.mockGameStore.selection.selectedId 
+                    ? this.getObjectById(window.mockGameStore.selection.selectedId)
+                    : null;
+            }
+        };
+
+        // Test functions
+        window.testCreateCircle = function() {
+            try {
+                const circleId = window.mockGameStoreMethods.createObject({
+                    type: 'circle',
+                    properties: {
+                        center: {x: 100, y: 100},
+                        radius: 50
+                    }
+                });
+                const result = `✅ Circle created successfully!\nID: ${circleId}\nRadius: 50 (should remain constant)`;
+                document.getElementById('creation-results').textContent = result;
+                document.getElementById('creation-results').className = 'result success';
+                updateStoreDisplay();
+            } catch (e) {
+                document.getElementById('creation-results').textContent = `❌ Error: ${e.message}`;
+                document.getElementById('creation-results').className = 'result error';
+            }
+        };
+
+        window.testCreateRectangle = function() {
+            try {
+                const rectId = window.mockGameStoreMethods.createObject({
+                    type: 'rectangle',
+                    properties: {
+                        center: {x: 200, y: 150},
+                        width: 80,
+                        height: 60
+                    }
+                });
+                const result = `✅ Rectangle created successfully!\nID: ${rectId}\nDimensions: 80x60`;
+                document.getElementById('creation-results').textContent = result;
+                document.getElementById('creation-results').className = 'result success';
+                updateStoreDisplay();
+            } catch (e) {
+                document.getElementById('creation-results').textContent = `❌ Error: ${e.message}`;
+                document.getElementById('creation-results').className = 'result error';
+            }
+        };
+
+        window.testCreateLine = function() {
+            try {
+                const lineId = window.mockGameStoreMethods.createObject({
+                    type: 'line',
+                    properties: {
+                        startPoint: {x: 50, y: 50},
+                        endPoint: {x: 150, y: 100}
+                    }
+                });
+                const result = `✅ Line created successfully!\nID: ${lineId}`;
+                document.getElementById('creation-results').textContent = result;
+                document.getElementById('creation-results').className = 'result success';
+                updateStoreDisplay();
+            } catch (e) {
+                document.getElementById('creation-results').textContent = `❌ Error: ${e.message}`;
+                document.getElementById('creation-results').className = 'result error';
+            }
+        };
+
+        window.testCreatePoint = function() {
+            try {
+                const pointId = window.mockGameStoreMethods.createObject({
+                    type: 'point',
+                    properties: {
+                        center: {x: 75, y: 75}
+                    }
+                });
+                const result = `✅ Point created successfully!\nID: ${pointId}`;
+                document.getElementById('creation-results').textContent = result;
+                document.getElementById('creation-results').className = 'result success';
+                updateStoreDisplay();
+            } catch (e) {
+                document.getElementById('creation-results').textContent = `❌ Error: ${e.message}`;
+                document.getElementById('creation-results').className = 'result error';
+            }
+        };
+
+        window.testCreateDiamond = function() {
+            try {
+                const diamondId = window.mockGameStoreMethods.createObject({
+                    type: 'diamond',
+                    properties: {
+                        center: {x: 300, y: 200},
+                        width: 70,
+                        height: 90
+                    }
+                });
+                const result = `✅ Diamond created successfully!\nID: ${diamondId}`;
+                document.getElementById('creation-results').textContent = result;
+                document.getElementById('creation-results').className = 'result success';
+                updateStoreDisplay();
+            } catch (e) {
+                document.getElementById('creation-results').textContent = `❌ Error: ${e.message}`;
+                document.getElementById('creation-results').className = 'result error';
+            }
+        };
+
+        window.testSelectObject = function() {
+            try {
+                if (window.mockGameStore.objects.length === 0) {
+                    document.getElementById('manipulation-results').textContent = '⚠️ No objects to select. Create some objects first.';
+                    document.getElementById('manipulation-results').className = 'result';
+                    return;
+                }
+                
+                const firstObject = window.mockGameStore.objects[0];
+                window.mockGameStoreMethods.selectObject(firstObject.id);
+                
+                const result = `✅ Object selected!\nID: ${firstObject.id}\nType: ${firstObject.type}`;
+                document.getElementById('manipulation-results').textContent = result;
+                document.getElementById('manipulation-results').className = 'result success';
+                updateStoreDisplay();
+            } catch (e) {
+                document.getElementById('manipulation-results').textContent = `❌ Error: ${e.message}`;
+                document.getElementById('manipulation-results').className = 'result error';
+            }
+        };
+
+        window.testMoveObject = function() {
+            try {
+                const selectedId = window.mockGameStore.selection.selectedId;
+                if (!selectedId) {
+                    document.getElementById('manipulation-results').textContent = '⚠️ No object selected. Select an object first.';
+                    document.getElementById('manipulation-results').className = 'result';
+                    return;
+                }
+
+                const obj = window.mockGameStoreMethods.getSelectedObject();
+                const originalCenter = obj.properties.center;
+                
+                // Move object by offset
+                const offset = {x: 50, y: 30};
+                const newVertices = mockGeometryHelper.moveVertices(obj.vertices, offset);
+                
+                window.mockGameStoreMethods.moveObject(selectedId, newVertices);
+                
+                const movedObj = window.mockGameStoreMethods.getSelectedObject();
+                const newCenter = movedObj.properties.center;
+                
+                const result = `✅ Object moved!\nOriginal center: (${originalCenter.x}, ${originalCenter.y})\nNew center: (${newCenter.x.toFixed(1)}, ${newCenter.y.toFixed(1)})\nOffset applied: (${offset.x}, ${offset.y})`;
+                document.getElementById('manipulation-results').textContent = result;
+                document.getElementById('manipulation-results').className = 'result success';
+                updateStoreDisplay();
+            } catch (e) {
+                document.getElementById('manipulation-results').textContent = `❌ Error: ${e.message}`;
+                document.getElementById('manipulation-results').className = 'result error';
+            }
+        };
+
+        window.testResizeObject = function() {
+            try {
+                const selectedId = window.mockGameStore.selection.selectedId;
+                if (!selectedId) {
+                    document.getElementById('manipulation-results').textContent = '⚠️ No object selected. Select an object first.';
+                    document.getElementById('manipulation-results').className = 'result';
+                    return;
+                }
+
+                const obj = window.mockGameStoreMethods.getSelectedObject();
+                
+                let newDimensions = {};
+                if (obj.type === 'circle') {
+                    newDimensions = {
+                        center: obj.properties.center,
+                        radius: obj.properties.radius * 1.5  // Increase by 50%
+                    };
+                } else if (obj.type === 'rectangle') {
+                    newDimensions = {
+                        center: obj.properties.center,
+                        width: obj.properties.width * 1.2,
+                        height: obj.properties.height * 1.2
+                    };
+                } else {
+                    document.getElementById('manipulation-results').textContent = '⚠️ Resize only implemented for circles and rectangles in this test.';
+                    document.getElementById('manipulation-results').className = 'result';
+                    return;
+                }
+
+                window.mockGameStoreMethods.resizeObject(selectedId, newDimensions);
+                
+                const resizedObj = window.mockGameStoreMethods.getSelectedObject();
+                const result = `✅ Object resized!\nType: ${resizedObj.type}\nNew properties: ${JSON.stringify(resizedObj.properties, null, 2)}`;
+                document.getElementById('manipulation-results').textContent = result;
+                document.getElementById('manipulation-results').className = 'result success';
+                updateStoreDisplay();
+            } catch (e) {
+                document.getElementById('manipulation-results').textContent = `❌ Error: ${e.message}`;
+                document.getElementById('manipulation-results').className = 'result error';
+            }
+        };
+
+        window.testRemoveObject = function() {
+            try {
+                const selectedId = window.mockGameStore.selection.selectedId;
+                if (!selectedId) {
+                    document.getElementById('manipulation-results').textContent = '⚠️ No object selected. Select an object first.';
+                    document.getElementById('manipulation-results').className = 'result';
+                    return;
+                }
+
+                const objCount = window.mockGameStore.objects.length;
+                window.mockGameStoreMethods.removeObject(selectedId);
+                const newObjCount = window.mockGameStore.objects.length;
+                
+                const result = `✅ Object removed!\nObject count: ${objCount} → ${newObjCount}\nSelection cleared: ${window.mockGameStore.selection.selectedId === null}`;
+                document.getElementById('manipulation-results').textContent = result;
+                document.getElementById('manipulation-results').className = 'result success';
+                updateStoreDisplay();
+            } catch (e) {
+                document.getElementById('manipulation-results').textContent = `❌ Error: ${e.message}`;
+                document.getElementById('manipulation-results').className = 'result error';
+            }
+        };
+
+        window.testChangeDefaultStyle = function() {
+            try {
+                const originalColor = window.mockGameStore.defaultStyle.color;
+                const newColor = 0xff0000; // Red
+
+                window.mockGameStoreMethods.setDefaultStyle({
+                    color: newColor,
+                    strokeWidth: 3,
+                    fillEnabled: true,
+                    fillAlpha: 0.5
+                });
+
+                const result = `✅ Default style changed!\nColor: ${originalColor.toString(16)} → ${newColor.toString(16)}\nStroke width: 2 → 3\nFill enabled: false → true`;
+                document.getElementById('style-results').textContent = result;
+                document.getElementById('style-results').className = 'result success';
+                updateStoreDisplay();
+            } catch (e) {
+                document.getElementById('style-results').textContent = `❌ Error: ${e.message}`;
+                document.getElementById('style-results').className = 'result error';
+            }
+        };
+
+        window.testResetDefaultStyle = function() {
+            try {
+                window.mockGameStoreMethods.resetDefaultStyle();
+                
+                const style = window.mockGameStore.defaultStyle;
+                const result = `✅ Default style reset!\nColor: ${style.color.toString(16)}\nStroke width: ${style.strokeWidth}\nFill enabled: ${style.fillEnabled}`;
+                document.getElementById('style-results').textContent = result;
+                document.getElementById('style-results').className = 'result success';
+                updateStoreDisplay();
+            } catch (e) {
+                document.getElementById('style-results').textContent = `❌ Error: ${e.message}`;
+                document.getElementById('style-results').className = 'result error';
+            }
+        };
+
+        window.testClearAll = function() {
+            try {
+                const objCount = window.mockGameStore.objects.length;
+                if (objCount === 0) {
+                    document.getElementById('utility-results').textContent = '⚠️ No objects to clear.';
+                    document.getElementById('utility-results').className = 'result';
+                    return;
+                }
+
+                window.mockGameStoreMethods.clearAllObjects();
+                
+                const result = `✅ All objects cleared!\nObjects removed: ${objCount}\nSelection cleared: ${window.mockGameStore.selection.selectedId === null}`;
+                document.getElementById('utility-results').textContent = result;
+                document.getElementById('utility-results').className = 'result success';
+                updateStoreDisplay();
+            } catch (e) {
+                document.getElementById('utility-results').textContent = `❌ Error: ${e.message}`;
+                document.getElementById('utility-results').className = 'result error';
+            }
+        };
+
+        window.testGetObjectById = function() {
+            try {
+                if (window.mockGameStore.objects.length === 0) {
+                    document.getElementById('utility-results').textContent = '⚠️ No objects to test with. Create some objects first.';
+                    document.getElementById('utility-results').className = 'result';
+                    return;
+                }
+
+                const firstObj = window.mockGameStore.objects[0];
+                const foundObj = window.mockGameStoreMethods.getObjectById(firstObj.id);
+                const notFoundObj = window.mockGameStoreMethods.getObjectById('nonexistent-id');
+
+                const result = `✅ Get object by ID test!\nFound existing: ${foundObj !== null}\nID matches: ${foundObj?.id === firstObj.id}\nNon-existent returns null: ${notFoundObj === null}`;
+                document.getElementById('utility-results').textContent = result;
+                document.getElementById('utility-results').className = 'result success';
+            } catch (e) {
+                document.getElementById('utility-results').textContent = `❌ Error: ${e.message}`;
+                document.getElementById('utility-results').className = 'result error';
+            }
+        };
+
+        window.updateStoreDisplay = function() {
+            const storeState = {
+                objects: window.mockGameStore.objects.map(obj => ({
+                    id: obj.id.substring(0, 12) + '...',
+                    type: obj.type,
+                    center: obj.properties.center,
+                    radius: obj.properties.radius,
+                    width: obj.properties.width,
+                    height: obj.properties.height,
+                    vertexCount: obj.vertices.length
+                })),
+                selection: window.mockGameStore.selection,
+                defaultStyle: window.mockGameStore.defaultStyle,
+                totalObjects: window.mockGameStore.objects.length
+            };
+
+            document.getElementById('store-display').textContent = JSON.stringify(storeState, null, 2);
+        };
+
+        // Initialize display
+        updateStoreDisplay();
+    </script>
+</body>
+</html>

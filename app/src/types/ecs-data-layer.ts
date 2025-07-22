@@ -349,86 +349,78 @@ export const createGeometricObject = (
 ): GeometricObject => {
   const bounds = calculateObjectBounds(params.vertices)
   
-  // ✅ NEW: Calculate properties using the new calculators
-  // Note: This will be imported at runtime to avoid circular dependencies
+  // ✅ FIXED: Direct property calculation (no circular dependency)
   let properties: GeometryProperties
   
-  try {
-    // Dynamic import to avoid circular dependency
-    const { GeometryPropertyCalculators } = require('../game/GeometryPropertyCalculators')
-    properties = GeometryPropertyCalculators.calculateProperties(params.type, params.vertices)
-  } catch (error) {
-    console.warn('Could not calculate properties, using fallback:', error)
-    // Fallback properties based on type
-    switch (params.type) {
-      case 'point':
-        properties = { type: 'point', center: params.vertices[0] || { x: 0, y: 0 } }
-        break
-      case 'line':
-        const start = params.vertices[0] || { x: 0, y: 0 }
-        const end = params.vertices[1] || { x: 0, y: 0 }
-        const dx = end.x - start.x
-        const dy = end.y - start.y
-        properties = {
-          type: 'line',
-          startPoint: start,
-          endPoint: end,
-          midpoint: { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 },
-          length: Math.sqrt(dx * dx + dy * dy),
-          angle: Math.atan2(dy, dx)
-        }
-        break
-      case 'circle':
-        const center = params.vertices[0] || { x: 0, y: 0 }
-        const radiusPoint = params.vertices[1] || { x: 1, y: 0 }
-        const radius = Math.sqrt(Math.pow(radiusPoint.x - center.x, 2) + Math.pow(radiusPoint.y - center.y, 2))
-        properties = {
-          type: 'circle',
-          center,
-          radius,
-          diameter: radius * 2,
-          circumference: 2 * Math.PI * radius,
-          area: Math.PI * radius * radius
-        }
-        break
-      case 'rectangle':
-        const v1 = params.vertices[0] || { x: 0, y: 0 }
-        const v2 = params.vertices[1] || { x: 1, y: 1 }
-        const topLeft = { x: Math.min(v1.x, v2.x), y: Math.min(v1.y, v2.y) }
-        const bottomRight = { x: Math.max(v1.x, v2.x), y: Math.max(v1.y, v2.y) }
-        const width = bottomRight.x - topLeft.x
-        const height = bottomRight.y - topLeft.y
-        properties = {
-          type: 'rectangle',
-          center: { x: topLeft.x + width / 2, y: topLeft.y + height / 2 },
-          topLeft,
-          bottomRight,
-          width,
-          height,
-          area: width * height,
-          perimeter: 2 * (width + height)
-        }
-        break
-      case 'diamond':
-        const west = params.vertices[0] || { x: 0, y: 0 }
-        const north = params.vertices[1] || { x: 0, y: -1 }
-        const east = params.vertices[2] || { x: 1, y: 0 }
-        const south = params.vertices[3] || { x: 0, y: 1 }
-        const diamondWidth = east.x - west.x
-        const diamondHeight = south.y - north.y
-        properties = {
-          type: 'diamond',
-          center: { x: (west.x + east.x) / 2, y: (north.y + south.y) / 2 },
-          west, north, east, south,
-          width: diamondWidth,
-          height: diamondHeight,
-          area: (diamondWidth * diamondHeight) / 2,
-          perimeter: 2 * Math.sqrt((diamondWidth/2) * (diamondWidth/2) + (diamondHeight/2) * (diamondHeight/2))
-        }
-        break
-      default:
-        throw new Error(`Unknown geometry type: ${params.type}`)
-    }
+  // Calculate properties directly from params (no reverse engineering needed)
+  switch (params.type) {
+    case 'point':
+      properties = { type: 'point', center: params.vertices[0] || { x: 0, y: 0 } }
+      break
+    case 'line':
+      const start = params.vertices[0] || { x: 0, y: 0 }
+      const end = params.vertices[1] || { x: 0, y: 0 }
+      const dx = end.x - start.x
+      const dy = end.y - start.y
+      properties = {
+        type: 'line',
+        startPoint: start,
+        endPoint: end,
+        midpoint: { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 },
+        length: Math.sqrt(dx * dx + dy * dy),
+        angle: Math.atan2(dy, dx)
+      }
+      break
+    case 'circle':
+      const center = params.vertices[0] || { x: 0, y: 0 }
+      const radiusPoint = params.vertices[1] || { x: 1, y: 0 }
+      const radius = Math.sqrt(Math.pow(radiusPoint.x - center.x, 2) + Math.pow(radiusPoint.y - center.y, 2))
+      properties = {
+        type: 'circle',
+        center,
+        radius,
+        diameter: radius * 2,
+        circumference: 2 * Math.PI * radius,
+        area: Math.PI * radius * radius
+      }
+      break
+    case 'rectangle':
+      const v1 = params.vertices[0] || { x: 0, y: 0 }
+      const v2 = params.vertices[1] || { x: 1, y: 1 }
+      const topLeft = { x: Math.min(v1.x, v2.x), y: Math.min(v1.y, v2.y) }
+      const bottomRight = { x: Math.max(v1.x, v2.x), y: Math.max(v1.y, v2.y) }
+      const width = bottomRight.x - topLeft.x
+      const height = bottomRight.y - topLeft.y
+      properties = {
+        type: 'rectangle',
+        center: { x: topLeft.x + width / 2, y: topLeft.y + height / 2 },
+        topLeft,
+        bottomRight,
+        width,
+        height,
+        area: width * height,
+        perimeter: 2 * (width + height)
+      }
+      break
+    case 'diamond':
+      const west = params.vertices[0] || { x: 0, y: 0 }
+      const north = params.vertices[1] || { x: 0, y: -1 }
+      const east = params.vertices[2] || { x: 1, y: 0 }
+      const south = params.vertices[3] || { x: 0, y: 1 }
+      const diamondWidth = east.x - west.x
+      const diamondHeight = south.y - north.y
+      properties = {
+        type: 'diamond',
+        center: { x: (west.x + east.x) / 2, y: (north.y + south.y) / 2 },
+        west, north, east, south,
+        width: diamondWidth,
+        height: diamondHeight,
+        area: (diamondWidth * diamondHeight) / 2,
+        perimeter: 2 * Math.sqrt((diamondWidth/2) * (diamondWidth/2) + (diamondHeight/2) * (diamondHeight/2))
+      }
+      break
+    default:
+      throw new Error(`Unknown geometry type: ${params.type}`)
   }
   
   return {

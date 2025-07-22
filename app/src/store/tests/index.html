@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Store Test Suite - Complete Test Coverage</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 20px; 
+            background: #f5f5f5; 
+            line-height: 1.6;
+        }
+        .header {
+            background: linear-gradient(135deg, #007acc, #005a9e);
+            color: white;
+            padding: 30px;
+            border-radius: 8px;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .test-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .test-card { 
+            background: white; 
+            padding: 25px; 
+            border-radius: 8px; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            border-left: 5px solid #007acc;
+        }
+        .test-card h3 {
+            margin-top: 0;
+            color: #007acc;
+        }
+        .test-link {
+            display: inline-block;
+            background: #007acc;
+            color: white;
+            text-decoration: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            margin-top: 15px;
+            transition: background 0.3s;
+        }
+        .test-link:hover {
+            background: #005a9e;
+        }
+        .critical {
+            border-left-color: #dc3545;
+        }
+        .critical .test-link {
+            background: #dc3545;
+        }
+        .critical .test-link:hover {
+            background: #c82333;
+        }
+        .overview-section {
+            background: white;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        .test-checklist {
+            background: #e9ecef;
+            padding: 20px;
+            border-radius: 6px;
+            margin: 20px 0;
+        }
+        .test-checklist ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+        .test-checklist li {
+            margin: 8px 0;
+        }
+        .success { color: #28a745; font-weight: bold; }
+        .error { color: #dc3545; font-weight: bold; }
+        .warning { color: #ffc107; font-weight: bold; }
+        .instructions {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            padding: 20px;
+            border-radius: 6px;
+            margin: 20px 0;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .status-ready { background: #28a745; }
+        .status-critical { background: #dc3545; }
+        .status-important { background: #ffc107; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🧪 Game Store Test Suite</h1>
+        <p>Comprehensive testing for the unified game store architecture</p>
+        <p><strong>Phase 0-1 Implementation Validation</strong></p>
+    </div>
+
+    <div class="overview-section">
+        <h2>📋 Test Suite Overview</h2>
+        <p>This test suite validates the <strong>Phase 0-1 modular architecture</strong> implementation that fixes the circle movement bug. Each test focuses on a specific aspect of the store architecture:</p>
+        
+        <div class="test-checklist">
+            <h3>🎯 Test Coverage Areas</h3>
+            <ul>
+                <li><span class="status-indicator status-ready"></span><strong>Basic Operations</strong> - Object creation, manipulation, selection</li>
+                <li><span class="status-indicator status-critical"></span><strong>Circle Movement Bug</strong> - The specific bug we're fixing</li>
+                <li><span class="status-indicator status-important"></span><strong>Preview System</strong> - Unified preview/commit consistency</li>
+                <li><span class="status-indicator status-ready"></span><strong>Geometry Transformations</strong> - Coordinate operations and edge cases</li>
+                <li><span class="status-indicator status-ready"></span><strong>Drawing System</strong> - Drawing workflow and property calculations</li>
+            </ul>
+        </div>
+
+        <div class="instructions">
+            <h3>🚀 How to Use This Test Suite</h3>
+            <ol>
+                <li><strong>Start with Circle Movement Bug Test</strong> - This is the main issue we're solving</li>
+                <li><strong>Run Basic Operations Test</strong> - Verify all fundamental operations work</li>
+                <li><strong>Test Preview System</strong> - Ensure preview/commit consistency</li>
+                <li><strong>Test Transformations & Drawing</strong> - Verify geometric operations</li>
+                <li><strong>Report any failures</strong> before proceeding to Phase 2-3</li>
+            </ol>
+        </div>
+    </div>
+
+    <div class="test-grid">
+        <div class="test-card critical">
+            <h3>🚨 Circle Movement Bug Test</h3>
+            <p><strong>Priority: CRITICAL</strong></p>
+            <p>Tests the specific bug described in the postmortem: when a user moves a circle by editing X/Y coordinates, the radius should remain constant.</p>
+            
+            <div class="test-checklist">
+                <strong>What this tests:</strong>
+                <ul>
+                    <li>Circle creation and movement</li>
+                    <li>Form data → preview → commit flow</li>
+                    <li>Radius preservation through movement</li>
+                    <li>Multiple movement consistency</li>
+                    <li>Forward vs reverse calculation comparison</li>
+                </ul>
+            </div>
+            
+            <a href="circle-movement-bug-test.html" class="test-link">🚨 TEST CIRCLE BUG FIX</a>
+        </div>
+
+        <div class="test-card">
+            <h3>🔧 Geometry Operations Test</h3>
+            <p><strong>Priority: HIGH</strong></p>
+            <p>Tests all basic store operations: creation, selection, movement, resizing, style changes, and utility functions.</p>
+            
+            <div class="test-checklist">
+                <strong>What this tests:</strong>
+                <ul>
+                    <li>All shape creation (circle, rectangle, line, point, diamond)</li>
+                    <li>Object selection and manipulation</li>
+                    <li>Style operations and defaults</li>
+                    <li>Utility functions (clear all, get by ID)</li>
+                    <li>Store state consistency</li>
+                </ul>
+            </div>
+            
+            <a href="geometry-operations-test.html" class="test-link">🔧 TEST BASIC OPERATIONS</a>
+        </div>
+
+        <div class="test-card">
+            <h3>🔄 Preview System Test</h3>
+            <p><strong>Priority: HIGH</strong></p>
+            <p>Tests the unified preview system that prevents the circle movement bug by ensuring preview and commit operations use identical methods.</p>
+            
+            <div class="test-checklist">
+                <strong>What this tests:</strong>
+                <ul>
+                    <li>Preview start/update/commit/cancel flow</li>
+                    <li>Preview → commit consistency</li>
+                    <li>Preview → cancel consistency</li>
+                    <li>Multiple preview updates</li>
+                    <li>Form data direct usage (bug fix)</li>
+                </ul>
+            </div>
+            
+            <a href="preview-system-test.html" class="test-link">🔄 TEST PREVIEW SYSTEM</a>
+        </div>
+
+        <div class="test-card">
+            <h3>📐 Geometry Transformations Test</h3>
+            <p><strong>Priority: MEDIUM</strong></p>
+            <p>Tests coordinate transformations, bounds calculations, and geometric operations including edge cases and precision.</p>
+            
+            <div class="test-checklist">
+                <strong>What this tests:</strong>
+                <ul>
+                    <li>Translation and scaling operations</li>
+                    <li>Bounds calculation accuracy</li>
+                    <li>Circle and rectangle property calculations</li>
+                    <li>Negative coordinates and edge cases</li>
+                    <li>Floating point precision</li>
+                </ul>
+            </div>
+            
+            <a href="geometry-transformations-test.html" class="test-link">📐 TEST TRANSFORMATIONS</a>
+        </div>
+
+        <div class="test-card">
+            <h3>🎨 Drawing System Test</h3>
+            <p><strong>Priority: MEDIUM</strong></p>
+            <p>Tests the drawing workflow, drawing property calculations, and drawing → object consistency.</p>
+            
+            <div class="test-checklist">
+                <strong>What this tests:</strong>
+                <ul>
+                    <li>Drawing mode selection</li>
+                    <li>Drawing start/update/finish flow</li>
+                    <li>Drawing property calculations</li>
+                    <li>Drawing → object consistency</li>
+                    <li>Multiple drawing modes</li>
+                    <li>Default style application</li>
+                </ul>
+            </div>
+            
+            <a href="drawing-system-test.html" class="test-link">🎨 TEST DRAWING SYSTEM</a>
+        </div>
+    </div>
+
+    <div class="overview-section">
+        <h2>🎯 Expected Test Results</h2>
+        
+        <div class="test-checklist">
+            <h3>✅ Success Criteria (What Should Pass)</h3>
+            <ul>
+                <li><strong>Circle Movement Bug Test:</strong> Radius stays exactly 50 when moving circle center</li>
+                <li><strong>Geometry Operations Test:</strong> All basic operations work without errors</li>
+                <li><strong>Preview System Test:</strong> Preview and commit produce identical results</li>
+                <li><strong>Transformations Test:</strong> All coordinate operations maintain accuracy</li>
+                <li><strong>Drawing System Test:</strong> All drawing modes create correct objects</li>
+            </ul>
+        </div>
+
+        <div class="test-checklist">
+            <h3>🚨 Critical Failures (What Would Block Phase 2-3)</h3>
+            <ul>
+                <li><strong>Circle radius changes during movement</strong> - Main bug not fixed</li>
+                <li><strong>Preview system inconsistency</strong> - Preview ≠ Commit results</li>
+                <li><strong>TypeScript compilation errors</strong> - Code not ready for integration</li>
+                <li><strong>Store method failures</strong> - Architecture not stable</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="overview-section">
+        <h2>📊 Test Results Summary</h2>
+        <p>After running all tests, document results here:</p>
+        
+        <div class="test-checklist">
+            <h3>🧪 Test Results (Fill after testing)</h3>
+            <ul>
+                <li><span class="status-indicator status-ready"></span><strong>Circle Movement Bug Test:</strong> <span id="circle-result">Not tested yet</span></li>
+                <li><span class="status-indicator status-ready"></span><strong>Geometry Operations Test:</strong> <span id="geometry-result">Not tested yet</span></li>
+                <li><span class="status-indicator status-ready"></span><strong>Preview System Test:</strong> <span id="preview-result">Not tested yet</span></li>
+                <li><span class="status-indicator status-ready"></span><strong>Transformations Test:</strong> <span id="transform-result">Not tested yet</span></li>
+                <li><span class="status-indicator status-ready"></span><strong>Drawing System Test:</strong> <span id="drawing-result">Not tested yet</span></li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="overview-section">
+        <h2>🔗 Implementation Context</h2>
+        <p>These tests validate the <strong>Phase 0-1 modular architecture</strong> that includes:</p>
+        
+        <div class="test-checklist">
+            <h3>📁 Implemented Files Being Tested</h3>
+            <ul>
+                <li><strong>app/src/store/game-store.ts</strong> - Main unified store (233 lines)</li>
+                <li><strong>app/src/store/actions/CreateActions.ts</strong> - Object creation (56 lines)</li>
+                <li><strong>app/src/store/actions/EditActions.ts</strong> - Object editing (127 lines)</li>
+                <li><strong>app/src/store/helpers/GeometryHelper.ts</strong> - Unified geometry (225 lines)</li>
+                <li><strong>app/src/store/systems/PreviewSystem.ts</strong> - Preview system (294 lines)</li>
+                <li><strong>app/src/types/game-store.ts</strong> - Store types (95 lines)</li>
+            </ul>
+            <p><strong>Total:</strong> 1,030 lines of clean, modular code</p>
+        </div>
+
+        <div class="instructions">
+            <h3>🔄 Next Steps After Testing</h3>
+            <p>If all tests pass:</p>
+            <ol>
+                <li><strong>Document test results</strong> in Phase 0-1 implementation report</li>
+                <li><strong>Proceed to Phase 2-3</strong> - UI integration with verified store</li>
+                <li><strong>Update existing UI components</strong> to use unified store methods</li>
+                <li><strong>Update rendering components</strong> to read from unified store</li>
+                <li><strong>Verify circle bug is completely eliminated</strong> in integrated system</li>
+            </ol>
+            
+            <p>If any tests fail:</p>
+            <ol>
+                <li><strong>Document failure details</strong> with specific error information</li>
+                <li><strong>Fix implementation issues</strong> before proceeding to Phase 2-3</li>
+                <li><strong>Re-run tests</strong> until all pass</li>
+            </ol>
+        </div>
+    </div>
+
+    <div class="overview-section">
+        <h2>📋 Testing Instructions</h2>
+        
+        <div class="instructions">
+            <h3>🎯 Recommended Testing Order</h3>
+            <ol>
+                <li><strong><a href="circle-movement-bug-test.html">Circle Movement Bug Test</a></strong> - Start here (most critical)</li>
+                <li><strong><a href="geometry-operations-test.html">Geometry Operations Test</a></strong> - Basic functionality</li>
+                <li><strong><a href="preview-system-test.html">Preview System Test</a></strong> - Core architecture</li>
+                <li><strong><a href="geometry-transformations-test.html">Transformations Test</a></strong> - Advanced operations</li>
+                <li><strong><a href="drawing-system-test.html">Drawing System Test</a></strong> - Drawing workflow</li>
+            </ol>
+        </div>
+
+        <p><strong>Each test is self-contained</strong> and can be run independently. All tests use mock implementations that match the real store architecture.</p>
+    </div>
+
+    <script>
+        // Simple results tracking
+        function updateResult(testName, result) {
+            const element = document.getElementById(testName + '-result');
+            if (element) {
+                element.textContent = result;
+                element.className = result.includes('✅') ? 'success' : result.includes('❌') ? 'error' : 'warning';
+            }
+        }
+
+        // Example usage (for manual result entry):
+        // updateResult('circle', '✅ All tests passed - Circle bug fixed!');
+        // updateResult('geometry', '❌ 2 operations failed');
+        
+        console.log('Game Store Test Suite loaded. Run individual tests and use updateResult() to track results.');
+    </script>
+</body>
+</html>

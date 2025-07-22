@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Preview System Test - Game Store</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 20px; 
+            background: #f5f5f5; 
+        }
+        .test-section { 
+            background: white; 
+            padding: 20px; 
+            margin: 20px 0; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-button { 
+            background: #007acc; 
+            color: white; 
+            border: none; 
+            padding: 10px 20px; 
+            margin: 5px; 
+            cursor: pointer; 
+            border-radius: 4px; 
+        }
+        .test-button:hover { background: #005a9e; }
+        .preview-button { background: #ffc107; color: #212529; }
+        .preview-button:hover { background: #e0a800; }
+        .commit-button { background: #28a745; }
+        .commit-button:hover { background: #1e7e34; }
+        .cancel-button { background: #dc3545; }
+        .cancel-button:hover { background: #c82333; }
+        .success { color: #28a745; font-weight: bold; }
+        .error { color: #dc3545; font-weight: bold; }
+        .result { 
+            background: #f8f9fa; 
+            padding: 15px; 
+            margin: 10px 0; 
+            border-left: 4px solid #007acc; 
+            font-family: monospace; 
+            white-space: pre-wrap;
+        }
+        .preview-state {
+            background: #fff3cd;
+            padding: 15px;
+            margin: 10px 0;
+            border-left: 4px solid #ffc107;
+            font-family: monospace;
+        }
+        .object-state {
+            background: #d4edda;
+            padding: 15px;
+            margin: 10px 0;
+            border-left: 4px solid #28a745;
+            font-family: monospace;
+        }
+        .form-input {
+            margin: 5px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 80px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔄 Preview System Test</h1>
+    <p>Testing the unified preview system that prevents the circle movement bug</p>
+
+    <div class="test-section">
+        <h2>🎯 Setup Test Objects</h2>
+        <button class="test-button" onclick="createTestObjects()">Create Test Objects</button>
+        <button class="test-button" onclick="selectFirstObject()">Select First Object</button>
+        <div id="setup-results" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>📊 Current State</h2>
+        <div id="objects-state" class="object-state">No objects created</div>
+        <div id="preview-state" class="preview-state">No preview active</div>
+        <button class="test-button" onclick="updateStateDisplay()">Refresh State</button>
+    </div>
+
+    <div class="test-section">
+        <h2>🔄 Preview Operations</h2>
+        
+        <div>
+            <h3>Start Preview</h3>
+            <button class="preview-button" onclick="startCreatePreview()">Start Create Preview</button>
+            <button class="preview-button" onclick="startMovePreview()">Start Move Preview</button>
+            <button class="preview-button" onclick="startResizePreview()">Start Resize Preview</button>
+        </div>
+
+        <div>
+            <h3>Form-Based Preview Update</h3>
+            <label>Center X: <input type="number" id="preview-x" class="form-input" value="200" /></label>
+            <label>Center Y: <input type="number" id="preview-y" class="form-input" value="150" /></label>
+            <label>Radius: <input type="number" id="preview-radius" class="form-input" value="60" /></label>
+            <br><br>
+            <button class="preview-button" onclick="updatePreviewFromForm()">Update Preview from Form</button>
+        </div>
+
+        <div>
+            <h3>Preview Actions</h3>
+            <button class="commit-button" onclick="commitPreview()">Commit Preview</button>
+            <button class="cancel-button" onclick="cancelPreview()">Cancel Preview</button>
+        </div>
+
+        <div id="preview-results" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>🧪 Preview Consistency Tests</h2>
+        <button class="test-button" onclick="testPreviewCommitConsistency()">Test Preview → Commit Consistency</button>
+        <button class="test-button" onclick="testPreviewCancelConsistency()">Test Preview → Cancel Consistency</button>
+        <button class="test-button" onclick="testMultiplePreviewUpdates()">Test Multiple Preview Updates</button>
+        <div id="consistency-results" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>🎯 Circle Bug Prevention Test</h2>
+        <button class="test-button" onclick="testCircleBugPrevention()">Test Circle Bug Prevention</button>
+        <div id="bug-prevention-results" class="result"></div>
+    </div>
+
+    <script type="module">
+        // Mock helpers (same pattern as other tests)
+        const mockGeometryHelper = {
+            generateVertices(type, properties) {
+                if (type === 'circle') {
+                    const segments = 8;
+                    const vertices = [];
+                    for (let i = 0; i < segments; i++) {
+                        const angle = (i / segments) * 2 * Math.PI;
+                        vertices.push({
+                            x: properties.center.x + Math.cos(angle) * properties.radius,
+                            y: properties.center.y + Math.sin(angle) * properties.radius
+                        });
+                    }
+                    return vertices;
+                }
+                if (type === 'rectangle') {
+                    const hw = properties.width / 2;
+                    const hh = properties.height / 2;
+                    return [
+                        {x: properties.center.x - hw, y: properties.center.y - hh},
+                        {x: properties.center.x + hw, y: properties.center.y - hh},
+                        {x: properties.center.x + hw, y: properties.center.y + hh},
+                        {x: properties.center.x - hw, y: properties.center.y + hh}
+                    ];
+                }
+                return [];
+            },
+            
+            calculateBounds(vertices) {
+                if (!vertices.length) return {minX: 0, minY: 0, maxX: 0, maxY: 0, width: 0, height: 0};
+                const xs = vertices.map(v => v.x);
+                const ys = vertices.map(v => v.y);
+                const minX = Math.min(...xs);
+                const maxX = Math.max(...xs);
+                const minY = Math.min(...ys);
+                const maxY = Math.max(...ys);
+                return {minX, minY, maxX, maxY, width: maxX - minX, height: maxY - minY};
+            }
+        };
+
+        // Mock preview system (implements the bug fix)
+        const mockPreviewSystem = {
+            generatePropertiesFromFormData(formData) {
+                if (formData.circle) {
+                    // ✅ BUG FIX: Direct from form data
+                    const radius = formData.circle.radius;
+                    return {
+                        type: 'circle',
+                        center: { x: formData.circle.centerX, y: formData.circle.centerY },
+                        radius: radius,
+                        diameter: radius * 2,
+                        circumference: 2 * Math.PI * radius,
+                        area: Math.PI * radius * radius
+                    };
+                }
+                if (formData.rectangle) {
+                    return {
+                        type: 'rectangle',
+                        center: { x: formData.rectangle.centerX, y: formData.rectangle.centerY },
+                        width: formData.rectangle.width,
+                        height: formData.rectangle.height,
+                        area: formData.rectangle.width * formData.rectangle.height,
+                        perimeter: 2 * (formData.rectangle.width + formData.rectangle.height)
+                    };
+                }
+                return null;
+            },
+
+            generateVerticesFromFormData(formData) {
+                if (formData.circle) {
+                    return mockGeometryHelper.generateVertices('circle', {
+                        center: { x: formData.circle.centerX, y: formData.circle.centerY },
+                        radius: formData.circle.radius
+                    });
+                }
+                if (formData.rectangle) {
+                    return mockGeometryHelper.generateVertices('rectangle', {
+                        center: { x: formData.rectangle.centerX, y: formData.rectangle.centerY },
+                        width: formData.rectangle.width,
+                        height: formData.rectangle.height
+                    });
+                }
+                return [];
+            }
+        };
+
+        // Mock store
+        window.previewTestStore = {
+            objects: [],
+            selection: {selectedId: null, selectionBounds: null},
+            preview: {
+                isActive: false,
+                editingObjectId: null,
+                originalObject: null,
+                previewData: null,
+                shouldShowPreview: true,
+                previewOpacity: 0.8
+            }
+        };
+
+        // Mock store methods
+        window.previewTestMethods = {
+            createObject(params) {
+                const vertices = mockGeometryHelper.generateVertices(params.type, params.properties);
+                const newObject = {
+                    id: `obj_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                    type: params.type,
+                    vertices: vertices,
+                    bounds: mockGeometryHelper.calculateBounds(vertices),
+                    properties: params.properties,
+                    isVisible: true,
+                    createdAt: Date.now()
+                };
+                window.previewTestStore.objects.push(newObject);
+                return newObject.id;
+            },
+
+            selectObject(objectId) {
+                const obj = window.previewTestStore.objects.find(o => o.id === objectId);
+                if (obj) {
+                    window.previewTestStore.selection.selectedId = objectId;
+                    window.previewTestStore.selection.selectionBounds = obj.bounds;
+                }
+            },
+
+            startPreview(operation, originalObjectId) {
+                if (originalObjectId) {
+                    const originalObject = window.previewTestStore.objects.find(obj => obj.id === originalObjectId);
+                    if (originalObject) {
+                        window.previewTestStore.preview = {
+                            isActive: true,
+                            editingObjectId: originalObjectId,
+                            originalObject: { ...originalObject },
+                            previewData: {
+                                previewProperties: { ...originalObject.properties },
+                                previewVertices: [...originalObject.vertices],
+                                previewBounds: { ...originalObject.bounds },
+                                isValid: true,
+                                hasChanges: false,
+                                lastUpdateTime: Date.now()
+                            },
+                            shouldShowPreview: true,
+                            previewOpacity: 0.8
+                        };
+                    }
+                } else {
+                    window.previewTestStore.preview = {
+                        isActive: true,
+                        editingObjectId: null,
+                        originalObject: null,
+                        previewData: null,
+                        shouldShowPreview: true,
+                        previewOpacity: 0.8
+                    };
+                }
+            },
+
+            updatePreview(data) {
+                if (!window.previewTestStore.preview.isActive) return;
+                
+                if (data.operation === 'create' && data.formData) {
+                    const vertices = mockPreviewSystem.generateVerticesFromFormData(data.formData);
+                    const properties = mockPreviewSystem.generatePropertiesFromFormData(data.formData);
+                    
+                    window.previewTestStore.preview.previewData = {
+                        previewProperties: properties,
+                        previewVertices: vertices,
+                        previewBounds: mockGeometryHelper.calculateBounds(vertices),
+                        isValid: true,
+                        hasChanges: true,
+                        lastUpdateTime: Date.now()
+                    };
+                } else if (data.operation === 'move' && data.formData) {
+                    const vertices = mockPreviewSystem.generateVerticesFromFormData(data.formData);
+                    const properties = mockPreviewSystem.generatePropertiesFromFormData(data.formData);
+                    
+                    window.previewTestStore.preview.previewData.previewVertices = vertices;
+                    window.previewTestStore.preview.previewData.previewBounds = mockGeometryHelper.calculateBounds(vertices);
+                    window.previewTestStore.preview.previewData.previewProperties = properties;
+                    window.previewTestStore.preview.previewData.hasChanges = true;
+                    window.previewTestStore.preview.previewData.lastUpdateTime = Date.now();
+                }
+            },
+
+            commitPreview() {
+                if (!window.previewTestStore.preview.isActive || !window.previewTestStore.preview.previewData) return;
+                
+                if (window.previewTestStore.preview.editingObjectId) {
+                    // Update existing object
+                    const objIndex = window.previewTestStore.objects.findIndex(obj => obj.id === window.previewTestStore.preview.editingObjectId);
+                    if (objIndex !== -1) {
+                        window.previewTestStore.objects[objIndex] = {
+                            ...window.previewTestStore.objects[objIndex],
+                            vertices: window.previewTestStore.preview.previewData.previewVertices,
+                            bounds: window.previewTestStore.preview.previewData.previewBounds,
+                            properties: window.previewTestStore.preview.previewData.previewProperties
+                        };
+                    }
+                } else {
+                    // Add new object
+                    const newObject = {
+                        id: `obj_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                        type: window.previewTestStore.preview.previewData.previewProperties.type,
+                        vertices: window.previewTestStore.preview.previewData.previewVertices,
+                        bounds: window.previewTestStore.preview.previewData.previewBounds,
+                        properties: window.previewTestStore.preview.previewData.previewProperties,
+                        isVisible: true,
+                        createdAt: Date.now()
+                    };
+                    window.previewTestStore.objects.push(newObject);
+                }
+                
+                this.clearPreview();
+            },
+
+            cancelPreview() {
+                this.clearPreview();
+            },
+
+            clearPreview() {
+                window.previewTestStore.preview = {
+                    isActive: false,
+                    editingObjectId: null,
+                    originalObject: null,
+                    previewData: null,
+                    shouldShowPreview: true,
+                    previewOpacity: 0.8
+                };
+            },
+
+            getSelectedObject() {
+                return window.previewTestStore.selection.selectedId 
+                    ? window.previewTestStore.objects.find(obj => obj.id === window.previewTestStore.selection.selectedId)
+                    : null;
+            }
+        };
+
+        // Test functions
+        window.createTestObjects = function() {
+            // Create circle
+            const circleId = window.previewTestMethods.createObject({
+                type: 'circle',
+                properties: {
+                    center: {x: 100, y: 100},
+                    radius: 50
+                }
+            });
+
+            // Create rectangle
+            const rectId = window.previewTestMethods.createObject({
+                type: 'rectangle',
+                properties: {
+                    center: {x: 250, y: 120},
+                    width: 80,
+                    height: 60
+                }
+            });
+
+            document.getElementById('setup-results').textContent = `✅ Test objects created!\nCircle ID: ${circleId.substring(0, 12)}...\nRectangle ID: ${rectId.substring(0, 12)}...`;
+            document.getElementById('setup-results').className = 'result success';
+            updateStateDisplay();
+        };
+
+        window.selectFirstObject = function() {
+            if (window.previewTestStore.objects.length === 0) {
+                document.getElementById('setup-results').textContent = '⚠️ No objects to select. Create objects first.';
+                document.getElementById('setup-results').className = 'result';
+                return;
+            }
+
+            const firstObject = window.previewTestStore.objects[0];
+            window.previewTestMethods.selectObject(firstObject.id);
+            
+            document.getElementById('setup-results').textContent = `✅ Selected object!\nID: ${firstObject.id.substring(0, 12)}...\nType: ${firstObject.type}`;
+            document.getElementById('setup-results').className = 'result success';
+            updateStateDisplay();
+        };
+
+        window.startCreatePreview = function() {
+            window.previewTestMethods.startPreview('create');
+            
+            document.getElementById('preview-results').textContent = '✅ Create preview started!';
+            document.getElementById('preview-results').className = 'result success';
+            updateStateDisplay();
+        };
+
+        window.startMovePreview = function() {
+            const selectedId = window.previewTestStore.selection.selectedId;
+            if (!selectedId) {
+                document.getElementById('preview-results').textContent = '❌ No object selected.';
+                document.getElementById('preview-results').className = 'result error';
+                return;
+            }
+
+            window.previewTestMethods.startPreview('move', selectedId);
+            
+            document.getElementById('preview-results').textContent = `✅ Move preview started for object ${selectedId.substring(0, 12)}...`;
+            document.getElementById('preview-results').className = 'result success';
+            updateStateDisplay();
+        };
+
+        window.startResizePreview = function() {
+            const selectedId = window.previewTestStore.selection.selectedId;
+            if (!selectedId) {
+                document.getElementById('preview-results').textContent = '❌ No object selected.';
+                document.getElementById('preview-results').className = 'result error';
+                return;
+            }
+
+            window.previewTestMethods.startPreview('resize', selectedId);
+            
+            document.getElementById('preview-results').textContent = `✅ Resize preview started for object ${selectedId.substring(0, 12)}...`;
+            document.getElementById('preview-results').className = 'result success';
+            updateStateDisplay();
+        };
+
+        window.updatePreviewFromForm = function() {
+            if (!window.previewTestStore.preview.isActive) {
+                document.getElementById('preview-results').textContent = '❌ No preview active. Start a preview first.';
+                document.getElementById('preview-results').className = 'result error';
+                return;
+            }
+
+            const centerX = parseFloat(document.getElementById('preview-x').value);
+            const centerY = parseFloat(document.getElementById('preview-y').value);
+            const radius = parseFloat(document.getElementById('preview-radius').value);
+
+            const selectedObject = window.previewTestMethods.getSelectedObject();
+            const operation = window.previewTestStore.preview.editingObjectId ? 'move' : 'create';
+
+            let formData;
+            if (!selectedObject || selectedObject.type === 'circle') {
+                formData = {
+                    isVisible: true,
+                    circle: {
+                        centerX: centerX,
+                        centerY: centerY,
+                        radius: radius
+                    },
+                    style: {
+                        strokeColor: '#0066cc',
+                        strokeWidth: 2,
+                        strokeAlpha: 1.0,
+                        hasFill: false
+                    }
+                };
+            } else {
+                formData = {
+                    isVisible: true,
+                    rectangle: {
+                        centerX: centerX,
+                        centerY: centerY,
+                        width: radius * 2, // Use radius input as width for rectangle
+                        height: radius * 1.5
+                    },
+                    style: {
+                        strokeColor: '#0066cc',
+                        strokeWidth: 2,
+                        strokeAlpha: 1.0,
+                        hasFill: false
+                    }
+                };
+            }
+
+            window.previewTestMethods.updatePreview({
+                operation: operation,
+                formData: formData
+            });
+
+            document.getElementById('preview-results').textContent = `✅ Preview updated!\nOperation: ${operation}\nCenter: (${centerX}, ${centerY})\nRadius/Size: ${radius}`;
+            document.getElementById('preview-results').className = 'result success';
+            updateStateDisplay();
+        };
+
+        window.commitPreview = function() {
+            if (!window.previewTestStore.preview.isActive) {
+                document.getElementById('preview-results').textContent = '❌ No preview active.';
+                document.getElementById('preview-results').className = 'result error';
+                return;
+            }
+
+            const wasEditing = window.previewTestStore.preview.editingObjectId !== null;
+            const objectCount = window.previewTestStore.objects.length;
+
+            window.previewTestMethods.commitPreview();
+            const newObjectCount = window.previewTestStore.objects.length;
+
+            const result = wasEditing 
+                ? `✅ Preview committed! Object updated.\nObject count: ${objectCount} (unchanged)`
+                : `✅ Preview committed! New object created.\nObject count: ${objectCount} → ${newObjectCount}`;
+
+            document.getElementById('preview-results').textContent = result;
+            document.getElementById('preview-results').className = 'result success';
+            updateStateDisplay();
+        };
+
+        window.cancelPreview = function() {
+            if (!window.previewTestStore.preview.isActive) {
+                document.getElementById('preview-results').textContent = '❌ No preview active.';
+                document.getElementById('preview-results').className = 'result error';
+                return;
+            }
+
+            window.previewTestMethods.cancelPreview();
+            
+            document.getElementById('preview-results').textContent = '✅ Preview cancelled! No changes made.';
+            document.getElementById('preview-results').className = 'result success';
+            updateStateDisplay();
+        };
+
+        window.testPreviewCommitConsistency = function() {
+            // Test that preview and commit produce identical results
+            const selectedObject = window.previewTestMethods.getSelectedObject();
+            if (!selectedObject || selectedObject.type !== 'circle') {
+                document.getElementById('consistency-results').textContent = '❌ Need a selected circle for this test.';
+                document.getElementById('consistency-results').className = 'result error';
+                return;
+            }
+
+            const originalRadius = selectedObject.properties.radius;
+            const newCenter = {x: 180, y: 140};
+            const newRadius = 65;
+
+            // Start preview
+            window.previewTestMethods.startPreview('move', selectedObject.id);
+
+            // Update preview
+            window.previewTestMethods.updatePreview({
+                operation: 'move',
+                formData: {
+                    isVisible: true,
+                    circle: {
+                        centerX: newCenter.x,
+                        centerY: newCenter.y,
+                        radius: newRadius
+                    },
+                    style: { strokeColor: '#0066cc', strokeWidth: 2, strokeAlpha: 1.0, hasFill: false }
+                }
+            });
+
+            // Check preview state
+            const previewRadius = window.previewTestStore.preview.previewData.previewProperties.radius;
+            const previewCenter = window.previewTestStore.preview.previewData.previewProperties.center;
+
+            // Commit preview
+            window.previewTestMethods.commitPreview();
+
+            // Check final state
+            const finalObject = window.previewTestMethods.getSelectedObject();
+            const finalRadius = finalObject.properties.radius;
+            const finalCenter = finalObject.properties.center;
+
+            const radiusConsistent = Math.abs(previewRadius - finalRadius) < 0.001;
+            const centerConsistent = Math.abs(previewCenter.x - finalCenter.x) < 0.001 && Math.abs(previewCenter.y - finalCenter.y) < 0.001;
+
+            const result = `Preview → Commit Consistency Test:
+Original radius: ${originalRadius}
+Preview radius: ${previewRadius}
+Final radius: ${finalRadius}
+
+Preview center: (${previewCenter.x}, ${previewCenter.y})
+Final center: (${finalCenter.x}, ${finalCenter.y})
+
+Radius consistency: ${radiusConsistent ? '✅' : '❌'}
+Center consistency: ${centerConsistent ? '✅' : '❌'}
+
+${radiusConsistent && centerConsistent ? 'SUCCESS: Preview and commit are perfectly consistent!' : 'BUG: Preview and commit differ!'}`;
+
+            document.getElementById('consistency-results').textContent = result;
+            document.getElementById('consistency-results').className = (radiusConsistent && centerConsistent) ? 'result success' : 'result error';
+            updateStateDisplay();
+        };
+
+        window.testPreviewCancelConsistency = function() {
+            // Test that cancel restores original state
+            const selectedObject = window.previewTestMethods.getSelectedObject();
+            if (!selectedObject) {
+                document.getElementById('consistency-results').textContent = '❌ Need a selected object for this test.';
+                document.getElementById('consistency-results').className = 'result error';
+                return;
+            }
+
+            const originalProperties = JSON.parse(JSON.stringify(selectedObject.properties));
+
+            // Start preview
+            window.previewTestMethods.startPreview('move', selectedObject.id);
+
+            // Update preview
+            window.previewTestMethods.updatePreview({
+                operation: 'move',
+                formData: {
+                    isVisible: true,
+                    circle: {
+                        centerX: 999,
+                        centerY: 999,
+                        radius: 999
+                    },
+                    style: { strokeColor: '#0066cc', strokeWidth: 2, strokeAlpha: 1.0, hasFill: false }
+                }
+            });
+
+            // Cancel preview
+            window.previewTestMethods.cancelPreview();
+
+            // Check final state
+            const finalObject = window.previewTestMethods.getSelectedObject();
+            const finalProperties = finalObject.properties;
+
+            const propertiesUnchanged = JSON.stringify(originalProperties) === JSON.stringify(finalProperties);
+
+            const result = `Preview → Cancel Consistency Test:
+Original properties: ${JSON.stringify(originalProperties, null, 2)}
+Final properties: ${JSON.stringify(finalProperties, null, 2)}
+
+Properties unchanged: ${propertiesUnchanged ? '✅' : '❌'}
+
+${propertiesUnchanged ? 'SUCCESS: Cancel properly restores original state!' : 'BUG: Cancel corrupted object state!'}`;
+
+            document.getElementById('consistency-results').textContent = result;
+            document.getElementById('consistency-results').className = propertiesUnchanged ? 'result success' : 'result error';
+            updateStateDisplay();
+        };
+
+        window.testMultiplePreviewUpdates = function() {
+            // Test multiple preview updates don't accumulate errors
+            const selectedObject = window.previewTestMethods.getSelectedObject();
+            if (!selectedObject || selectedObject.type !== 'circle') {
+                document.getElementById('consistency-results').textContent = '❌ Need a selected circle for this test.';
+                document.getElementById('consistency-results').className = 'result error';
+                return;
+            }
+
+            const expectedRadius = 42;
+            const updates = [];
+
+            // Start preview
+            window.previewTestMethods.startPreview('move', selectedObject.id);
+
+            // Perform 5 preview updates
+            for (let i = 0; i < 5; i++) {
+                const randomX = 100 + Math.random() * 100;
+                const randomY = 100 + Math.random() * 100;
+
+                window.previewTestMethods.updatePreview({
+                    operation: 'move',
+                    formData: {
+                        isVisible: true,
+                        circle: {
+                            centerX: randomX,
+                            centerY: randomY,
+                            radius: expectedRadius // Always same radius
+                        },
+                        style: { strokeColor: '#0066cc', strokeWidth: 2, strokeAlpha: 1.0, hasFill: false }
+                    }
+                });
+
+                const currentRadius = window.previewTestStore.preview.previewData.previewProperties.radius;
+                updates.push({
+                    update: i + 1,
+                    center: `(${randomX.toFixed(1)}, ${randomY.toFixed(1)})`,
+                    radius: currentRadius,
+                    radiusCorrect: Math.abs(currentRadius - expectedRadius) < 0.001
+                });
+            }
+
+            // Commit final preview
+            window.previewTestMethods.commitPreview();
+            const finalObject = window.previewTestMethods.getSelectedObject();
+            const finalRadius = finalObject.properties.radius;
+
+            const allRadiiCorrect = updates.every(u => u.radiusCorrect);
+            const finalRadiusCorrect = Math.abs(finalRadius - expectedRadius) < 0.001;
+
+            const result = `Multiple Preview Updates Test:
+Expected radius: ${expectedRadius}
+Final radius: ${finalRadius}
+
+Update Details:
+${updates.map(u => `${u.update}. Center: ${u.center} → Radius: ${u.radius} ${u.radiusCorrect ? '✅' : '❌'}`).join('\n')}
+
+All preview updates correct: ${allRadiiCorrect ? '✅' : '❌'}
+Final commit correct: ${finalRadiusCorrect ? '✅' : '❌'}
+
+${allRadiiCorrect && finalRadiusCorrect ? 'SUCCESS: Multiple updates maintain consistency!' : 'BUG: Multiple updates accumulate errors!'}`;
+
+            document.getElementById('consistency-results').textContent = result;
+            document.getElementById('consistency-results').className = (allRadiiCorrect && finalRadiusCorrect) ? 'result success' : 'result error';
+            updateStateDisplay();
+        };
+
+        window.testCircleBugPrevention = function() {
+            // Comprehensive test for circle bug prevention
+            const testResults = [];
+
+            // Test 1: Create circle via preview
+            window.previewTestMethods.startPreview('create');
+            window.previewTestMethods.updatePreview({
+                operation: 'create',
+                formData: {
+                    isVisible: true,
+                    circle: { centerX: 150, centerY: 100, radius: 75 },
+                    style: { strokeColor: '#0066cc', strokeWidth: 2, strokeAlpha: 1.0, hasFill: false }
+                }
+            });
+            
+            const createPreviewRadius = window.previewTestStore.preview.previewData.previewProperties.radius;
+            window.previewTestMethods.commitPreview();
+            
+            const createdObject = window.previewTestStore.objects[window.previewTestStore.objects.length - 1];
+            const createdRadius = createdObject.properties.radius;
+            
+            testResults.push({
+                test: 'Create via preview',
+                expected: 75,
+                preview: createPreviewRadius,
+                final: createdRadius,
+                success: Math.abs(createdRadius - 75) < 0.001
+            });
+
+            // Test 2: Move circle via preview
+            window.previewTestMethods.selectObject(createdObject.id);
+            window.previewTestMethods.startPreview('move', createdObject.id);
+            window.previewTestMethods.updatePreview({
+                operation: 'move',
+                formData: {
+                    isVisible: true,
+                    circle: { centerX: 200, centerY: 150, radius: 75 },
+                    style: { strokeColor: '#0066cc', strokeWidth: 2, strokeAlpha: 1.0, hasFill: false }
+                }
+            });
+            
+            const movePreviewRadius = window.previewTestStore.preview.previewData.previewProperties.radius;
+            window.previewTestMethods.commitPreview();
+            
+            const movedObject = window.previewTestMethods.getSelectedObject();
+            const movedRadius = movedObject.properties.radius;
+            
+            testResults.push({
+                test: 'Move via preview',
+                expected: 75,
+                preview: movePreviewRadius,
+                final: movedRadius,
+                success: Math.abs(movedRadius - 75) < 0.001
+            });
+
+            const allTestsPass = testResults.every(t => t.success);
+
+            const result = `🎯 Circle Bug Prevention Test Results:
+
+${testResults.map(t => `${t.test}:
+  Expected radius: ${t.expected}
+  Preview radius: ${t.preview}
+  Final radius: ${t.final}
+  Result: ${t.success ? '✅ PASS' : '❌ FAIL'}`).join('\n\n')}
+
+Overall Result: ${allTestsPass ? '✅ CIRCLE BUG PREVENTION SUCCESS!' : '❌ CIRCLE BUG STILL EXISTS!'}
+
+${allTestsPass ? 'The preview system correctly maintains radius consistency through all operations.' : 'The preview system is still corrupting radius values.'}`;
+
+            document.getElementById('bug-prevention-results').textContent = result;
+            document.getElementById('bug-prevention-results').className = allTestsPass ? 'result success' : 'result error';
+            updateStateDisplay();
+        };
+
+        window.updateStateDisplay = function() {
+            // Update objects state
+            const objectsInfo = window.previewTestStore.objects.map(obj => ({
+                id: obj.id.substring(0, 8) + '...',
+                type: obj.type,
+                center: obj.properties.center,
+                radius: obj.properties.radius,
+                width: obj.properties.width,
+                height: obj.properties.height
+            }));
+
+            document.getElementById('objects-state').textContent = `Objects (${window.previewTestStore.objects.length}):
+${JSON.stringify(objectsInfo, null, 2)}
+
+Selection: ${window.previewTestStore.selection.selectedId ? window.previewTestStore.selection.selectedId.substring(0, 8) + '...' : 'None'}`;
+
+            // Update preview state
+            const preview = window.previewTestStore.preview;
+            if (preview.isActive) {
+                document.getElementById('preview-state').textContent = `Preview ACTIVE:
+Editing Object: ${preview.editingObjectId ? preview.editingObjectId.substring(0, 8) + '...' : 'New Object'}
+Has Changes: ${preview.previewData?.hasChanges || false}
+Preview Properties: ${JSON.stringify(preview.previewData?.previewProperties || {}, null, 2)}`;
+            } else {
+                document.getElementById('preview-state').textContent = 'Preview: INACTIVE';
+            }
+        };
+
+        // Initialize
+        updateStateDisplay();
+    </script>
+</body>
+</html>

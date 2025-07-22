@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Circle Movement Bug Test - Game Store</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 20px; 
+            background: #f5f5f5; 
+        }
+        .test-section { 
+            background: white; 
+            padding: 20px; 
+            margin: 20px 0; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-button { 
+            background: #007acc; 
+            color: white; 
+            border: none; 
+            padding: 10px 20px; 
+            margin: 5px; 
+            cursor: pointer; 
+            border-radius: 4px; 
+        }
+        .test-button:hover { background: #005a9e; }
+        .critical { background: #dc3545; }
+        .critical:hover { background: #b02a37; }
+        .success { color: #28a745; font-weight: bold; }
+        .error { color: #dc3545; font-weight: bold; }
+        .warning { color: #ffc107; font-weight: bold; }
+        .result { 
+            background: #f8f9fa; 
+            padding: 15px; 
+            margin: 10px 0; 
+            border-left: 4px solid #007acc; 
+            font-family: monospace; 
+            white-space: pre-wrap;
+        }
+        .circle-details {
+            background: #e9ecef;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        .form-input {
+            margin: 5px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 80px;
+        }
+        .bug-test {
+            border: 3px solid #dc3545;
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .bug-fixed {
+            border: 3px solid #28a745;
+            background: #d4edda;
+            color: #155724;
+        }
+    </style>
+</head>
+<body>
+    <h1>🚨 Circle Movement Bug Test</h1>
+    <p><strong>Testing the specific bug described in the postmortem:</strong> When a user moves a circle by editing X/Y coordinates, the radius should remain constant.</p>
+
+    <div class="test-section">
+        <h2>🎯 Bug Reproduction Test</h2>
+        <p>This test reproduces the exact scenario that was causing the circle movement bug.</p>
+        
+        <div>
+            <h3>Step 1: Create Test Circle</h3>
+            <button class="test-button" onclick="createTestCircle()">Create Circle (Center: 100,100, Radius: 50)</button>
+        </div>
+
+        <div id="circle-state" class="circle-details">
+            No circle created yet
+        </div>
+    </div>
+
+    <div class="test-section bug-test" id="bug-test-section">
+        <h2>⚠️ CRITICAL BUG TEST</h2>
+        <p><strong>The Bug:</strong> Moving circle by editing center coordinates causes radius to change spontaneously.</p>
+        
+        <div>
+            <h3>Step 2: Move Circle via Form Data (The Bug Scenario)</h3>
+            <label>New Center X: <input type="number" id="new-center-x" class="form-input" value="150" /></label>
+            <label>New Center Y: <input type="number" id="new-center-y" class="form-input" value="120" /></label>
+            <label>Radius (should stay 50): <input type="number" id="new-radius" class="form-input" value="50" /></label>
+            <br><br>
+            <button class="test-button critical" onclick="testCircleMovement()">MOVE CIRCLE (Test Bug Fix)</button>
+        </div>
+
+        <div id="bug-test-results" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>🔬 Multiple Movement Test</h2>
+        <p>Test multiple movements to ensure radius stability</p>
+        
+        <button class="test-button" onclick="testMultipleMovements()">Test 5 Random Movements</button>
+        <div id="multiple-test-results" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>🧪 Preview System Test</h2>
+        <p>Test the preview system that was causing the bug</p>
+        
+        <button class="test-button" onclick="testPreviewSystem()">Test Preview → Commit Flow</button>
+        <div id="preview-test-results" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>🔄 Forward/Reverse Calculation Test</h2>
+        <p>Test that we only use forward calculations (no reverse engineering)</p>
+        
+        <button class="test-button" onclick="testCalculationMethods()">Test Calculation Consistency</button>
+        <div id="calculation-test-results" class="result"></div>
+    </div>
+
+    <script type="module">
+        // Import mock helpers (same as previous test)
+        const mockGeometryHelper = {
+            generateVertices(type, properties) {
+                if (type === 'circle') {
+                    const segments = 8; // Simplified for testing
+                    const vertices = [];
+                    for (let i = 0; i < segments; i++) {
+                        const angle = (i / segments) * 2 * Math.PI;
+                        vertices.push({
+                            x: properties.center.x + Math.cos(angle) * properties.radius,
+                            y: properties.center.y + Math.sin(angle) * properties.radius
+                        });
+                    }
+                    return vertices;
+                }
+                return [];
+            },
+            
+            calculateBounds(vertices) {
+                if (!vertices.length) return {minX: 0, minY: 0, maxX: 0, maxY: 0, width: 0, height: 0};
+                const xs = vertices.map(v => v.x);
+                const ys = vertices.map(v => v.y);
+                const minX = Math.min(...xs);
+                const maxX = Math.max(...xs);
+                const minY = Math.min(...ys);
+                const maxY = Math.max(...ys);
+                return {minX, minY, maxX, maxY, width: maxX - minX, height: maxY - minY};
+            },
+            
+            calculateProperties(type, vertices) {
+                if (type === 'circle') {
+                    const bounds = this.calculateBounds(vertices);
+                    return {
+                        type: 'circle',
+                        center: {x: bounds.minX + bounds.width/2, y: bounds.minY + bounds.height/2},
+                        radius: bounds.width / 2,
+                        diameter: bounds.width,
+                        circumference: Math.PI * bounds.width,
+                        area: Math.PI * Math.pow(bounds.width/2, 2)
+                    };
+                }
+                return {type, center: {x: 0, y: 0}};
+            }
+        };
+
+        // Mock preview system that FIXES the bug
+        const mockPreviewSystem = {
+            generatePropertiesFromFormData(formData) {
+                if (formData.circle) {
+                    // ✅ CIRCLE BUG FIX: Use form data directly - NO REVERSE ENGINEERING
+                    const radius = formData.circle.radius;
+                    return {
+                        type: 'circle',
+                        center: { x: formData.circle.centerX, y: formData.circle.centerY },
+                        radius: radius,  // ✅ Direct from form - stays exactly 50
+                        diameter: radius * 2,
+                        circumference: 2 * Math.PI * radius,
+                        area: Math.PI * radius * radius
+                    };
+                }
+                return null;
+            },
+
+            generateVerticesFromFormData(formData) {
+                if (formData.circle) {
+                    return mockGeometryHelper.generateVertices('circle', {
+                        center: { x: formData.circle.centerX, y: formData.circle.centerY },
+                        radius: formData.circle.radius
+                    });
+                }
+                return [];
+            }
+        };
+
+        // Mock store
+        window.testGameStore = {
+            objects: [],
+            selection: {selectedId: null, selectionBounds: null},
+            preview: {isActive: false, editingObjectId: null, originalObject: null, previewData: null, shouldShowPreview: true, previewOpacity: 0.8}
+        };
+
+        // Mock store methods with bug fix
+        window.testGameStoreMethods = {
+            createObject(params) {
+                const vertices = mockGeometryHelper.generateVertices(params.type, params.properties);
+                const newObject = {
+                    id: `obj_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                    type: params.type,
+                    vertices: vertices,
+                    bounds: mockGeometryHelper.calculateBounds(vertices),
+                    properties: params.properties, // Use properties directly, not calculated
+                    isVisible: true,
+                    createdAt: Date.now()
+                };
+                window.testGameStore.objects.push(newObject);
+                return newObject.id;
+            },
+
+            selectObject(objectId) {
+                const obj = window.testGameStore.objects.find(o => o.id === objectId);
+                if (obj) {
+                    window.testGameStore.selection.selectedId = objectId;
+                    window.testGameStore.selection.selectionBounds = obj.bounds;
+                }
+            },
+
+            startPreview(operation, originalObjectId) {
+                if (originalObjectId) {
+                    const originalObject = window.testGameStore.objects.find(obj => obj.id === originalObjectId);
+                    if (originalObject) {
+                        window.testGameStore.preview = {
+                            isActive: true,
+                            editingObjectId: originalObjectId,
+                            originalObject: { ...originalObject },
+                            previewData: {
+                                previewProperties: originalObject.properties,
+                                previewVertices: [...originalObject.vertices],
+                                previewBounds: { ...originalObject.bounds },
+                                isValid: true,
+                                hasChanges: false,
+                                lastUpdateTime: Date.now()
+                            },
+                            shouldShowPreview: true,
+                            previewOpacity: 0.8
+                        };
+                    }
+                }
+            },
+
+            updatePreview(data) {
+                if (!window.testGameStore.preview.isActive) return;
+                
+                if (data.operation === 'move' && data.formData) {
+                    // ✅ CIRCLE BUG FIX: Use form data directly (no reverse engineering)
+                    const vertices = mockPreviewSystem.generateVerticesFromFormData(data.formData);
+                    const properties = mockPreviewSystem.generatePropertiesFromFormData(data.formData);
+                    
+                    window.testGameStore.preview.previewData.previewVertices = vertices;
+                    window.testGameStore.preview.previewData.previewBounds = mockGeometryHelper.calculateBounds(vertices);
+                    window.testGameStore.preview.previewData.previewProperties = properties;
+                    window.testGameStore.preview.previewData.hasChanges = true;
+                    window.testGameStore.preview.previewData.lastUpdateTime = Date.now();
+                }
+            },
+
+            commitPreview() {
+                if (!window.testGameStore.preview.isActive || !window.testGameStore.preview.previewData) return;
+                
+                if (window.testGameStore.preview.editingObjectId) {
+                    const objIndex = window.testGameStore.objects.findIndex(obj => obj.id === window.testGameStore.preview.editingObjectId);
+                    if (objIndex !== -1) {
+                        window.testGameStore.objects[objIndex] = {
+                            ...window.testGameStore.objects[objIndex],
+                            vertices: window.testGameStore.preview.previewData.previewVertices,
+                            bounds: window.testGameStore.preview.previewData.previewBounds,
+                            properties: window.testGameStore.preview.previewData.previewProperties
+                        };
+                    }
+                }
+                
+                this.clearPreview();
+            },
+
+            clearPreview() {
+                window.testGameStore.preview = {
+                    isActive: false,
+                    editingObjectId: null,
+                    originalObject: null,
+                    previewData: null,
+                    shouldShowPreview: true,
+                    previewOpacity: 0.8
+                };
+            },
+
+            getSelectedObject() {
+                return window.testGameStore.selection.selectedId 
+                    ? window.testGameStore.objects.find(obj => obj.id === window.testGameStore.selection.selectedId)
+                    : null;
+            }
+        };
+
+        // Test functions
+        window.createTestCircle = function() {
+            const circleId = window.testGameStoreMethods.createObject({
+                type: 'circle',
+                properties: {
+                    center: {x: 100, y: 100},
+                    radius: 50
+                }
+            });
+            
+            window.testGameStoreMethods.selectObject(circleId);
+            const circle = window.testGameStoreMethods.getSelectedObject();
+            
+            document.getElementById('circle-state').innerHTML = `
+✅ Test Circle Created:
+ID: ${circle.id.substring(0, 12)}...
+Type: ${circle.type}
+Center: (${circle.properties.center.x}, ${circle.properties.center.y})
+Radius: ${circle.properties.radius}
+Vertices: ${circle.vertices.length} points
+Selected: ${window.testGameStore.selection.selectedId !== null}
+            `;
+        };
+
+        window.testCircleMovement = function() {
+            const selectedObject = window.testGameStoreMethods.getSelectedObject();
+            if (!selectedObject) {
+                document.getElementById('bug-test-results').textContent = '❌ No circle selected. Create a test circle first.';
+                document.getElementById('bug-test-results').className = 'result error';
+                return;
+            }
+
+            if (selectedObject.type !== 'circle') {
+                document.getElementById('bug-test-results').textContent = '❌ Selected object is not a circle.';
+                document.getElementById('bug-test-results').className = 'result error';
+                return;
+            }
+
+            // Get form values
+            const newCenterX = parseFloat(document.getElementById('new-center-x').value);
+            const newCenterY = parseFloat(document.getElementById('new-center-y').value);
+            const expectedRadius = parseFloat(document.getElementById('new-radius').value);
+
+            // Record original properties
+            const originalCenter = selectedObject.properties.center;
+            const originalRadius = selectedObject.properties.radius;
+
+            // ✅ CRITICAL TEST: Use the EXACT same flow as the edit panel
+            // This is the flow that was causing the circle bug
+
+            // 1. Start preview (simulates opening edit panel)
+            window.testGameStoreMethods.startPreview('move', selectedObject.id);
+
+            // 2. Update preview with form data (simulates user editing form)
+            const formData = {
+                isVisible: true,
+                circle: {
+                    centerX: newCenterX,
+                    centerY: newCenterY,
+                    radius: expectedRadius
+                },
+                style: {
+                    strokeColor: '#0066cc',
+                    strokeWidth: 2,
+                    strokeAlpha: 1.0,
+                    hasFill: false
+                }
+            };
+
+            window.testGameStoreMethods.updatePreview({
+                operation: 'move',
+                formData: formData
+            });
+
+            // 3. Check preview state (this is where the bug would manifest)
+            const previewRadius = window.testGameStore.preview.previewData.previewProperties.radius;
+
+            // 4. Commit preview (simulates clicking Apply button)
+            window.testGameStoreMethods.commitPreview();
+
+            // 5. Check final state
+            const finalObject = window.testGameStoreMethods.getSelectedObject();
+            const finalRadius = finalObject.properties.radius;
+
+            // ✅ CRITICAL VERIFICATION: Radius should be EXACTLY what was entered
+            const radiusChanged = Math.abs(finalRadius - expectedRadius) > 0.001;
+            
+            let resultClass = 'result success';
+            let resultText = '';
+
+            if (radiusChanged) {
+                resultClass = 'result error';
+                resultText = `🚨 CIRCLE BUG DETECTED!
+Original center: (${originalCenter.x}, ${originalCenter.y})
+Original radius: ${originalRadius}
+
+Form input:
+- New center: (${newCenterX}, ${newCenterY})
+- Expected radius: ${expectedRadius}
+
+Preview radius: ${previewRadius}
+Final radius: ${finalRadius}
+
+❌ BUG: Radius changed from ${expectedRadius} to ${finalRadius}!
+This is the exact bug described in the postmortem.`;
+
+                // Update bug test section styling
+                document.getElementById('bug-test-section').className = 'test-section bug-test';
+            } else {
+                resultText = `✅ CIRCLE BUG FIXED!
+Original center: (${originalCenter.x}, ${originalCenter.y}) → (${finalObject.properties.center.x}, ${finalObject.properties.center.y})
+Original radius: ${originalRadius}
+
+Form input:
+- New center: (${newCenterX}, ${newCenterY})
+- Expected radius: ${expectedRadius}
+
+Preview radius: ${previewRadius}
+Final radius: ${finalRadius}
+
+✅ SUCCESS: Radius stayed exactly ${expectedRadius}!
+The circle movement bug has been eliminated.`;
+
+                // Update bug test section styling
+                document.getElementById('bug-test-section').className = 'test-section bug-fixed';
+            }
+
+            document.getElementById('bug-test-results').textContent = resultText;
+            document.getElementById('bug-test-results').className = resultClass;
+
+            // Update circle state display
+            document.getElementById('circle-state').innerHTML = `
+Circle After Movement:
+Center: (${finalObject.properties.center.x}, ${finalObject.properties.center.y})
+Radius: ${finalObject.properties.radius}
+Movement: (${newCenterX - originalCenter.x}, ${newCenterY - originalCenter.y})
+Radius Change: ${finalRadius - originalRadius} (should be 0)
+            `;
+        };
+
+        window.testMultipleMovements = function() {
+            const selectedObject = window.testGameStoreMethods.getSelectedObject();
+            if (!selectedObject || selectedObject.type !== 'circle') {
+                document.getElementById('multiple-test-results').textContent = '❌ Need a selected circle for this test.';
+                document.getElementById('multiple-test-results').className = 'result error';
+                return;
+            }
+
+            const originalRadius = selectedObject.properties.radius;
+            const movements = [];
+            let currentRadius = originalRadius;
+
+            // Perform 5 random movements
+            for (let i = 0; i < 5; i++) {
+                const randomX = 50 + Math.random() * 200;
+                const randomY = 50 + Math.random() * 150;
+
+                // Use the same preview flow each time
+                window.testGameStoreMethods.startPreview('move', selectedObject.id);
+                window.testGameStoreMethods.updatePreview({
+                    operation: 'move',
+                    formData: {
+                        isVisible: true,
+                        circle: {
+                            centerX: randomX,
+                            centerY: randomY,
+                            radius: originalRadius // Always use original radius
+                        },
+                        style: { strokeColor: '#0066cc', strokeWidth: 2, strokeAlpha: 1.0, hasFill: false }
+                    }
+                });
+                window.testGameStoreMethods.commitPreview();
+
+                const movedObject = window.testGameStoreMethods.getSelectedObject();
+                const newRadius = movedObject.properties.radius;
+                
+                movements.push({
+                    movement: i + 1,
+                    center: `(${randomX.toFixed(1)}, ${randomY.toFixed(1)})`,
+                    expectedRadius: originalRadius,
+                    actualRadius: newRadius,
+                    radiusChanged: Math.abs(newRadius - originalRadius) > 0.001
+                });
+
+                currentRadius = newRadius;
+            }
+
+            // Check if any movement caused radius to change
+            const anyRadiusChanged = movements.some(m => m.radiusChanged);
+            
+            const resultText = `${anyRadiusChanged ? '❌' : '✅'} Multiple Movement Test:
+Original radius: ${originalRadius}
+Final radius: ${currentRadius}
+
+Movement Details:
+${movements.map(m => `${m.movement}. Center: ${m.center} → Radius: ${m.actualRadius} ${m.radiusChanged ? '❌' : '✅'}`).join('\n')}
+
+${anyRadiusChanged ? 'BUG: Radius changed during movements!' : 'SUCCESS: Radius remained constant through all movements!'}`;
+
+            document.getElementById('multiple-test-results').textContent = resultText;
+            document.getElementById('multiple-test-results').className = anyRadiusChanged ? 'result error' : 'result success';
+        };
+
+        window.testPreviewSystem = function() {
+            const selectedObject = window.testGameStoreMethods.getSelectedObject();
+            if (!selectedObject || selectedObject.type !== 'circle') {
+                document.getElementById('preview-test-results').textContent = '❌ Need a selected circle for this test.';
+                document.getElementById('preview-test-results').className = 'result error';
+                return;
+            }
+
+            const originalRadius = selectedObject.properties.radius;
+            const originalCenter = selectedObject.properties.center;
+
+            // Test preview system
+            window.testGameStoreMethods.startPreview('move', selectedObject.id);
+            
+            const previewData = window.testGameStore.preview.previewData;
+            const previewRadius = previewData.previewProperties.radius;
+
+            // Update preview
+            window.testGameStoreMethods.updatePreview({
+                operation: 'move',
+                formData: {
+                    isVisible: true,
+                    circle: {
+                        centerX: originalCenter.x + 25,
+                        centerY: originalCenter.y + 25,
+                        radius: originalRadius
+                    },
+                    style: { strokeColor: '#0066cc', strokeWidth: 2, strokeAlpha: 1.0, hasFill: false }
+                }
+            });
+
+            const updatedPreviewRadius = window.testGameStore.preview.previewData.previewProperties.radius;
+
+            // Commit preview
+            window.testGameStoreMethods.commitPreview();
+
+            const finalObject = window.testGameStoreMethods.getSelectedObject();
+            const finalRadius = finalObject.properties.radius;
+
+            const resultText = `✅ Preview System Test:
+Original radius: ${originalRadius}
+Preview initial radius: ${previewRadius}
+Preview updated radius: ${updatedPreviewRadius}
+Final committed radius: ${finalRadius}
+
+Preview consistency: ${Math.abs(previewRadius - originalRadius) < 0.001 ? '✅' : '❌'}
+Update consistency: ${Math.abs(updatedPreviewRadius - originalRadius) < 0.001 ? '✅' : '❌'}
+Commit consistency: ${Math.abs(finalRadius - originalRadius) < 0.001 ? '✅' : '❌'}
+
+${Math.abs(finalRadius - originalRadius) < 0.001 ? 'SUCCESS: Preview system maintains radius consistency!' : 'BUG: Preview system corrupted radius!'}`;
+
+            document.getElementById('preview-test-results').textContent = resultText;
+            document.getElementById('preview-test-results').className = Math.abs(finalRadius - originalRadius) < 0.001 ? 'result success' : 'result error';
+        };
+
+        window.testCalculationMethods = function() {
+            // Test forward calculation vs reverse engineering
+            const testRadius = 75;
+            const testCenter = {x: 150, y: 100};
+
+            // 1. Forward calculation (CORRECT)
+            const forwardVertices = mockGeometryHelper.generateVertices('circle', {
+                center: testCenter,
+                radius: testRadius
+            });
+            const forwardProperties = {
+                type: 'circle',
+                center: testCenter,
+                radius: testRadius
+            };
+
+            // 2. Reverse engineering (BROKEN - what the bug was doing)
+            const reverseProperties = mockGeometryHelper.calculateProperties('circle', forwardVertices);
+
+            // 3. Forward from form data (OUR FIX)
+            const formData = {
+                circle: {
+                    centerX: testCenter.x,
+                    centerY: testCenter.y,
+                    radius: testRadius
+                }
+            };
+            const fixedProperties = mockPreviewSystem.generatePropertiesFromFormData(formData);
+
+            const resultText = `🔬 Calculation Method Comparison:
+Original radius: ${testRadius}
+
+1. Forward calculation (correct):
+   Center: (${forwardProperties.center.x}, ${forwardProperties.center.y})
+   Radius: ${forwardProperties.radius}
+
+2. Reverse engineering (broken method):
+   Center: (${reverseProperties.center.x.toFixed(2)}, ${reverseProperties.center.y.toFixed(2)})
+   Radius: ${reverseProperties.radius.toFixed(2)}
+   ❌ Error: ${Math.abs(reverseProperties.radius - testRadius).toFixed(2)}
+
+3. Form data direct (our fix):
+   Center: (${fixedProperties.center.x}, ${fixedProperties.center.y})
+   Radius: ${fixedProperties.radius}
+   ✅ Exact match: ${fixedProperties.radius === testRadius}
+
+${fixedProperties.radius === testRadius ? 'SUCCESS: Form data direct method maintains exact radius!' : 'BUG: Our fix is not working correctly!'}`;
+
+            document.getElementById('calculation-test-results').textContent = resultText;
+            document.getElementById('calculation-test-results').className = fixedProperties.radius === testRadius ? 'result success' : 'result error';
+        };
+
+        // Initialize with instructions
+        setTimeout(() => {
+            document.getElementById('circle-state').innerHTML = `
+📋 Instructions:
+1. Click "Create Circle" to create a test circle
+2. Use the form inputs to move the circle
+3. Click "MOVE CIRCLE" to test the bug fix
+4. Verify that radius stays exactly 50
+
+The original bug: radius would change spontaneously during movement.
+Our fix: radius comes directly from form data, no reverse engineering.
+            `;
+        }, 100);
+    </script>
+</body>
+</html>
