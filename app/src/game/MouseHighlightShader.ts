@@ -1,24 +1,24 @@
-// app/src/game/MouseHighlightShader_3b.ts - GPU-accelerated sprite highlighting
+// app/src/game/MouseHighlightShader.ts - GPU-accelerated sprite highlighting
 import { Sprite, Texture, ColorMatrixFilter } from 'pixi.js'
 import { gameStore } from '../store/game-store'
-import { MeshManager_3b } from './MeshManager'
+import { MeshManager } from './MeshManager'
 import { VertexCoordinate } from '../types/ecs-coordinates'
 
 /**
- * MouseHighlightShader_3b - GPU-accelerated mouse highlighter for Phase 3B
+ * MouseHighlightShader - GPU-accelerated mouse highlighter for Phase 3B
  *
  * Uses Sprite + ColorMatrixFilter for responsive, GPU-accelerated highlighting
  * No animations - static highlighting for maximum performance
  */
-export class MouseHighlightShader_3b {
+export class MouseHighlightShader {
   private highlightSprite: Sprite
   private colorMatrixFilter: ColorMatrixFilter
-  private meshManager: MeshManager_3b
+  private meshManager: MeshManager
 
   // Debug constants
   private readonly VERBOSE_LOGGING = false
   
-  constructor(meshManager: MeshManager_3b) {
+  constructor(meshManager: MeshManager) {
     this.meshManager = meshManager
     
     // Create simple white sprite for highlighting
@@ -38,7 +38,7 @@ export class MouseHighlightShader_3b {
     // Initially hidden
     this.highlightSprite.visible = false
     
-    console.log('MouseHighlightShader_3b: Initialized with Sprite + ColorMatrixFilter')
+    console.log('MouseHighlightShader: Initialized with Sprite + ColorMatrixFilter')
   }
 
   /**
@@ -56,7 +56,7 @@ export class MouseHighlightShader_3b {
     this.highlightSprite.visible = true
     
     if (this.VERBOSE_LOGGING) {
-      console.log('MouseHighlightShader_3b: Direct positioning at', vertexCoord)
+      console.log('MouseHighlightShader: Direct positioning at', vertexCoord)
     }
   }
 
@@ -66,14 +66,14 @@ export class MouseHighlightShader_3b {
   public setHighlightColor(color: number): void {
     gameStore.ui.mouse.highlightColor = color
     this.highlightSprite.tint = color
-    console.log('MouseHighlightShader_3b: Highlight color set to', color.toString(16))
+    console.log('MouseHighlightShader: Highlight color set to', color.toString(16))
   }
 
   public setHighlightIntensity(intensity: number): void {
     gameStore.ui.mouse.highlightIntensity = Math.max(0, Math.min(1, intensity))
     // Update filter brightness based on intensity
     this.colorMatrixFilter.brightness(1 + intensity * 0.5, false)
-    console.log('MouseHighlightShader_3b: Highlight intensity set to', intensity)
+    console.log('MouseHighlightShader: Highlight intensity set to', intensity)
   }
 
   /**
@@ -91,6 +91,6 @@ export class MouseHighlightShader_3b {
       this.highlightSprite.destroy()
     }
     
-    console.log('MouseHighlightShader_3b: Cleanup complete')
+    console.log('MouseHighlightShader: Cleanup complete')
   }
 }

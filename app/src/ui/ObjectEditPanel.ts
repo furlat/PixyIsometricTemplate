@@ -1,5 +1,5 @@
 /**
- * ObjectEditPanel_3b.ts - CORRECTED Unified Store Integration
+ * ObjectEditPanel.ts - CORRECTED Unified Store Integration
  * 
  * Object editing panel using unified game store.
  * Fixes the circle movement bug through direct form data usage.
@@ -9,7 +9,7 @@
 import { gameStore, gameStore_methods } from '../store/game-store'
 import type { GeometricObject, ObjectEditFormData } from '../types'
 
-export class ObjectEditPanel_3b {
+export class ObjectEditPanel {
   private panelElement: HTMLElement | null = null
   private formElement: HTMLFormElement | null = null
 
@@ -510,5 +510,18 @@ export class ObjectEditPanel_3b {
     if (this.panelElement) {
       this.panelElement.style.display = 'none'
     }
+  }
+
+  /**
+   * Clean up resources and remove the panel
+   */
+  public destroy(): void {
+    this.hidePanel()
+    if (this.panelElement) {
+      this.panelElement.remove()
+      this.panelElement = null
+    }
+    this.formElement = null
+    console.log('ObjectEditPanel: Destroyed')
   }
 }

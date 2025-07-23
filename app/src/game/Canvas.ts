@@ -1,7 +1,7 @@
 // app/src/game/Phase3BCanvas.ts - Updated with mesh-first modules
 import { Application, Container } from 'pixi.js'
 import { BackgroundGridRenderer } from './BackgroundGridRenderer'
-import { MouseHighlightShader_3b } from './MouseHighlightShader'
+import { MouseHighlightShader } from './MouseHighlightShader'
 import { InputManager } from './InputManager'
 import { GeometryRenderer } from './GeometryRenderer'
 import { gameStore, gameStore_methods } from '../store/game-store'
@@ -15,7 +15,7 @@ import { gameStore, gameStore_methods } from '../store/game-store'
 export class Phase3BCanvas {
   private app: Application
   private backgroundGridRenderer: BackgroundGridRenderer
-  private mouseHighlightShader: MouseHighlightShader_3b
+  private mouseHighlightShader: MouseHighlightShader
   private inputManager: InputManager
   private geometryRenderer: GeometryRenderer
   
@@ -35,7 +35,7 @@ export class Phase3BCanvas {
     
     // Initialize renderers with mesh-first architecture
     this.backgroundGridRenderer = new BackgroundGridRenderer()
-    this.mouseHighlightShader = new MouseHighlightShader_3b(this.backgroundGridRenderer.getMeshManager())
+    this.mouseHighlightShader = new MouseHighlightShader(this.backgroundGridRenderer.getMeshManager())
     
     // ✅ Use provided InputManager or create new one (backward compatibility)
     this.inputManager = inputManager || new InputManager()
@@ -157,7 +157,7 @@ export class Phase3BCanvas {
   }
   
   /**
-   * Render the geometry layer using GeometryRenderer_3b
+   * Render the geometry layer using GeometryRenderer
    */
   private renderGeometryLayer(): void {
     try {
@@ -191,7 +191,7 @@ export class Phase3BCanvas {
   /**
    * Get the mouse shader for external access
    */
-  public getMouseShader(): MouseHighlightShader_3b {
+  public getMouseShader(): MouseHighlightShader {
     return this.mouseHighlightShader
   }
   

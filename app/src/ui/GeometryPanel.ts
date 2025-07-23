@@ -1,17 +1,33 @@
+// app/src/ui/GeometryPanel.ts - Refactored to use unified game store
 import { subscribe } from 'valtio'
-import { gameStore_3b, gameStore_3b_methods } from '../store/gameStore_3b'
+import { gameStore, gameStore_methods } from '../store/game-store'
 
-export class GeometryPanel_3b {
+/**
+ * GeometryPanel - Geometry Drawing and Style Controls
+ *
+ * Comprehensive geometry panel with:
+ * - Drawing mode selection (point, line, circle, rectangle, diamond)
+ * - Style settings (colors, stroke width, fill options, alpha)
+ * - Drawing options (preview opacity)
+ * - Action buttons (clear all, reset styles)
+ * - Live status display (mode, object count, selection)
+ * 
+ * ✅ Fully refactored to use unified gameStore
+ * ✅ All functionality preserved from GeometryPanel_3b
+ * ✅ Same HTML element IDs maintained
+ * ✅ Color picker state management preserved
+ */
+export class GeometryPanel {
   private panel: HTMLElement | null = null
   private isVisible: boolean = false
   private activeColorPickers: Set<string> = new Set()
-
+  
   constructor() {
     this.panel = document.getElementById('geometry-panel')
     this.setupEventListeners()
     this.setupReactivity()
   }
-
+  
   private setupEventListeners(): void {
     // Close button
     const closeBtn = document.getElementById('close-geometry-panel')
@@ -20,30 +36,30 @@ export class GeometryPanel_3b {
         this.hide()
       })
     }
-
+    
     // Drawing mode buttons
     const drawingModes = ['none', 'point', 'line', 'circle', 'rectangle', 'diamond']
     drawingModes.forEach(mode => {
       const button = document.getElementById(`geometry-mode-${mode}`)
       if (button) {
         button.addEventListener('click', () => {
-          // Clear selection when switching drawing modes
-          if (gameStore_3b.geometry.selectedId) {
-            gameStore_3b_methods.clearSelection()
+          // ✅ UPDATED: Clear selection when switching drawing modes
+          if (gameStore.selection.selectedId) {
+            gameStore_methods.clearSelection()
             console.log(`GeometryPanel: Deselected object when switching to ${mode} mode`)
           }
-          gameStore_3b_methods.setDrawingMode(mode as any)
+          gameStore_methods.setDrawingMode(mode as any)
           console.log(`GeometryPanel: Set drawing mode to ${mode}`)
         })
       }
     })
-
-    // ✅ NEW: Complete event handler setup
+    
+    // Complete event handler setup
     this.setupDrawingSettingsHandlers()
     this.setupDrawingOptionsHandlers()
     this.setupActionsHandlers()
   }
-
+  
   private setupDrawingSettingsHandlers(): void {
     // Stroke color
     const strokeColorInput = document.getElementById('geometry-default-color') as HTMLInputElement
@@ -53,11 +69,10 @@ export class GeometryPanel_3b {
       })
       strokeColorInput.addEventListener('change', (e) => {
         const color = parseInt((e.target as HTMLInputElement).value.replace('#', ''), 16)
-        gameStore_3b_methods.setStrokeColor(color)
+        gameStore_methods.setStrokeColor(color)
         this.activeColorPickers.delete('geometry-default-color')
         console.log('Set stroke color to:', color.toString(16))
       })
-      // Remove blur event that was interfering with click-away behavior
     }
     
     // Stroke width
@@ -65,7 +80,7 @@ export class GeometryPanel_3b {
     if (strokeWidthInput) {
       strokeWidthInput.addEventListener('input', (e) => {
         const width = parseFloat((e.target as HTMLInputElement).value)
-        gameStore_3b_methods.setStrokeWidth(width)
+        gameStore_methods.setStrokeWidth(width)
         console.log('Set stroke width to:', width)
       })
     }
@@ -78,11 +93,10 @@ export class GeometryPanel_3b {
       })
       fillColorInput.addEventListener('change', (e) => {
         const color = parseInt((e.target as HTMLInputElement).value.replace('#', ''), 16)
-        gameStore_3b_methods.setFillColor(color)
+        gameStore_methods.setFillColor(color)
         this.activeColorPickers.delete('geometry-default-fill-color')
         console.log('Set fill color to:', color.toString(16))
       })
-      // Remove blur event that was interfering with click-away behavior
     }
     
     // Fill enabled
@@ -90,7 +104,7 @@ export class GeometryPanel_3b {
     if (fillEnabledInput) {
       fillEnabledInput.addEventListener('change', (e) => {
         const enabled = (e.target as HTMLInputElement).checked
-        gameStore_3b_methods.setFillEnabled(enabled)
+        gameStore_methods.setFillEnabled(enabled)
         console.log('Set fill enabled to:', enabled)
       })
     }
@@ -101,7 +115,7 @@ export class GeometryPanel_3b {
     if (fillAlphaInput && fillAlphaValue) {
       fillAlphaInput.addEventListener('input', (e) => {
         const alpha = parseFloat((e.target as HTMLInputElement).value)
-        gameStore_3b_methods.setFillAlpha(alpha)
+        gameStore_methods.setFillAlpha(alpha)
         fillAlphaValue.textContent = alpha.toFixed(1)
         console.log('Set fill alpha to:', alpha)
       })
@@ -113,7 +127,7 @@ export class GeometryPanel_3b {
     if (strokeAlphaInput && strokeAlphaValue) {
       strokeAlphaInput.addEventListener('input', (e) => {
         const alpha = parseFloat((e.target as HTMLInputElement).value)
-        gameStore_3b_methods.setStrokeAlpha(alpha)
+        gameStore_methods.setStrokeAlpha(alpha)
         strokeAlphaValue.textContent = alpha.toFixed(1)
         console.log('Set stroke alpha to:', alpha)
       })
@@ -121,13 +135,14 @@ export class GeometryPanel_3b {
   }
   
   private setupDrawingOptionsHandlers(): void {
-    // Preview opacity with live update - ONLY functional option remaining
+    // Preview opacity with live update
     const previewOpacityInput = document.getElementById('drawing-preview-opacity') as HTMLInputElement
     const previewOpacityValue = document.getElementById('drawing-preview-opacity-value')
     if (previewOpacityInput && previewOpacityValue) {
       previewOpacityInput.addEventListener('input', (e) => {
         const opacity = parseFloat((e.target as HTMLInputElement).value)
-        gameStore_3b.drawing.settings.previewOpacity = opacity
+        // ✅ UPDATED: Direct store property update
+        gameStore.drawing.settings.previewOpacity = opacity
         previewOpacityValue.textContent = opacity.toFixed(1)
         console.log('Preview opacity:', opacity)
       })
@@ -140,7 +155,7 @@ export class GeometryPanel_3b {
     if (clearAllBtn) {
       clearAllBtn.addEventListener('click', () => {
         if (confirm('Are you sure you want to clear all objects?')) {
-          gameStore_3b_methods.clearAllObjects()
+          gameStore_methods.clearAllObjects()
           console.log('Cleared all objects')
         }
       })
@@ -151,16 +166,11 @@ export class GeometryPanel_3b {
     if (resetStylesBtn) {
       resetStylesBtn.addEventListener('click', () => {
         if (confirm('Are you sure you want to reset all styles to defaults?')) {
-          // Reset global styles
-          gameStore_3b_methods.setStrokeColor(0x0066cc)
-          gameStore_3b_methods.setStrokeWidth(2)
-          gameStore_3b_methods.setFillColor(0x0066cc)
-          gameStore_3b_methods.setFillEnabled(false)
-          gameStore_3b_methods.setStrokeAlpha(1.0)
-          gameStore_3b_methods.setFillAlpha(0.3)
+          // ✅ UPDATED: Reset styles using unified store methods
+          gameStore_methods.resetDefaultStyle()
           
           // Clear all per-object style overrides
-          gameStore_3b.objectStyles = {}
+          gameStore.objectStyles = {}
           
           // Update UI elements
           this.updateUIFromStore()
@@ -170,127 +180,134 @@ export class GeometryPanel_3b {
       })
     }
   }
-
+  
   private setupReactivity(): void {
-    // ✅ PRECISE SUBSCRIPTIONS - Following StorePanel_3b pattern
+    // ✅ PRECISE SUBSCRIPTIONS - Updated for unified store
     
     // Style-specific subscription for Reset All Styles functionality
-    subscribe(gameStore_3b.style, () => {
+    subscribe(gameStore.defaultStyle, () => {
       this.updateUIFromStore()
       console.log('🔧 Style subscription triggered - UI updated')
     })
     
     // Drawing mode subscription for mode button updates
-    subscribe(gameStore_3b.drawing, () => {
+    subscribe(gameStore.drawing, () => {
       this.updateValues()
     })
     
-    // Geometry subscription for object count updates
-    subscribe(gameStore_3b.geometry, () => {
+    // ✅ UPDATED: Subscribe to root objects array instead of geometry
+    subscribe(gameStore.objects, () => {
+      this.updateValues()
+    })
+    
+    // ✅ UPDATED: Subscribe to selection for selected count
+    subscribe(gameStore.selection, () => {
       this.updateValues()
     })
     
     // Initial update
     this.updateValues()
   }
-
+  
   private updateValues(): void {
     // Update current mode display
     const currentModeElement = document.getElementById('geometry-current-mode')
     if (currentModeElement) {
-      currentModeElement.textContent = gameStore_3b.drawing.mode
+      currentModeElement.textContent = gameStore.drawing.mode
       currentModeElement.className = `font-bold font-mono text-success`
     }
-
-    // Update objects count
+    
+    // ✅ UPDATED: Update objects count using root objects array
     const objectsCountElement = document.getElementById('geometry-objects-count')
     if (objectsCountElement) {
-      objectsCountElement.textContent = gameStore_3b.geometry.objects.length.toString()
+      objectsCountElement.textContent = gameStore.objects.length.toString()
       objectsCountElement.className = `font-bold font-mono text-primary`
     }
-
-    // Update selected count
+    
+    // ✅ UPDATED: Update selected count using selection.selectedId
     const selectedCountElement = document.getElementById('geometry-selected-count')
     if (selectedCountElement) {
-      const selectedCount = gameStore_3b.geometry.selectedId ? 1 : 0
+      const selectedCount = gameStore.selection.selectedId ? 1 : 0
       selectedCountElement.textContent = selectedCount.toString()
       selectedCountElement.className = `font-bold font-mono text-info`
     }
-
-    // Update stroke width input
+    
+    // ✅ UPDATED: Update stroke width using defaultStyle
     const strokeWidthInput = document.getElementById('geometry-default-stroke-width') as HTMLInputElement
     if (strokeWidthInput) {
-      strokeWidthInput.value = gameStore_3b.style.strokeWidth.toString()
+      strokeWidthInput.value = gameStore.defaultStyle.strokeWidth.toString()
     }
-
-    // Update stroke color display
+    
+    // ✅ UPDATED: Update stroke color display using defaultStyle
     const colorElement = document.getElementById('geometry-default-color')
     if (colorElement) {
-      const colorHex = `#${gameStore_3b.style.color.toString(16).padStart(6, '0')}`
+      const colorHex = `#${gameStore.defaultStyle.color.toString(16).padStart(6, '0')}`
       colorElement.textContent = colorHex
       colorElement.style.color = colorHex
     }
-
+    
     // Update drawing mode button states
     this.updateModeButtons()
     
     // Update new UI elements
     this.updateUIFromStore()
   }
-
-  // ✅ NEW: Update UI elements from store values
+  
+  // Update UI elements from store values
   private updateUIFromStore(): void {
+    // ✅ UPDATED: All properties now use defaultStyle
+    
     // Update stroke color (only if not currently active)
     const strokeColorInput = document.getElementById('geometry-default-color') as HTMLInputElement
     if (strokeColorInput && !this.activeColorPickers.has('geometry-default-color')) {
-      strokeColorInput.value = '#' + gameStore_3b.style.color.toString(16).padStart(6, '0')
+      strokeColorInput.value = '#' + gameStore.defaultStyle.color.toString(16).padStart(6, '0')
     }
     
     // Update stroke width
     const strokeWidthInput = document.getElementById('geometry-default-stroke-width') as HTMLInputElement
     if (strokeWidthInput) {
-      strokeWidthInput.value = gameStore_3b.style.strokeWidth.toString()
+      strokeWidthInput.value = gameStore.defaultStyle.strokeWidth.toString()
     }
     
     // Update fill color (only if not currently active)
     const fillColorInput = document.getElementById('geometry-default-fill-color') as HTMLInputElement
     if (fillColorInput && !this.activeColorPickers.has('geometry-default-fill-color')) {
-      fillColorInput.value = '#' + gameStore_3b.style.fillColor.toString(16).padStart(6, '0')
+      fillColorInput.value = '#' + gameStore.defaultStyle.fillColor.toString(16).padStart(6, '0')
     }
     
     // Update fill enabled
     const fillEnabledInput = document.getElementById('geometry-fill-enabled') as HTMLInputElement
     if (fillEnabledInput) {
-      fillEnabledInput.checked = gameStore_3b.style.fillEnabled
+      fillEnabledInput.checked = gameStore.defaultStyle.fillEnabled
     }
     
     // Update fill alpha
     const fillAlphaInput = document.getElementById('geometry-fill-alpha') as HTMLInputElement
     const fillAlphaValue = document.getElementById('geometry-fill-alpha-value')
     if (fillAlphaInput && fillAlphaValue) {
-      fillAlphaInput.value = gameStore_3b.style.fillAlpha.toString()
-      fillAlphaValue.textContent = gameStore_3b.style.fillAlpha.toFixed(1)
+      fillAlphaInput.value = gameStore.defaultStyle.fillAlpha.toString()
+      fillAlphaValue.textContent = gameStore.defaultStyle.fillAlpha.toFixed(1)
     }
     
     // Update stroke alpha
     const strokeAlphaInput = document.getElementById('geometry-stroke-alpha') as HTMLInputElement
     const strokeAlphaValue = document.getElementById('geometry-stroke-alpha-value')
     if (strokeAlphaInput && strokeAlphaValue) {
-      strokeAlphaInput.value = gameStore_3b.style.strokeAlpha.toString()
-      strokeAlphaValue.textContent = gameStore_3b.style.strokeAlpha.toFixed(1)
+      strokeAlphaInput.value = gameStore.defaultStyle.strokeAlpha.toString()
+      strokeAlphaValue.textContent = gameStore.defaultStyle.strokeAlpha.toFixed(1)
     }
     
     // Update drawing options - only Preview Opacity remains functional
     const previewOpacityInput = document.getElementById('drawing-preview-opacity') as HTMLInputElement
     const previewOpacityValue = document.getElementById('drawing-preview-opacity-value')
     if (previewOpacityInput && previewOpacityValue) {
-      previewOpacityInput.value = gameStore_3b.drawing.settings.previewOpacity.toString()
-      previewOpacityValue.textContent = gameStore_3b.drawing.settings.previewOpacity.toFixed(1)
+      previewOpacityInput.value = gameStore.drawing.settings.previewOpacity.toString()
+      previewOpacityValue.textContent = gameStore.drawing.settings.previewOpacity.toFixed(1)
     }
   }
-
+  
   private updateModeButtons(): void {
-    const currentMode = gameStore_3b.drawing.mode
+    const currentMode = gameStore.drawing.mode
     const drawingModes = ['none', 'point', 'line', 'circle', 'rectangle', 'diamond']
     
     drawingModes.forEach(mode => {
@@ -304,24 +321,28 @@ export class GeometryPanel_3b {
       }
     })
   }
-
+  
   public show(): void {
     if (this.panel) {
       this.panel.style.display = 'block'
       this.isVisible = true
+      // ✅ UPDATED: Update showGeometryPanel in unified store
+      gameStore.ui.showGeometryPanel = true
       this.updateValues()
       console.log('GeometryPanel: Shown')
     }
   }
-
+  
   public hide(): void {
     if (this.panel) {
       this.panel.style.display = 'none'
       this.isVisible = false
+      // ✅ UPDATED: Update showGeometryPanel in unified store
+      gameStore.ui.showGeometryPanel = false
       console.log('GeometryPanel: Hidden')
     }
   }
-
+  
   public toggle(): void {
     if (this.isVisible) {
       this.hide()
@@ -329,7 +350,7 @@ export class GeometryPanel_3b {
       this.show()
     }
   }
-
+  
   public isOpen(): boolean {
     return this.isVisible
   }

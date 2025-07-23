@@ -1,10 +1,6 @@
 import { Game } from './game/Game'
 import { gameStore, gameStore_methods } from './store/game-store'
-import { StorePanel_3b } from './ui/StorePanel_3b'
-import { UIControlBar_3b } from './ui/UIControlBar_3b'
-import { LayerToggleBar_3b } from './ui/LayerToggleBar_3b'
-import { GeometryPanel_3b } from './ui/GeometryPanel_3b'
-// import { ObjectEditPanel_3b } from './ui/ObjectEditPanel_3b'
+import { StorePanel, UIControlBar, LayerToggleBar, GeometryPanel } from './ui'
 import './styles/main.css'
 
 // ✅ TYPE-SAFE: Global debugging interface declaration
@@ -28,10 +24,10 @@ declare global {
  */
 
 let game: Game | null = null
-let storePanel: StorePanel_3b | null = null
-let geometryPanel: GeometryPanel_3b | null = null
-let uiControlBar: UIControlBar_3b | null = null
-let layerToggleBar: LayerToggleBar_3b | null = null
+let storePanel: StorePanel | null = null
+let geometryPanel: GeometryPanel | null = null
+let uiControlBar: UIControlBar | null = null
+let layerToggleBar: LayerToggleBar | null = null
 
 /**
  * Initialize Phase 3B application
@@ -49,10 +45,10 @@ async function initPhase3B(): Promise<void> {
     await game.init(canvas)
     
     // Initialize UI components for Phase 3B
-    storePanel = new StorePanel_3b()
-    geometryPanel = new GeometryPanel_3b()
-    uiControlBar = new UIControlBar_3b()
-    layerToggleBar = new LayerToggleBar_3b()
+    storePanel = new StorePanel()
+    geometryPanel = new GeometryPanel()
+    uiControlBar = new UIControlBar()
+    layerToggleBar = new LayerToggleBar()
     
     // Connect UI components for Phase 3B
     if (storePanel && uiControlBar) {
@@ -101,12 +97,12 @@ async function initPhase3B(): Promise<void> {
 
 /**
  * Setup Phase 3B specific UI event listeners
- * Note: UI components handle their own buttons (LayerToggleBar_3b, UIControlBar_3b)
- * Note: F1/F2 shortcuts are handled by UIControlBar_3b
+ * Note: UI components handle their own buttons (LayerToggleBar, UIControlBar)
+ * Note: F1/F2 shortcuts are handled by UIControlBar
  */
 function setupPhase3BUIListeners(): void {
-  // NOTE: Layer toggle buttons are handled by LayerToggleBar_3b
-  // NOTE: Store panel and layers buttons are handled by UIControlBar_3b
+  // NOTE: Layer toggle buttons are handled by LayerToggleBar
+  // NOTE: Store panel and layers buttons are handled by UIControlBar
   // NOTE: No global handlers needed - components handle their own events
   console.log('Phase 3B: UI components handle their own event listeners')
 }

@@ -67,7 +67,7 @@ export interface GameStoreData {
     isDrawing: boolean
     startPoint: PixeloidCoordinate | null
     currentPoint: PixeloidCoordinate | null
-    settings: {                    // ← For GeometryPanel_3b
+    settings: {                    // ← For GeometryPanel
       previewOpacity: number
     }
   }
@@ -85,9 +85,9 @@ export interface GameStoreData {
     // ✅ ADD THESE FOR _3b FILES
     showGrid: boolean              // ← For CanvasManager (replaces Phase3BCanvas)
     showMouse: boolean             // ← For CanvasManager mouse layer visibility
-    enableCheckboard: boolean      // ← For GridShaderRenderer_3b
-    showLayerToggle: boolean       // ← For LayerToggleBar_3b
-    mouse: {                       // ← For MouseHighlightShader_3b
+    enableCheckboard: boolean      // ← For GridShaderRenderer
+    showLayerToggle: boolean       // ← For LayerToggleBar
+    mouse: {                       // ← For MouseHighlightShader
       highlightColor: number
       highlightIntensity: number
     }
@@ -108,7 +108,7 @@ export interface GameStoreData {
   navigation: {
     offset: PixeloidCoordinate
     isDragging: boolean
-    moveAmount: number             // ← For StorePanel_3b display
+    moveAmount: number             // ← For StorePanel display
   }
   
   // Clipboard system (for InputManager_3b copy/paste)
@@ -123,22 +123,22 @@ export interface GameStoreData {
     draggedObjectId: string | null
     dragStartPosition: PixeloidCoordinate | null
     currentDragPosition: PixeloidCoordinate | null
-    vertexOffsets: PixeloidCoordinate[]  // ← For StorePanel_3b display
+    vertexOffsets: PixeloidCoordinate[]  // ← For StorePanel display
   }
   
   // Mesh configuration
   mesh: {
     cellSize: number
-    vertexData: Float32Array | null          // ← For StorePanel_3b display
-    dimensions: { width: number, height: number } | null  // ← For StorePanel_3b display
-    needsUpdate: boolean                     // ← For StorePanel_3b display
+    vertexData: Float32Array | null          // ← For StorePanel display
+    dimensions: { width: number, height: number } | null  // ← For StorePanel display
+    needsUpdate: boolean                     // ← For StorePanel display
   }
   
   // Style system extensions
-  objectStyles: Record<string, Partial<StyleSettings>>  // ← For GeometryPanel_3b per-object styles
+  objectStyles: Record<string, Partial<StyleSettings>>  // ← For GeometryPanel per-object styles
   
   // Drag preview system
-  dragPreview: {                           // ← For StorePanel_3b display
+  dragPreview: {                           // ← For StorePanel display
     isActive: boolean
     currentMousePosition: PixeloidCoordinate | null
     previewVertices: PixeloidCoordinate[]

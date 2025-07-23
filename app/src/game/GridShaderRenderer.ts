@@ -1,11 +1,11 @@
-// app/src/game/GridShaderRenderer_3b.ts
+// app/src/game/GridShaderRenderer.ts
 import { Shader, MeshSimple } from 'pixi.js'
-import { MeshManager_3b } from './MeshManager'
+import { MeshManager } from './MeshManager'
 import { gameStore } from '../store/game-store'
 
-export class GridShaderRenderer_3b {
+export class GridShaderRenderer {
   private shader: Shader | null = null
-  private meshManager: MeshManager_3b
+  private meshManager: MeshManager
   
   // Statistics tracking
   private shaderStats = {
@@ -14,7 +14,7 @@ export class GridShaderRenderer_3b {
     lastState: false
   }
   
-  constructor(meshManager: MeshManager_3b) {
+  constructor(meshManager: MeshManager) {
     this.meshManager = meshManager
     this.createCheckboardShader()
   }
@@ -106,7 +106,7 @@ export class GridShaderRenderer_3b {
     // Log statistics every 15 seconds
     const now = Date.now()
     if (now - this.shaderStats.lastStatsTime >= 15000) {
-      console.log('📊 GridShaderRenderer_3b Stats (15s):', {
+      console.log('📊 GridShaderRenderer Stats (15s):', {
         toggles: this.shaderStats.toggleCount,
         currentState: enabled ? 'ON' : 'OFF'
       })

@@ -9,9 +9,9 @@
  */
 
 import { MeshSimple } from 'pixi.js'
-import { MeshManager_3b } from './MeshManager'
-import { GridShaderRenderer_3b } from './GridShaderRenderer'
-import { MouseHighlightShader_3b } from './MouseHighlightShader'
+import { MeshManager } from './MeshManager'
+import { GridShaderRenderer } from './GridShaderRenderer'
+import { MouseHighlightShader } from './MouseHighlightShader'
 import { InputManager } from './InputManager'
 import { gameStore, gameStore_methods } from '../store/game-store'
 import { VertexCoordinate } from '../types/ecs-coordinates'
@@ -19,23 +19,23 @@ import { VertexCoordinate } from '../types/ecs-coordinates'
 /**
  * BackgroundGridRenderer - Orchestrator for mesh-first architecture
  *
- * Coordinates MeshManager_3b (mesh creation) and GridShaderRenderer_3b (visual rendering)
+ * Coordinates MeshManager (mesh creation) and GridShaderRenderer (visual rendering)
  * Handles mesh interaction events and routes to store and mouse highlight
  */
 export class BackgroundGridRenderer {
-  private meshManager: MeshManager_3b
-  private gridShaderRenderer: GridShaderRenderer_3b
-  private mouseHighlightShader: MouseHighlightShader_3b | null = null
+  private meshManager: MeshManager
+  private gridShaderRenderer: GridShaderRenderer
+  private mouseHighlightShader: MouseHighlightShader | null = null
   private inputManager: InputManager | null = null
   
   constructor() {
     console.log('BackgroundGridRenderer: Initializing with clean architecture')
     
     // Create mesh manager (authoritative source) with NEW store
-    this.meshManager = new MeshManager_3b(gameStore)
+    this.meshManager = new MeshManager(gameStore)
     
     // Create grid shader renderer (visual layer)
-    this.gridShaderRenderer = new GridShaderRenderer_3b(this.meshManager)
+    this.gridShaderRenderer = new GridShaderRenderer(this.meshManager)
     
     // Setup mesh interaction
     this.setupMeshInteraction()
@@ -161,7 +161,7 @@ export class BackgroundGridRenderer {
   /**
    * Register mouse highlight shader for direct mesh updates
    */
-  public registerMouseHighlightShader(mouseHighlightShader: MouseHighlightShader_3b): void {
+  public registerMouseHighlightShader(mouseHighlightShader: MouseHighlightShader): void {
     this.mouseHighlightShader = mouseHighlightShader
     console.log('BackgroundGridRenderer: Mouse highlight shader registered for direct mesh updates')
   }
@@ -169,14 +169,14 @@ export class BackgroundGridRenderer {
   /**
    * Get the mesh manager for external access
    */
-  public getMeshManager(): MeshManager_3b {
+  public getMeshManager(): MeshManager {
     return this.meshManager
   }
   
   /**
    * Get the grid shader renderer for external access
    */
-  public getGridShaderRenderer(): GridShaderRenderer_3b {
+  public getGridShaderRenderer(): GridShaderRenderer {
     return this.gridShaderRenderer
   }
   
