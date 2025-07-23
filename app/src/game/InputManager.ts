@@ -57,6 +57,11 @@ export class InputManager {
     // ✅ UNIFIED: Movement detection only
     const dragAction = this.dragDetector.handleMouseMove(coord)
     
+    // ✅ DRAG AND DROP: Handle object dragging preview updates
+    if (gameStore.dragging.isDragging && gameStore.preview.isActive) {
+      this.updateDragPreview(coord)
+    }
+    
     // ✅ UNIFIED: Delayed preview creation on movement
     if (gameStore.drawing.isDrawing) {
       const startPoint = gameStore.drawing.startPoint
@@ -83,6 +88,11 @@ export class InputManager {
     const clickResult = this.clickDetector.handleMouseUp(coord)
     
     console.log('InputManager: Mouse up', { coord, clickResult })
+    
+    // ✅ DRAG AND DROP: Complete drag operation
+    if (gameStore.dragging.isDragging && gameStore.preview.isActive) {
+      this.completeDragOperation()
+    }
     
     // ✅ SAFE: Drag completion via existing store methods
     if (this.dragDetector.isDragging) {
@@ -115,14 +125,27 @@ export class InputManager {
   // ===== SAFE MODE-SPECIFIC HANDLERS =====
   private handleSelectionMode(hitObjectId: string | null, coord: PixeloidCoordinate, clickType: string, event: FederatedMouseEvent | MouseEvent): void {
     if (hitObjectId) {
-      // ✅ SAFE: Selection via existing store methods
-      if (clickType === 'single-click') {
-        gameStore_methods.selectObject(hitObjectId)
-        console.log('InputManager: Object selected', hitObjectId)
-      } else if (clickType === 'double-click') {
-        gameStore_methods.selectObject(hitObjectId)
-        console.log('InputManager: Object double-clicked', hitObjectId)
-        // TODO: Open edit panel via existing UI methods
+      // ✅ DRAG AND DROP: Check if clicking on already selected object
+      if (hitObjectId === gameStore.selection.selectedId) {
+        // ✅ Already selected → START DRAG
+        if (clickType === 'single-click') {
+          this.initiateDragOperation(hitObjectId, coord)
+          console.log('InputManager: Drag initiated for selected object', hitObjectId)
+        } else if (clickType === 'double-click') {
+          // Double-click on selected object - keep selection, don't drag
+          console.log('InputManager: Double-click on selected object', hitObjectId)
+          // TODO: Open edit panel via existing UI methods
+        }
+      } else {
+        // ✅ Different object → SELECT IT
+        if (clickType === 'single-click') {
+          gameStore_methods.selectObject(hitObjectId)
+          console.log('InputManager: Object selected', hitObjectId)
+        } else if (clickType === 'double-click') {
+          gameStore_methods.selectObject(hitObjectId)
+          console.log('InputManager: Object double-clicked', hitObjectId)
+          // TODO: Open edit panel via existing UI methods
+        }
       }
     } else {
       // ✅ SAFE: Clear selection via existing store methods
@@ -153,6 +176,87 @@ export class InputManager {
   private handleContextMenu(objectId: string, coord: PixeloidCoordinate): void {
     // TODO: Integrate with existing UI context menu system
     console.log('InputManager: Context menu for object', objectId, 'at', coord)
+  }
+  
+  /**
+   * Initiate drag operation for the selected object
+   * ✅ DRAG AND DROP: Calculate vertex offsets and start drag state
+   */
+  private initiateDragOperation(objectId: string, clickPosition: PixeloidCoordinate): void {
+    const object = gameStore_methods.getObjectById(objectId)
+    if (!object) {
+      console.warn('InputManager: Cannot drag - object not found:', objectId)
+      return
+    }
+    
+    // ✅ Calculate vertex offsets from click position (ONCE - no accumulation)
+    const vertexOffsets = object.vertices.map(vertex => ({
+      x: vertex.x - clickPosition.x,
+      y: vertex.y - clickPosition.y
+    }))
+    
+    // ✅ Start drag using existing method
+    gameStore_methods.startDragging(objectId, clickPosition)
+    
+    // ✅ Store offsets in existing store structure
+    gameStore.dragging.vertexOffsets = vertexOffsets
+    
+    // ✅ Start preview using existing method
+    gameStore_methods.startPreview('move', objectId)
+    
+    console.log('InputManager: Drag initiated:', {
+      objectId,
+      clickPosition,
+      vertexCount: vertexOffsets.length
+    })
+  }
+
+  /**
+   * Update drag preview during mouse movement
+   * ✅ DRAG AND DROP: Calculate new vertices from offsets (no accumulation)
+   */
+  private updateDragPreview(currentMousePosition: PixeloidCoordinate): void {
+    const { dragStartPosition, vertexOffsets } = gameStore.dragging
+    
+    if (!dragStartPosition || !vertexOffsets || vertexOffsets.length === 0) {
+      console.warn('InputManager: Cannot update drag preview - missing drag data')
+      return
+    }
+    
+    // ✅ Update drag position using existing method
+    gameStore_methods.updateDragPosition(currentMousePosition)
+    
+    // ✅ Calculate mouse delta (absolute, no accumulation)
+    const mouseDelta = {
+      x: currentMousePosition.x - dragStartPosition.x,
+      y: currentMousePosition.y - dragStartPosition.y
+    }
+    
+    // ✅ Calculate new vertices using pre-calculated offsets
+    const newVertices = vertexOffsets.map(offset => ({
+      x: dragStartPosition.x + offset.x + mouseDelta.x,
+      y: dragStartPosition.y + offset.y + mouseDelta.y
+    }))
+    
+    // ✅ Update preview using existing method
+    gameStore_methods.updatePreview({
+      operation: 'move',
+      vertices: newVertices
+    })
+  }
+
+  /**
+   * Complete drag operation by committing preview to store
+   * ✅ DRAG AND DROP: Finalize object position in store
+   */
+  private completeDragOperation(): void {
+    // ✅ Commit preview using existing method
+    gameStore_methods.commitPreview()
+    
+    // ✅ Clear drag state using existing method
+    gameStore_methods.cancelDragging()
+    
+    console.log('InputManager: Drag completed and committed to store')
   }
   
   // ===== UNIFIED PREVIEWSYSTEM INTEGRATION =====
@@ -701,20 +805,28 @@ class KeyboardHandler {
   }
   
   public handleEscape(): void {
-    // ✅ ESC PRIORITY 1: Close edit panel if open
+    // ✅ ESC PRIORITY 1: Cancel drag operation if active
+    if (gameStore.dragging.isDragging) {
+      gameStore_methods.cancelDragging()
+      gameStore_methods.cancelPreview() // Cancel preview too
+      console.log('KeyboardHandler: Cancelled drag operation (ESC)')
+      return // STOP HERE
+    }
+    
+    // ✅ ESC PRIORITY 2: Close edit panel if open
     if (gameStore.ui.isEditPanelOpen) {
       gameStore_methods.clearSelectionEnhanced() // This closes panel
       return // STOP HERE
     }
     
-    // ✅ ESC PRIORITY 2: Cancel drawing and reset mode
+    // ✅ ESC PRIORITY 3: Cancel drawing and reset mode
     if (gameStore.drawing.isDrawing || gameStore.drawing.mode !== 'none') {
       gameStore_methods.cancelDrawing()
       gameStore_methods.setDrawingMode('none')  // Reset to none on ESC
       return // STOP HERE
     }
     
-    // ✅ ESC PRIORITY 3: Clear selection (fallback)
+    // ✅ ESC PRIORITY 4: Clear selection (fallback)
     gameStore_methods.clearSelectionEnhanced()
   }
   
