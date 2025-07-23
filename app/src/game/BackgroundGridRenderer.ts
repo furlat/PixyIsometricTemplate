@@ -64,11 +64,8 @@ export class BackgroundGridRenderer {
       // Get local position from mesh (authoritative)
       const localPos = event.getLocalPosition(mesh)
       
-      // Convert to vertex coordinates directly
-      const vertexCoord = {
-        x: Math.floor(localPos.x),
-        y: Math.floor(localPos.y)
-      }
+      // ✅ FIXED: Convert to vertex coordinates using proper conversion
+      const vertexCoord = this.meshManager.screenToVertex(localPos.x, localPos.y)
       
       // ✅ IMMEDIATE GPU UPDATE (visual feedback)
       if (this.mouseHighlightShader) {
@@ -77,6 +74,8 @@ export class BackgroundGridRenderer {
       
       // ✅ IMMEDIATE STORE UPDATE (UI sync) - NEW store methods
       gameStore_methods.updateMouseVertex(vertexCoord.x, vertexCoord.y)
+      // ✅ FIXED: Update screen/world coordinates on move, not just click
+      gameStore_methods.updateMousePosition(vertexCoord.x, vertexCoord.y)
       
       // ✅ INPUT HANDLING - Route to NEW InputManager
       this.handleGeometryInput('move', vertexCoord, event)

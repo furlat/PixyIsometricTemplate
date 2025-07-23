@@ -121,7 +121,7 @@ export const gameStore = proxy<GameStoreData>({
   },
   
   mesh: {
-    cellSize: 20,  // Default 20px cells matching _3b files
+    cellSize: 1,   // ✅ FIXED: Scale 1 for proper coordinate system
     vertexData: null,
     dimensions: null,
     needsUpdate: false

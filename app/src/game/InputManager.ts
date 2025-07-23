@@ -684,19 +684,20 @@ class KeyboardHandler {
   
   // ✅ SAFE: Navigation via existing store methods
   public handleWASD(key: 'w'|'a'|'s'|'d'): void {
-    const moveAmount = 20  // Fixed move amount
-    const currentOffset = gameStore.navigation.offset
+    const moveAmount = gameStore.navigation.moveAmount  // ✅ FIXED: Use store value
     
-    let newOffset = { ...currentOffset }
+    // ✅ FIXED: Pass deltas instead of absolute coordinates
+    let deltaX = 0
+    let deltaY = 0
     
     switch (key) {
-      case 'w': newOffset.y -= moveAmount; break
-      case 's': newOffset.y += moveAmount; break
-      case 'a': newOffset.x -= moveAmount; break
-      case 'd': newOffset.x += moveAmount; break
+      case 'w': deltaY = -moveAmount; break
+      case 's': deltaY = +moveAmount; break
+      case 'a': deltaX = -moveAmount; break
+      case 'd': deltaX = +moveAmount; break
     }
     
-    gameStore_methods.updateNavigationOffset(newOffset.x, newOffset.y)
+    gameStore_methods.updateNavigationOffset(deltaX, deltaY)
   }
   
   public handleSpacebar(): void {
@@ -769,7 +770,7 @@ class KeyboardHandler {
   public getState(): any {
     return {
       keysPressed: this.getPressedKeys(),
-      moveAmount: 20  // Fixed move amount
+      moveAmount: gameStore.navigation.moveAmount  // ✅ FIXED: Use store value
     }
   }
   
