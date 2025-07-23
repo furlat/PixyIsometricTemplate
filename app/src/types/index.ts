@@ -95,6 +95,19 @@ export type {
 } from './game-store'
 
 // ================================
+// GLOBAL TYPE DECLARATIONS
+// ================================
+// ✅ TYPE-SAFE: Global debugging interface
+declare global {
+  var phase3B: {
+    game: any
+    store: any
+    methods: any
+    cleanup: () => void
+  } | undefined
+}
+
+// ================================
 // NO FUTURE PHASE EXPORTS
 // ================================
 // REMOVED: All future phase types and require() functions

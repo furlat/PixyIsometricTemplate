@@ -1,6 +1,6 @@
 import { StorePanel_3b } from './StorePanel_3b'
 import { GeometryPanel_3b } from './GeometryPanel_3b'
-import { ObjectEditPanel_3b } from './ObjectEditPanel_3b'
+import { ObjectEditPanel_3b } from './ObjectEditPanel'
 import { gameStore_3b, gameStore_3b_methods } from '../store/gameStore_3b'
 import { subscribe } from 'valtio'
 

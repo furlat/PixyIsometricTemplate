@@ -4,7 +4,8 @@ import { MeshManager_3b } from './MeshManager_3b'
 import { GridShaderRenderer_3b } from './GridShaderRenderer_3b'
 import { MouseHighlightShader_3b } from './MouseHighlightShader_3b'
 import { GeometryRenderer_3b } from './GeometryRenderer_3b'
-import { gameStore_3b, gameStore_3b_methods } from '../store/gameStore_3b'
+import { InputManager } from './InputManager'
+import { gameStore, gameStore_methods } from '../store/game-store'
 import { VertexCoordinate } from '../types/ecs-coordinates'
 
 /**
@@ -18,12 +19,13 @@ export class BackgroundGridRenderer_3b {
   private gridShaderRenderer: GridShaderRenderer_3b
   private mouseHighlightShader: MouseHighlightShader_3b | null = null
   private geometryRenderer: GeometryRenderer_3b | null = null
+  private inputManager: InputManager | null = null
   
   constructor() {
     console.log('BackgroundGridRenderer_3b: Initializing with mesh-first architecture')
     
     // Create mesh manager (authoritative source)
-    this.meshManager = new MeshManager_3b(gameStore_3b)
+    this.meshManager = new MeshManager_3b(gameStore)
     
     // Create grid shader renderer (visual layer)
     this.gridShaderRenderer = new GridShaderRenderer_3b(this.meshManager)
@@ -67,7 +69,7 @@ export class BackgroundGridRenderer_3b {
       }
       
       // ✅ IMMEDIATE STORE UPDATE (UI sync)
-      gameStore_3b_methods.updateMouseVertex(vertexCoord.x, vertexCoord.y)
+      gameStore_methods.updateMouseVertex(vertexCoord.x, vertexCoord.y)
       
       // ✅ GEOMETRY INPUT HANDLING - Update drawing preview
       this.handleGeometryInput('move', vertexCoord, event)
@@ -81,7 +83,7 @@ export class BackgroundGridRenderer_3b {
       console.log(`BackgroundGridRenderer_3b: Click at vertex (${vertexCoord.x}, ${vertexCoord.y})`)
       
       // Update mouse position in store with mesh coordinates
-      gameStore_3b_methods.updateMousePosition(vertexCoord.x, vertexCoord.y)
+      gameStore_methods.updateMousePosition(vertexCoord.x, vertexCoord.y)
       
       // ✅ GEOMETRY INPUT HANDLING - Start drawing
       this.handleGeometryInput('down', vertexCoord, event)
@@ -107,8 +109,8 @@ export class BackgroundGridRenderer_3b {
       
       // Convert to pixeloid coordinates and handle as right-click
       const pixeloidCoord = {
-        x: vertexCoord.x + gameStore_3b.navigation.offset.x,
-        y: vertexCoord.y + gameStore_3b.navigation.offset.y
+        x: vertexCoord.x + gameStore.navigation.offset.x,
+        y: vertexCoord.y + gameStore.navigation.offset.y
       }
       
       // Create a modified event with right-click info
@@ -186,21 +188,32 @@ export class BackgroundGridRenderer_3b {
   }
   
   /**
-   * Handle geometry input events for drawing - DELEGATES TO GEOMETRY RENDERER
+   * Handle geometry input events for drawing - DELEGATES TO INPUT MANAGER
    * BackgroundGridRenderer should only handle mouse capture, not drawing logic
    */
   private handleGeometryInput(eventType: 'down' | 'up' | 'move', vertexCoord: VertexCoordinate, event: any): void {
     // Convert vertex coordinates to pixeloid coordinates
     const pixeloidCoord = {
-      x: vertexCoord.x + gameStore_3b.navigation.offset.x,
-      y: vertexCoord.y + gameStore_3b.navigation.offset.y
+      x: vertexCoord.x + gameStore.navigation.offset.x,
+      y: vertexCoord.y + gameStore.navigation.offset.y
     }
     
-    // Delegate to geometry renderer (correct architectural location)
-    if (this.geometryRenderer) {
-      this.geometryRenderer.handleDrawingInput(eventType, pixeloidCoord, event)
+    // ✅ CORRECT: Delegate to input manager (proper separation)
+    if (this.inputManager) {
+      // Map event types to InputManager methods
+      switch (eventType) {
+        case 'down':
+          this.inputManager.handleMouseDown(pixeloidCoord, event)
+          break
+        case 'up':
+          this.inputManager.handleMouseUp(pixeloidCoord)
+          break
+        case 'move':
+          this.inputManager.handleMouseMove(pixeloidCoord)
+          break
+      }
     } else {
-      console.warn('BackgroundGridRenderer_3b: No geometry renderer registered for drawing input')
+      console.warn('BackgroundGridRenderer_3b: No input manager registered for input handling')
     }
   }
   
@@ -210,5 +223,13 @@ export class BackgroundGridRenderer_3b {
   public registerGeometryRenderer(geometryRenderer: GeometryRenderer_3b): void {
     this.geometryRenderer = geometryRenderer
     console.log('BackgroundGridRenderer_3b: Geometry renderer registered for drawing input')
+  }
+  
+  /**
+   * Register input manager for input handling delegation
+   */
+  public registerInputManager(inputManager: InputManager): void {
+    this.inputManager = inputManager
+    console.log('BackgroundGridRenderer_3b: Input manager registered for input handling')
   }
 }

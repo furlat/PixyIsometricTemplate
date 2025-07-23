@@ -3,6 +3,7 @@
  * 
  * Object editing panel using unified game store.
  * Fixes the circle movement bug through direct form data usage.
+ * need a double check is correct
  */
 
 import { gameStore, gameStore_methods } from '../store/game-store'

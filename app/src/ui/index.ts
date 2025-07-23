@@ -3,7 +3,7 @@ export { StorePanel_3b } from './StorePanel_3b';
 export { UIControlBar_3b } from './UIControlBar_3b';
 export { GeometryPanel_3b } from './GeometryPanel_3b';
 export { LayerToggleBar_3b } from './LayerToggleBar_3b';
-export { ObjectEditPanel_3b } from './ObjectEditPanel_3b';
+export { ObjectEditPanel_3b } from './ObjectEditPanel';
 export { StoreExplorer } from './StoreExplorer';
 export { Workspace } from './Workspace';
 

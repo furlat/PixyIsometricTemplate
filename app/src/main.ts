@@ -1,11 +1,21 @@
-import { Game_3b } from './game/Game_3b'
-import { gameStore_3b, gameStore_3b_methods } from './store/gameStore_3b'
+import { Game } from './game/Game'
+import { gameStore, gameStore_methods } from './store/game-store'
 import { StorePanel_3b } from './ui/StorePanel_3b'
 import { UIControlBar_3b } from './ui/UIControlBar_3b'
 import { LayerToggleBar_3b } from './ui/LayerToggleBar_3b'
 import { GeometryPanel_3b } from './ui/GeometryPanel_3b'
-import { ObjectEditPanel_3b } from './ui/ObjectEditPanel_3b'
+// import { ObjectEditPanel_3b } from './ui/ObjectEditPanel_3b'
 import './styles/main.css'
+
+// ✅ TYPE-SAFE: Global debugging interface declaration
+declare global {
+  var phase3B: {
+    game: any
+    store: any
+    methods: any
+    cleanup: () => void
+  } | undefined
+}
 
 /**
  * Phase 3B Main Entry Point
@@ -17,7 +27,7 @@ import './styles/main.css'
  * - Enhanced UI with geometry controls
  */
 
-let game: Game_3b | null = null
+let game: Game | null = null
 let storePanel: StorePanel_3b | null = null
 let geometryPanel: GeometryPanel_3b | null = null
 let uiControlBar: UIControlBar_3b | null = null
@@ -34,8 +44,8 @@ async function initPhase3B(): Promise<void> {
       throw new Error('Canvas element with id "gameCanvas" not found')
     }
     
-    // Create and initialize Game_3b
-    game = new Game_3b()
+    // Create and initialize Game
+    game = new Game()
     await game.init(canvas)
     
     // Initialize UI components for Phase 3B
@@ -58,27 +68,27 @@ async function initPhase3B(): Promise<void> {
     // Setup Phase 3B specific UI event listeners
     setupPhase3BUIListeners()
     
-    console.log('🎮 Phase 3B initialized successfully!')
-    console.log('✅ Game_3b Instance:', game)
-    console.log('✅ Phase3BCanvas:', game.getCanvas())
+    console.log('🎮 Clean Architecture initialized successfully!')
+    console.log('✅ Game Instance:', game)
+    console.log('✅ Phase3BCanvas:', game?.getCanvas())
     console.log('✅ Store Panel:', storePanel)
     console.log('✅ Geometry Panel:', geometryPanel)
     console.log('✅ UI Control Bar:', uiControlBar)
     console.log('✅ Layer Toggle Bar:', layerToggleBar)
     console.log('')
-    console.log('🎯 Phase 3B Controls:')
-    console.log('   WASD: Move navigation offset')
-    console.log('   Mouse: Track position in world coordinates')
+    console.log('🎯 Clean Architecture Controls:')
+    console.log('   WASD: Move navigation offset (via InputManager)')
+    console.log('   Mouse: Track position in world coordinates (via InputManager)')
     console.log('   Grid/Mouse toggle: Show/hide layers')
     console.log('   Geometry: Create and manage geometry objects')
     console.log('')
-    console.log('📊 Phase 3B Status:')
-    console.log('   - All Phase 3A features ✅')
-    console.log('   - Geometry layer with 5 types ✅')
-    console.log('   - ECS integration ✅')
-    console.log('   - Enhanced UI controls ✅')
+    console.log('📊 Clean Architecture Status:')
+    console.log('   - Single InputManager (no duplicates) ✅')
+    console.log('   - Unified store (no fragmentation) ✅')
+    console.log('   - Circle bug prevention ✅')
+    console.log('   - Clean dependency injection ✅')
     console.log('')
-    console.log('🔍 Debug info:', game.getDebugInfo())
+    console.log('🔍 Debug info:', game?.getDebugInfo())
     
   } catch (error) {
     console.error('❌ Phase 3B initialization failed:', error)
@@ -165,9 +175,9 @@ if (document.readyState === 'loading') {
 }
 
 // Export for debugging
-;(globalThis as any).phase3B = {
+globalThis.phase3B = {
   game,
-  store: gameStore_3b,
-  methods: gameStore_3b_methods,
+  store: gameStore,
+  methods: gameStore_methods,
   cleanup
 }

@@ -1,19 +1,10 @@
 // app/src/game/Phase3BCanvas.ts - Updated with mesh-first modules
 import { Application, Container } from 'pixi.js'
-import { BackgroundGridRenderer_3b } from './BackgroundGridRenderer_3b'
-import { MouseHighlightShader_3b } from './MouseHighlightShader_3b'
-import { InputManager_3b } from './InputManager_3b'
-import { GeometryRenderer_3b } from './GeometryRenderer_3b'
-import { gameStore_3b, gameStore_3b_methods } from '../store/gameStore_3b'
-import { PixeloidCoordinate } from '../types/ecs-coordinates'
-
-// Simple interface for viewport corners
-interface ViewportCorners {
-  topLeft: PixeloidCoordinate
-  topRight: PixeloidCoordinate
-  bottomLeft: PixeloidCoordinate
-  bottomRight: PixeloidCoordinate
-}
+import { BackgroundGridRenderer } from './BackgroundGridRenderer'
+import { MouseHighlightShader_3b } from './MouseHighlightShader'
+import { InputManager } from './InputManager'
+import { GeometryRenderer } from './GeometryRenderer'
+import { gameStore, gameStore_methods } from '../store/game-store'
 
 /**
  * Phase3BCanvas - Mesh-first 3-layer canvas for Phase 3B foundation
@@ -23,17 +14,17 @@ interface ViewportCorners {
  */
 export class Phase3BCanvas {
   private app: Application
-  private backgroundGridRenderer: BackgroundGridRenderer_3b
+  private backgroundGridRenderer: BackgroundGridRenderer
   private mouseHighlightShader: MouseHighlightShader_3b
-  private inputManager: InputManager_3b
-  private geometryRenderer: GeometryRenderer_3b
+  private inputManager: InputManager
+  private geometryRenderer: GeometryRenderer
   
   // 3-layer system
   private gridLayer: Container
   private geometryLayer: Container
   private mouseLayer: Container
   
-  constructor(app: Application) {
+  constructor(app: Application, inputManager?: InputManager) {
     this.app = app
     console.log('Phase3BCanvas: Initializing with mesh-first architecture')
     
@@ -43,10 +34,12 @@ export class Phase3BCanvas {
     this.mouseLayer = new Container()
     
     // Initialize renderers with mesh-first architecture
-    this.backgroundGridRenderer = new BackgroundGridRenderer_3b()
+    this.backgroundGridRenderer = new BackgroundGridRenderer()
     this.mouseHighlightShader = new MouseHighlightShader_3b(this.backgroundGridRenderer.getMeshManager())
-    this.inputManager = new InputManager_3b()
-    this.geometryRenderer = new GeometryRenderer_3b()
+    
+    // ✅ Use provided InputManager or create new one (backward compatibility)
+    this.inputManager = inputManager || new InputManager()
+    this.geometryRenderer = new GeometryRenderer()
     
     // Setup layers
     this.setupLayers()
@@ -57,8 +50,8 @@ export class Phase3BCanvas {
     // Register mouse highlight shader for direct mesh updates
     this.backgroundGridRenderer.registerMouseHighlightShader(this.mouseHighlightShader)
     
-    // Register geometry renderer with background grid for drawing input
-    this.backgroundGridRenderer.registerGeometryRenderer(this.geometryRenderer)
+    // Register input manager with background grid for input handling
+    this.backgroundGridRenderer.registerInputManager(this.inputManager)
     
     // Initialize mesh data in store
     this.initializeMeshData()
@@ -103,7 +96,7 @@ export class Phase3BCanvas {
     const dimensions = meshManager.getMeshDimensions()
     
     if (vertices) {
-      gameStore_3b_methods.updateMeshData(vertices, cellSize, dimensions)
+      gameStore_methods.updateMeshData(vertices, cellSize, dimensions)
       console.log('Phase3BCanvas: Mesh data initialized in store', { cellSize, dimensions })
     }
   }
@@ -123,9 +116,9 @@ export class Phase3BCanvas {
    */
   public render(): void {
     // ✅ Functional store reading (no reactive subscriptions)
-    const showGrid = gameStore_3b.ui.showGrid
-    const showGeometry = gameStore_3b.ui.showGeometry
-    const showMouse = gameStore_3b.ui.showMouse
+    const showGrid = gameStore.ui.showGrid
+    const showGeometry = gameStore.ui.showGeometry
+    const showMouse = gameStore.ui.showMouse
     
     // Clear layers that need updating
     this.gridLayer.removeChildren()
@@ -182,31 +175,16 @@ export class Phase3BCanvas {
   }
   
   /**
-   * Get simple screen-based viewport corners for Phase 3B
-   */
-  private getSimpleCorners(): ViewportCorners {
-    const width = this.app.screen.width
-    const height = this.app.screen.height
-    
-    return {
-      topLeft: { x: 0, y: 0 },
-      topRight: { x: width, y: 0 },
-      bottomLeft: { x: 0, y: height },
-      bottomRight: { x: width, y: height }
-    }
-  }
-  
-  /**
    * Get the input manager for external access
    */
-  public getInputManager(): InputManager_3b {
+  public getInputManager(): InputManager {
     return this.inputManager
   }
   
   /**
    * Get the grid renderer for external access
    */
-  public getGridRenderer(): BackgroundGridRenderer_3b {
+  public getGridRenderer(): BackgroundGridRenderer {
     return this.backgroundGridRenderer
   }
   
@@ -220,7 +198,7 @@ export class Phase3BCanvas {
   /**
    * Get the geometry renderer for external access
    */
-  public getGeometryRenderer(): GeometryRenderer_3b {
+  public getGeometryRenderer(): GeometryRenderer {
     return this.geometryRenderer
   }
   
@@ -281,24 +259,24 @@ export class Phase3BCanvas {
         }
       },
       mesh: {
-        initialized: gameStore_3b.mesh.vertexData !== null,
-        cellSize: gameStore_3b.mesh.cellSize,
-        dimensions: gameStore_3b.mesh.dimensions,
+        initialized: gameStore.mesh.cellSize !== null,
+        cellSize: gameStore.mesh.cellSize,
+        // dimensions: gameStore.mesh.dimensions,  // May not exist in new store
         scale: 1 // Always scale 1 for Phase 3B
       },
       mouse: {
-        vertex: gameStore_3b.mouse.vertex,
-        screen: gameStore_3b.mouse.screen,
-        world: gameStore_3b.mouse.world
+        vertex: gameStore.mouse.vertex,
+        position: gameStore.mouse.position,
+        world: gameStore.mouse.world
       },
       navigation: {
-        offset: gameStore_3b.navigation.offset,
-        isDragging: gameStore_3b.navigation.isDragging
+        offset: gameStore.navigation.offset,
+        isDragging: gameStore.navigation.isDragging
       },
       ui: {
-        showGrid: gameStore_3b.ui.showGrid,
-        showGeometry: gameStore_3b.ui.showGeometry,
-        showMouse: gameStore_3b.ui.showMouse
+        showGrid: gameStore.ui.showGrid,
+        showGeometry: gameStore.ui.showGeometry,
+        showMouse: gameStore.ui.showMouse
       }
     }
   }

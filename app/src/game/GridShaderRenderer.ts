@@ -1,7 +1,7 @@
 // app/src/game/GridShaderRenderer_3b.ts
 import { Shader, MeshSimple } from 'pixi.js'
-import { MeshManager_3b } from './MeshManager_3b'
-import { gameStore_3b } from '../store/gameStore_3b'
+import { MeshManager_3b } from './MeshManager'
+import { gameStore } from '../store/game-store'
 
 export class GridShaderRenderer_3b {
   private shader: Shader | null = null
@@ -77,7 +77,7 @@ export class GridShaderRenderer_3b {
     const mesh = this.meshManager.getMesh()
     if (!mesh) return
     
-    const enabled = gameStore_3b.ui.enableCheckboard
+    const enabled = gameStore.ui.enableCheckboard
     
     if (enabled) {
       // Apply shader
