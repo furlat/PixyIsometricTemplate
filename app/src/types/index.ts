@@ -108,6 +108,23 @@ declare global {
 }
 
 // ================================
+// UI TYPES (PHASE 3B)
+// ================================
+export type {
+  StatusColors,
+  UIElementUpdateParams,
+  CoordinateFormatOptions,
+  WindowSizeData,
+  BooleanStatusConfig,
+  KeyStatusConfig
+} from '../ui/types'
+
+export {
+  isStatusColors,
+  isUIElementUpdateParams
+} from '../ui/types'
+
+// ================================
 // NO FUTURE PHASE EXPORTS
 // ================================
 // REMOVED: All future phase types and require() functions

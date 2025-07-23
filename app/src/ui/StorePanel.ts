@@ -1,6 +1,6 @@
-// app/src/ui/StorePanel_3b.ts - Updated to show mesh data
+// app/src/ui/StorePanel.ts - Refactored to use unified game store
 import { subscribe } from 'valtio'
-import { gameStore_3b, gameStore_3b_methods } from '../store/gameStore_3b'
+import { gameStore, gameStore_methods } from '../store/game-store'
 import {
   updateElement,
   getBooleanStatusClass,
@@ -9,7 +9,7 @@ import {
 } from './handlers/UIHandlers'
 
 /**
- * StorePanel_3b - Mesh-first Store Panel for Phase 3B
+ * StorePanel - Unified Store Panel
  *
  * Displays core foundation data:
  * - Game initialization status
@@ -17,8 +17,14 @@ import {
  * - Navigation offset
  * - Mesh system status with vertex data
  * - Layer controls
+ * - Selected object information
+ * - Drag state information
+ * 
+ * ✅ Fully refactored to use unified gameStore
+ * ✅ All functionality preserved from StorePanel_3b
+ * ✅ Same HTML element IDs maintained
  */
-export class StorePanel_3b {
+export class StorePanel {
   private elements: Map<string, HTMLElement> = new Map()
   
   constructor() {
@@ -28,7 +34,7 @@ export class StorePanel_3b {
   }
   
   private initializeElements(): void {
-    // Get all Phase 3b elements by their IDs
+    // Get all elements by their IDs - SAME AS ORIGINAL
     const elementIds = [
       'game-initialized',
       'mesh-scale',
@@ -54,7 +60,7 @@ export class StorePanel_3b {
       'geometry-drawing-mode',
       'geometry-is-drawing',
       'geometry-preview-active',
-      // ✅ NEW: Selected object testing elements
+      // Selected object testing elements
       'selected-object-id',
       'selected-object-type',
       'selected-object-pixeloid-x',
@@ -66,7 +72,7 @@ export class StorePanel_3b {
       'selected-object-style-color',
       'selected-object-style-stroke-width',
       'selected-object-dragging-state',
-      // ✅ NEW: Drag state elements
+      // Drag state elements
       'drag-state-is-dragging',
       'drag-state-object-id',
       'drag-state-click-position',
@@ -81,7 +87,7 @@ export class StorePanel_3b {
       if (element) {
         this.elements.set(id, element)
       } else {
-        console.warn(`StorePanel_3b: Element with id '${id}' not found`)
+        console.warn(`StorePanel: Element with id '${id}' not found`)
       }
     })
   }
@@ -94,43 +100,45 @@ export class StorePanel_3b {
     // ✅ PRECISE SUBSCRIPTIONS - Only subscribe to relevant slices
     
     // UI-only subscription for visibility
-    subscribe(gameStore_3b.ui, () => {
+    subscribe(gameStore.ui, () => {
       this.updateDOMVisibility()
-      this.updateValues()  // ✅ ADD THIS - Updates layer controls when UI state changes
+      this.updateValues()  // Updates layer controls when UI state changes
     })
     
     // Data subscriptions for content updates
-    subscribe(gameStore_3b.mouse, () => {
+    subscribe(gameStore.mouse, () => {
       this.updateMouseValues()
     })
     
-    subscribe(gameStore_3b.navigation, () => {
+    subscribe(gameStore.navigation, () => {
       this.updateNavigationValues()
     })
     
-    subscribe(gameStore_3b.mesh, () => {
+    subscribe(gameStore.mesh, () => {
       this.updateMeshValues()
     })
     
-    subscribe(gameStore_3b.geometry, () => {
+    // ✅ UPDATED: Subscribe to root objects array instead of geometry.objects
+    subscribe(gameStore.objects, () => {
+      this.updateGeometryValues()
+      this.updateSelectedObjectValues() // Update selection when objects change
+    })
+    
+    subscribe(gameStore.drawing, () => {
       this.updateGeometryValues()
     })
     
-    subscribe(gameStore_3b.drawing, () => {
-      this.updateGeometryValues()
-    })
-    
-    // ✅ NEW: Selection subscription
-    subscribe(gameStore_3b.selection, () => {
+    // Selection subscription
+    subscribe(gameStore.selection, () => {
       this.updateSelectedObjectValues()
     })
     
-    // ✅ NEW: Drag state subscriptions
-    subscribe(gameStore_3b.dragging, () => {
+    // Drag state subscriptions
+    subscribe(gameStore.dragging, () => {
       this.updateDragValues()
     })
     
-    subscribe(gameStore_3b.dragPreview, () => {
+    subscribe(gameStore.dragPreview, () => {
       this.updateDragValues()
     })
   }
@@ -147,23 +155,22 @@ export class StorePanel_3b {
     const panelElement = document.getElementById('store-panel')
     
     if (!panelElement) {
-      console.error('StorePanel_3b: store-panel element not found')
+      console.error('StorePanel: store-panel element not found')
       return
     }
     
-    const shouldShow = gameStore_3b.ui.showStorePanel
+    const shouldShow = gameStore.ui.showStorePanel
     const displayValue = shouldShow ? 'block' : 'none'
     
-    console.log(`StorePanel_3b: Setting visibility to ${displayValue}`)
+    console.log(`StorePanel: Setting visibility to ${displayValue}`)
     panelElement.style.display = displayValue
   }
   
   private updateValues(): void {
-    
     try {
       // Phase 3b Status
       updateElement(this.elements, 'game-initialized', 
-        'true', // Game_3b initializes synchronously
+        'true', // Game initializes synchronously
         'status-active'
       )
       
@@ -179,128 +186,133 @@ export class StorePanel_3b {
       
       // ✅ MESH-FIRST MOUSE POSITION - Show all coordinate systems
       updateElement(this.elements, 'mouse-vertex',
-        `${gameStore_3b.mouse.vertex.x}, ${gameStore_3b.mouse.vertex.y}`,
+        `${gameStore.mouse.vertex.x}, ${gameStore.mouse.vertex.y}`,
         STATUS_COLORS.mouse
       )
       
+      // ✅ UPDATED: mouse.position instead of mouse.screen
       updateElement(this.elements, 'mouse-screen',
-        `${gameStore_3b.mouse.screen.x.toFixed(0)}, ${gameStore_3b.mouse.screen.y.toFixed(0)}`,
+        `${gameStore.mouse.position.x.toFixed(0)}, ${gameStore.mouse.position.y.toFixed(0)}`,
         STATUS_COLORS.mouse
       )
       
       updateElement(this.elements, 'mouse-world',
-        `${gameStore_3b.mouse.world.x}, ${gameStore_3b.mouse.world.y}`,
+        `${gameStore.mouse.world.x}, ${gameStore.mouse.world.y}`,
         STATUS_COLORS.mouse
       )
       
       // Navigation
       updateElement(this.elements, 'navigation-offset',
-        `${gameStore_3b.navigation.offset.x.toFixed(1)}, ${gameStore_3b.navigation.offset.y.toFixed(1)}`,
+        `${gameStore.navigation.offset.x.toFixed(1)}, ${gameStore.navigation.offset.y.toFixed(1)}`,
         STATUS_COLORS.camera
       )
       
       updateElement(this.elements, 'navigation-dragging',
-        getBooleanStatusText(gameStore_3b.navigation.isDragging),
-        getBooleanStatusClass(gameStore_3b.navigation.isDragging)
+        getBooleanStatusText(gameStore.navigation.isDragging),
+        getBooleanStatusClass(gameStore.navigation.isDragging)
       )
       
       updateElement(this.elements, 'navigation-move-amount',
-        gameStore_3b.navigation.moveAmount.toString(),
+        gameStore.navigation.moveAmount.toString(),
         'text-primary'
       )
       
       // ✅ MESH SYSTEM - Show mesh data
       updateElement(this.elements, 'mesh-ready',
-        getBooleanStatusText(gameStore_3b.mesh.vertexData !== null),
-        getBooleanStatusClass(gameStore_3b.mesh.vertexData !== null)
+        getBooleanStatusText(gameStore.mesh.vertexData !== null),
+        getBooleanStatusClass(gameStore.mesh.vertexData !== null)
       )
       
       updateElement(this.elements, 'mesh-cell-size',
-        gameStore_3b.mesh.cellSize.toString(),
+        gameStore.mesh.cellSize.toString(),
         'text-primary'
       )
       
       updateElement(this.elements, 'mesh-dimensions',
-        `${gameStore_3b.mesh.dimensions.width}x${gameStore_3b.mesh.dimensions.height}`,
+        gameStore.mesh.dimensions 
+          ? `${gameStore.mesh.dimensions.width}x${gameStore.mesh.dimensions.height}`
+          : '0x0',
         'text-primary'
       )
       
       updateElement(this.elements, 'mesh-vertex-count',
-        gameStore_3b.mesh.vertexData ? (gameStore_3b.mesh.vertexData.length / 2).toString() : '0',
+        gameStore.mesh.vertexData ? (gameStore.mesh.vertexData.length / 2).toString() : '0',
         'text-primary'
       )
       
       updateElement(this.elements, 'mesh-needs-update',
-        getBooleanStatusText(gameStore_3b.mesh.needsUpdate),
-        getBooleanStatusClass(gameStore_3b.mesh.needsUpdate)
+        getBooleanStatusText(gameStore.mesh.needsUpdate),
+        getBooleanStatusClass(gameStore.mesh.needsUpdate)
       )
       
       // Layer Controls
       updateElement(this.elements, 'layer-grid-status',
-        getBooleanStatusText(gameStore_3b.ui.showGrid),
-        getBooleanStatusClass(gameStore_3b.ui.showGrid)
+        getBooleanStatusText(gameStore.ui.showGrid),
+        getBooleanStatusClass(gameStore.ui.showGrid)
       )
       
       updateElement(this.elements, 'layer-mouse-status',
-        getBooleanStatusText(gameStore_3b.ui.showMouse),
-        getBooleanStatusClass(gameStore_3b.ui.showMouse)
+        getBooleanStatusText(gameStore.ui.showMouse),
+        getBooleanStatusClass(gameStore.ui.showMouse)
       )
       
       updateElement(this.elements, 'checkboard-enabled',
-        getBooleanStatusText(gameStore_3b.ui.enableCheckboard),
-        getBooleanStatusClass(gameStore_3b.ui.enableCheckboard)
+        getBooleanStatusText(gameStore.ui.enableCheckboard),
+        getBooleanStatusClass(gameStore.ui.enableCheckboard)
       )
       
       updateElement(this.elements, 'layer-geometry-status',
-        getBooleanStatusText(gameStore_3b.ui.showGeometry),
-        getBooleanStatusClass(gameStore_3b.ui.showGeometry)
+        getBooleanStatusText(gameStore.ui.showGeometry),
+        getBooleanStatusClass(gameStore.ui.showGeometry)
       )
       
-      // Geometry System Status
+      // ✅ UPDATED: Geometry System Status - using root objects array
       updateElement(this.elements, 'geometry-objects-count',
-        gameStore_3b.geometry.objects.length.toString(),
+        gameStore.objects.length.toString(),
         'text-primary'
       )
       
       updateElement(this.elements, 'geometry-drawing-mode',
-        gameStore_3b.drawing.mode,
-        gameStore_3b.drawing.mode === 'none' ? 'text-muted' : 'text-success'
+        gameStore.drawing.mode,
+        gameStore.drawing.mode === 'none' ? 'text-muted' : 'text-success'
       )
       
       updateElement(this.elements, 'geometry-is-drawing',
-        getBooleanStatusText(gameStore_3b.drawing.isDrawing),
-        getBooleanStatusClass(gameStore_3b.drawing.isDrawing)
+        getBooleanStatusText(gameStore.drawing.isDrawing),
+        getBooleanStatusClass(gameStore.drawing.isDrawing)
       )
       
+      // ✅ UPDATED: Using gameStore.preview instead of gameStore.drawing.preview
       updateElement(this.elements, 'geometry-preview-active',
-        getBooleanStatusText(gameStore_3b.drawing.preview !== null),
-        getBooleanStatusClass(gameStore_3b.drawing.preview !== null)
+        getBooleanStatusText(gameStore.preview.isActive),
+        getBooleanStatusClass(gameStore.preview.isActive)
       )
       
       // Mouse Highlight Properties
       updateElement(this.elements, 'mouse-highlight-color',
-        `#${gameStore_3b.ui.mouse.highlightColor.toString(16).padStart(6, '0')}`,
+        `#${gameStore.ui.mouse.highlightColor.toString(16).padStart(6, '0')}`,
         'text-primary'
       )
       
       updateElement(this.elements, 'mouse-highlight-intensity',
-        gameStore_3b.ui.mouse.highlightIntensity.toFixed(2),
+        gameStore.ui.mouse.highlightIntensity.toFixed(2),
         'text-primary'
       )
       
     } catch (error) {
-      console.warn('StorePanel_3b: Error updating values:', error)
+      console.warn('StorePanel: Error updating values:', error)
     }
   }
   
   /**
-   * ✅ NEW: Update selected object display for testing
+   * Update selected object display for testing
+   * ✅ UPDATED: Uses gameStore.selection.selectedId and gameStore.objects
    */
   private updateSelectedObjectValues(): void {
     try {
-      const selectedId = gameStore_3b.selection.selectedObjectId
+      const selectedId = gameStore.selection.selectedId // ✅ Changed from selectedObjectId
       const selectedObject = selectedId ?
-        gameStore_3b.geometry.objects.find(obj => obj.id === selectedId) : null
+        gameStore.objects.find(obj => obj.id === selectedId) : null // ✅ Changed from geometry.objects
       
       if (selectedObject) {
         // Object info
@@ -319,8 +331,8 @@ export class StorePanel_3b {
           firstVertex.y.toFixed(2), 'text-primary')
         
         // Convert to vertex coordinates (subtract navigation offset)
-        const vertexX = firstVertex.x - gameStore_3b.navigation.offset.x
-        const vertexY = firstVertex.y - gameStore_3b.navigation.offset.y
+        const vertexX = firstVertex.x - gameStore.navigation.offset.x
+        const vertexY = firstVertex.y - gameStore.navigation.offset.y
         
         updateElement(this.elements, 'selected-object-vertex-x',
           vertexX.toFixed(2), STATUS_COLORS.mouse)
@@ -329,8 +341,8 @@ export class StorePanel_3b {
           vertexY.toFixed(2), STATUS_COLORS.mouse)
         
         // Convert to screen coordinates
-        const screenX = vertexX * gameStore_3b.mesh.cellSize
-        const screenY = vertexY * gameStore_3b.mesh.cellSize
+        const screenX = vertexX * gameStore.mesh.cellSize
+        const screenY = vertexY * gameStore.mesh.cellSize
         
         updateElement(this.elements, 'selected-object-screen-x',
           screenX.toFixed(0), STATUS_COLORS.camera)
@@ -345,8 +357,8 @@ export class StorePanel_3b {
         updateElement(this.elements, 'selected-object-style-stroke-width',
           selectedObject.style.strokeWidth.toString(), 'text-accent')
         
-        // Dragging state (when implemented)
-        const isDragging = gameStore_3b.dragging?.dragObjectId === selectedId
+        // ✅ UPDATED: Dragging state - using draggedObjectId
+        const isDragging = gameStore.dragging?.draggedObjectId === selectedId
         updateElement(this.elements, 'selected-object-dragging-state',
           getBooleanStatusText(isDragging), getBooleanStatusClass(isDragging))
         
@@ -365,41 +377,43 @@ export class StorePanel_3b {
         updateElement(this.elements, 'selected-object-dragging-state', 'false', 'status-inactive')
       }
     } catch (error) {
-      console.warn('StorePanel_3b: Error updating selected object values:', error)
+      console.warn('StorePanel: Error updating selected object values:', error)
     }
   }
   
   /**
    * Update only mouse-related elements
+   * ✅ UPDATED: Uses mouse.position instead of mouse.screen
    */
   private updateMouseValues(): void {
     try {
       updateElement(this.elements, 'mouse-vertex',
-        `${gameStore_3b.mouse.vertex.x}, ${gameStore_3b.mouse.vertex.y}`,
+        `${gameStore.mouse.vertex.x}, ${gameStore.mouse.vertex.y}`,
         STATUS_COLORS.mouse
       )
       
+      // ✅ UPDATED: mouse.position instead of mouse.screen
       updateElement(this.elements, 'mouse-screen',
-        `${gameStore_3b.mouse.screen.x.toFixed(0)}, ${gameStore_3b.mouse.screen.y.toFixed(0)}`,
+        `${gameStore.mouse.position.x.toFixed(0)}, ${gameStore.mouse.position.y.toFixed(0)}`,
         STATUS_COLORS.mouse
       )
       
       updateElement(this.elements, 'mouse-world',
-        `${gameStore_3b.mouse.world.x}, ${gameStore_3b.mouse.world.y}`,
+        `${gameStore.mouse.world.x}, ${gameStore.mouse.world.y}`,
         STATUS_COLORS.mouse
       )
       
       updateElement(this.elements, 'mouse-highlight-color',
-        `#${gameStore_3b.ui.mouse.highlightColor.toString(16).padStart(6, '0')}`,
+        `#${gameStore.ui.mouse.highlightColor.toString(16).padStart(6, '0')}`,
         'text-primary'
       )
       
       updateElement(this.elements, 'mouse-highlight-intensity',
-        gameStore_3b.ui.mouse.highlightIntensity.toFixed(2),
+        gameStore.ui.mouse.highlightIntensity.toFixed(2),
         'text-primary'
       )
     } catch (error) {
-      console.warn('StorePanel_3b: Error updating mouse values:', error)
+      console.warn('StorePanel: Error updating mouse values:', error)
     }
   }
   
@@ -409,21 +423,21 @@ export class StorePanel_3b {
   private updateNavigationValues(): void {
     try {
       updateElement(this.elements, 'navigation-offset',
-        `${gameStore_3b.navigation.offset.x.toFixed(1)}, ${gameStore_3b.navigation.offset.y.toFixed(1)}`,
+        `${gameStore.navigation.offset.x.toFixed(1)}, ${gameStore.navigation.offset.y.toFixed(1)}`,
         STATUS_COLORS.camera
       )
       
       updateElement(this.elements, 'navigation-dragging',
-        getBooleanStatusText(gameStore_3b.navigation.isDragging),
-        getBooleanStatusClass(gameStore_3b.navigation.isDragging)
+        getBooleanStatusText(gameStore.navigation.isDragging),
+        getBooleanStatusClass(gameStore.navigation.isDragging)
       )
       
       updateElement(this.elements, 'navigation-move-amount',
-        gameStore_3b.navigation.moveAmount.toString(),
+        gameStore.navigation.moveAmount.toString(),
         'text-primary'
       )
     } catch (error) {
-      console.warn('StorePanel_3b: Error updating navigation values:', error)
+      console.warn('StorePanel: Error updating navigation values:', error)
     }
   }
   
@@ -433,138 +447,147 @@ export class StorePanel_3b {
   private updateMeshValues(): void {
     try {
       updateElement(this.elements, 'mesh-ready',
-        getBooleanStatusText(gameStore_3b.mesh.vertexData !== null),
-        getBooleanStatusClass(gameStore_3b.mesh.vertexData !== null)
+        getBooleanStatusText(gameStore.mesh.vertexData !== null),
+        getBooleanStatusClass(gameStore.mesh.vertexData !== null)
       )
       
       updateElement(this.elements, 'mesh-cell-size',
-        gameStore_3b.mesh.cellSize.toString(),
+        gameStore.mesh.cellSize.toString(),
         'text-primary'
       )
       
       updateElement(this.elements, 'mesh-dimensions',
-        `${gameStore_3b.mesh.dimensions.width}x${gameStore_3b.mesh.dimensions.height}`,
+        gameStore.mesh.dimensions 
+          ? `${gameStore.mesh.dimensions.width}x${gameStore.mesh.dimensions.height}`
+          : '0x0',
         'text-primary'
       )
       
       updateElement(this.elements, 'mesh-vertex-count',
-        gameStore_3b.mesh.vertexData ? (gameStore_3b.mesh.vertexData.length / 2).toString() : '0',
+        gameStore.mesh.vertexData ? (gameStore.mesh.vertexData.length / 2).toString() : '0',
         'text-primary'
       )
       
       updateElement(this.elements, 'mesh-needs-update',
-        getBooleanStatusText(gameStore_3b.mesh.needsUpdate),
-        getBooleanStatusClass(gameStore_3b.mesh.needsUpdate)
+        getBooleanStatusText(gameStore.mesh.needsUpdate),
+        getBooleanStatusClass(gameStore.mesh.needsUpdate)
       )
     } catch (error) {
-      console.warn('StorePanel_3b: Error updating mesh values:', error)
+      console.warn('StorePanel: Error updating mesh values:', error)
     }
   }
   
   /**
    * Update only geometry-related elements
+   * ✅ UPDATED: Uses gameStore.objects and gameStore.preview
    */
   private updateGeometryValues(): void {
     try {
       updateElement(this.elements, 'layer-geometry-status',
-        getBooleanStatusText(gameStore_3b.ui.showGeometry),
-        getBooleanStatusClass(gameStore_3b.ui.showGeometry)
+        getBooleanStatusText(gameStore.ui.showGeometry),
+        getBooleanStatusClass(gameStore.ui.showGeometry)
       )
       
+      // ✅ UPDATED: gameStore.objects instead of geometry.objects
       updateElement(this.elements, 'geometry-objects-count',
-        gameStore_3b.geometry.objects.length.toString(),
+        gameStore.objects.length.toString(),
         'text-primary'
       )
       
       updateElement(this.elements, 'geometry-drawing-mode',
-        gameStore_3b.drawing.mode,
-        gameStore_3b.drawing.mode === 'none' ? 'text-muted' : 'text-success'
+        gameStore.drawing.mode,
+        gameStore.drawing.mode === 'none' ? 'text-muted' : 'text-success'
       )
       
       updateElement(this.elements, 'geometry-is-drawing',
-        getBooleanStatusText(gameStore_3b.drawing.isDrawing),
-        getBooleanStatusClass(gameStore_3b.drawing.isDrawing)
+        getBooleanStatusText(gameStore.drawing.isDrawing),
+        getBooleanStatusClass(gameStore.drawing.isDrawing)
       )
       
+      // ✅ UPDATED: gameStore.preview instead of drawing.preview
       updateElement(this.elements, 'geometry-preview-active',
-        getBooleanStatusText(gameStore_3b.drawing.preview !== null),
-        getBooleanStatusClass(gameStore_3b.drawing.preview !== null)
+        getBooleanStatusText(gameStore.preview.isActive),
+        getBooleanStatusClass(gameStore.preview.isActive)
       )
     } catch (error) {
-      console.warn('StorePanel_3b: Error updating geometry values:', error)
+      console.warn('StorePanel: Error updating geometry values:', error)
     }
   }
+  
   /**
-   * ✅ NEW: Update drag state values for debugging
+   * Update drag state values for debugging
+   * ✅ UPDATED: Uses draggedObjectId and dragStartPosition
    */
   private updateDragValues(): void {
     try {
       // Drag state
       updateElement(this.elements, 'drag-state-is-dragging',
-        getBooleanStatusText(gameStore_3b.dragging.isDragging),
-        getBooleanStatusClass(gameStore_3b.dragging.isDragging))
+        getBooleanStatusText(gameStore.dragging.isDragging),
+        getBooleanStatusClass(gameStore.dragging.isDragging))
       
+      // ✅ UPDATED: draggedObjectId instead of dragObjectId
       updateElement(this.elements, 'drag-state-object-id',
-        gameStore_3b.dragging.dragObjectId || 'none',
-        gameStore_3b.dragging.dragObjectId ? 'text-info' : 'text-muted')
+        gameStore.dragging.draggedObjectId || 'none',
+        gameStore.dragging.draggedObjectId ? 'text-info' : 'text-muted')
       
-      const clickPos = gameStore_3b.dragging.clickPosition
+      // ✅ UPDATED: dragStartPosition instead of clickPosition
+      const clickPos = gameStore.dragging.dragStartPosition
       updateElement(this.elements, 'drag-state-click-position',
         clickPos ? `${clickPos.x.toFixed(1)}, ${clickPos.y.toFixed(1)}` : 'none',
         clickPos ? 'text-primary' : 'text-muted')
       
       updateElement(this.elements, 'drag-state-vertex-offsets-count',
-        gameStore_3b.dragging.vertexOffsets.length.toString(),
-        gameStore_3b.dragging.vertexOffsets.length > 0 ? 'text-success' : 'text-muted')
+        gameStore.dragging.vertexOffsets.length.toString(),
+        gameStore.dragging.vertexOffsets.length > 0 ? 'text-success' : 'text-muted')
       
       // Drag preview state
       updateElement(this.elements, 'drag-preview-is-active',
-        getBooleanStatusText(gameStore_3b.dragPreview.isActive),
-        getBooleanStatusClass(gameStore_3b.dragPreview.isActive))
+        getBooleanStatusText(gameStore.dragPreview.isActive),
+        getBooleanStatusClass(gameStore.dragPreview.isActive))
       
-      const mousePos = gameStore_3b.dragPreview.currentMousePosition
+      const mousePos = gameStore.dragPreview.currentMousePosition
       updateElement(this.elements, 'drag-preview-mouse-position',
         mousePos ? `${mousePos.x.toFixed(1)}, ${mousePos.y.toFixed(1)}` : 'none',
         mousePos ? 'text-warning' : 'text-muted')
       
       updateElement(this.elements, 'drag-preview-vertices-count',
-        gameStore_3b.dragPreview.previewVertices.length.toString(),
-        gameStore_3b.dragPreview.previewVertices.length > 0 ? 'text-success' : 'text-muted')
+        gameStore.dragPreview.previewVertices.length.toString(),
+        gameStore.dragPreview.previewVertices.length > 0 ? 'text-success' : 'text-muted')
         
     } catch (error) {
-      console.warn('StorePanel_3b: Error updating drag values:', error)
+      console.warn('StorePanel: Error updating drag values:', error)
     }
   }
-
   
   /**
    * Toggle panel visibility
+   * ✅ UPDATED: Uses gameStore_methods from unified store
    */
   public toggle(): void {
-    const currentState = gameStore_3b.ui.showStorePanel
-    console.log(`StorePanel_3b: Toggling from ${currentState} to ${!currentState}`)
+    const currentState = gameStore.ui.showStorePanel
+    console.log(`StorePanel: Toggling from ${currentState} to ${!currentState}`)
     
-    // Use store method instead of local state
-    gameStore_3b_methods.toggleStorePanel()
+    // Use store method
+    gameStore_methods.toggleStorePanel()
     
     // Verify state change
-    console.log(`StorePanel_3b: New state is ${gameStore_3b.ui.showStorePanel}`)
+    console.log(`StorePanel: New state is ${gameStore.ui.showStorePanel}`)
   }
   
   /**
    * Set panel visibility
    */
   public setVisible(visible: boolean): void {
-    // Update store state instead of local state
-    gameStore_3b.ui.showStorePanel = visible
-    console.log('StorePanel_3b: Set visibility to', visible)
+    // Update store state
+    gameStore.ui.showStorePanel = visible
+    console.log('StorePanel: Set visibility to', visible)
   }
   
   /**
    * Get current visibility state
    */
   public getVisible(): boolean {
-    return gameStore_3b.ui.showStorePanel
+    return gameStore.ui.showStorePanel
   }
   
   /**
@@ -580,15 +603,18 @@ export class StorePanel_3b {
    */
   public getDebugInfo(): any {
     return {
-      isVisible: gameStore_3b.ui.showStorePanel,
+      isVisible: gameStore.ui.showStorePanel,
       elementsFound: this.elements.size,
       storeData: {
-        mouse: gameStore_3b.mouse,
-        navigation: gameStore_3b.navigation,
-        mesh: gameStore_3b.mesh,
-        geometry: gameStore_3b.geometry,
-        drawing: gameStore_3b.drawing,
-        ui: gameStore_3b.ui
+        mouse: gameStore.mouse,
+        navigation: gameStore.navigation,
+        mesh: gameStore.mesh,
+        objects: gameStore.objects.length,
+        drawing: gameStore.drawing,
+        selection: gameStore.selection,
+        dragging: gameStore.dragging,
+        dragPreview: gameStore.dragPreview,
+        ui: gameStore.ui
       }
     }
   }
@@ -597,8 +623,8 @@ export class StorePanel_3b {
    * Clean up resources
    */
   public destroy(): void {
-    console.log('StorePanel_3b: Starting cleanup')
+    console.log('StorePanel: Starting cleanup')
     this.elements.clear()
-    console.log('StorePanel_3b: Cleanup complete')
+    console.log('StorePanel: Cleanup complete')
   }
 }

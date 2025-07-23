@@ -1,4 +1,4 @@
-import type { StatusColors } from '../../types'
+import type { StatusColors } from '../types'
 
 // Status color mapping for consistent UI styling
 export const STATUS_COLORS: StatusColors = {
