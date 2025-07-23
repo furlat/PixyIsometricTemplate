@@ -7,6 +7,7 @@
  */
 
 import { gameStore, gameStore_methods } from '../store/game-store'
+import { UnifiedGeometryGenerator } from '../store/helpers/UnifiedGeometryGenerator'
 import type { GeometricObject, ObjectEditFormData } from '../types'
 
 export class ObjectEditPanel {
@@ -345,19 +346,31 @@ export class ObjectEditPanel {
 
   /**
    * Handle form input changes - live preview
-   * CONNECTS TO: gameStore_methods.updatePreview() from unified store
-   * CRITICAL: Uses ObjectEditFormData to fix circle bug
+   * UNIFIED: Uses UnifiedGeometryGenerator for consistent validation
+   * CRITICAL: Prevents circle bug through unified geometry generation
    */
   private handleFormInput(): void {
-    const formData = this.getFormData()
-    if (!formData) return
+    try {
+      const rawFormData = this.getRawFormData()
+      if (!rawFormData) return
 
-    // ✅ CRITICAL CIRCLE BUG FIX: Use form data directly
-    // This prevents reverse engineering from vertices that caused the bug
-    gameStore_methods.updatePreview({
-      operation: 'move',
-      formData: formData  // Direct form data - radius stays exactly as typed
-    })
+      // ✅ UNIFIED: Use UnifiedGeometryGenerator for validation and normalization
+      const normalizedFormData = UnifiedGeometryGenerator.generateFormData({
+        type: this.getObjectType(),
+        formData: rawFormData,
+        style: rawFormData.style,
+        isVisible: rawFormData.isVisible
+      })
+
+      // ✅ UNIFIED: Same preview system as drawing
+      gameStore_methods.updatePreview({
+        operation: 'move',
+        formData: normalizedFormData  // Unified geometry generation
+      })
+    } catch (error) {
+      console.warn('ObjectEditPanel: Form validation failed:', error)
+      // Don't update preview if form data is invalid
+    }
   }
 
   /**
@@ -382,9 +395,42 @@ export class ObjectEditPanel {
 
   /**
    * Extract form data into ObjectEditFormData structure
-   * CRITICAL: This is the circle bug fix - direct form data usage
+   * UNIFIED: Works with UnifiedGeometryGenerator for consistency
    */
   private getFormData(): ObjectEditFormData | null {
+    try {
+      const rawFormData = this.getRawFormData()
+      if (!rawFormData) return null
+
+      // ✅ UNIFIED: Use UnifiedGeometryGenerator for validation
+      return UnifiedGeometryGenerator.generateFormData({
+        type: this.getObjectType(),
+        formData: rawFormData,
+        style: rawFormData.style,
+        isVisible: rawFormData.isVisible
+      })
+    } catch (error) {
+      console.warn('ObjectEditPanel: Unified geometry generation failed:', error)
+      return null
+    }
+  }
+
+  /**
+   * Get object type for UnifiedGeometryGenerator
+   */
+  private getObjectType(): 'point' | 'line' | 'circle' | 'rectangle' | 'diamond' {
+    const selectedObject = gameStore_methods.getSelectedObject()
+    if (!selectedObject) {
+      throw new Error('ObjectEditPanel: No selected object for type detection')
+    }
+    return selectedObject.type
+  }
+
+  /**
+   * Extract raw form data (unified with InputManager approach)
+   * UNIFIED: Same validation logic as UnifiedGeometryGenerator expects
+   */
+  private getRawFormData(): ObjectEditFormData | null {
     if (!this.formElement) return null
 
     const selectedObject = gameStore_methods.getSelectedObject()
@@ -392,7 +438,10 @@ export class ObjectEditPanel {
 
     // Get common properties
     const visibilityInput = document.getElementById('edit-visibility') as HTMLInputElement
-    const isVisible = visibilityInput?.checked ?? true
+    if (!visibilityInput) {
+      throw new Error('ObjectEditPanel: visibility input element missing')
+    }
+    const isVisible = visibilityInput.checked
 
     // Get style properties
     const style = this.getStyleData()
@@ -406,13 +455,17 @@ export class ObjectEditPanel {
         const centerYInput = document.getElementById('edit-center-y') as HTMLInputElement
         const radiusInput = document.getElementById('edit-radius') as HTMLInputElement
 
+        if (!centerXInput || !centerYInput || !radiusInput) {
+          throw new Error('ObjectEditPanel: circle input elements missing')
+        }
+
+        const centerX = parseFloat(centerXInput.value || '0')
+        const centerY = parseFloat(centerYInput.value || '0')
+        const radius = parseFloat(radiusInput.value || '0.1')
+
         return {
           isVisible,
-          circle: {
-            centerX: parseFloat(centerXInput?.value ?? '0'),
-            centerY: parseFloat(centerYInput?.value ?? '0'),
-            radius: parseFloat(radiusInput?.value ?? '1')  // ✅ CIRCLE BUG FIX: Direct from form
-          },
+          circle: { centerX, centerY, radius },
           style
         }
       }
@@ -423,14 +476,30 @@ export class ObjectEditPanel {
         const widthInput = document.getElementById('edit-width') as HTMLInputElement
         const heightInput = document.getElementById('edit-height') as HTMLInputElement
 
+        if (!centerXInput || !centerYInput || !widthInput || !heightInput) {
+          throw new Error('ObjectEditPanel: rectangle input elements missing - form corrupted')
+        }
+
+        if (!centerXInput.value || !centerYInput.value || !widthInput.value || !heightInput.value) {
+          throw new Error('ObjectEditPanel: rectangle input values missing - form incomplete')
+        }
+
+        const centerX = parseFloat(centerXInput.value)
+        const centerY = parseFloat(centerYInput.value)
+        const width = parseFloat(widthInput.value)
+        const height = parseFloat(heightInput.value)
+
+        if (isNaN(centerX) || isNaN(centerY) || isNaN(width) || isNaN(height)) {
+          throw new Error('ObjectEditPanel: invalid rectangle values - not numbers')
+        }
+
+        if (width <= 0 || height <= 0) {
+          throw new Error(`ObjectEditPanel: invalid rectangle dimensions ${width}x${height} - must be positive`)
+        }
+
         return {
           isVisible,
-          rectangle: {
-            centerX: parseFloat(centerXInput?.value ?? '0'),
-            centerY: parseFloat(centerYInput?.value ?? '0'),
-            width: parseFloat(widthInput?.value ?? '1'),
-            height: parseFloat(heightInput?.value ?? '1')
-          },
+          rectangle: { centerX, centerY, width, height },
           style
         }
       }
@@ -441,14 +510,26 @@ export class ObjectEditPanel {
         const endXInput = document.getElementById('edit-end-x') as HTMLInputElement
         const endYInput = document.getElementById('edit-end-y') as HTMLInputElement
 
+        if (!startXInput || !startYInput || !endXInput || !endYInput) {
+          throw new Error('ObjectEditPanel: line input elements missing - form corrupted')
+        }
+
+        if (!startXInput.value || !startYInput.value || !endXInput.value || !endYInput.value) {
+          throw new Error('ObjectEditPanel: line input values missing - form incomplete')
+        }
+
+        const startX = parseFloat(startXInput.value)
+        const startY = parseFloat(startYInput.value)
+        const endX = parseFloat(endXInput.value)
+        const endY = parseFloat(endYInput.value)
+
+        if (isNaN(startX) || isNaN(startY) || isNaN(endX) || isNaN(endY)) {
+          throw new Error('ObjectEditPanel: invalid line values - not numbers')
+        }
+
         return {
           isVisible,
-          line: {
-            startX: parseFloat(startXInput?.value ?? '0'),
-            startY: parseFloat(startYInput?.value ?? '0'),
-            endX: parseFloat(endXInput?.value ?? '0'),
-            endY: parseFloat(endYInput?.value ?? '0')
-          },
+          line: { startX, startY, endX, endY },
           style
         }
       }
@@ -457,24 +538,36 @@ export class ObjectEditPanel {
         const centerXInput = document.getElementById('edit-center-x') as HTMLInputElement
         const centerYInput = document.getElementById('edit-center-y') as HTMLInputElement
 
+        if (!centerXInput || !centerYInput) {
+          throw new Error('ObjectEditPanel: point input elements missing - form corrupted')
+        }
+
+        if (!centerXInput.value || !centerYInput.value) {
+          throw new Error('ObjectEditPanel: point input values missing - form incomplete')
+        }
+
+        const centerX = parseFloat(centerXInput.value)
+        const centerY = parseFloat(centerYInput.value)
+
+        if (isNaN(centerX) || isNaN(centerY)) {
+          throw new Error('ObjectEditPanel: invalid point values - not numbers')
+        }
+
         return {
           isVisible,
-          point: {
-            centerX: parseFloat(centerXInput?.value ?? '0'),
-            centerY: parseFloat(centerYInput?.value ?? '0')
-          },
+          point: { centerX, centerY },
           style
         }
       }
 
       default:
-        return null
+        throw new Error(`ObjectEditPanel: unsupported object type ${objectType}`)
     }
   }
 
   /**
    * Extract style data from form inputs
-   * USES: Real StyleSettings structure
+   * UNIFIED: Consistent with UnifiedGeometryGenerator expectations
    */
   private getStyleData(): ObjectEditFormData['style'] {
     const strokeColorInput = document.getElementById('edit-stroke-color') as HTMLInputElement
@@ -484,13 +577,29 @@ export class ObjectEditPanel {
     const fillColorInput = document.getElementById('edit-fill-color') as HTMLInputElement
     const fillAlphaInput = document.getElementById('edit-fill-alpha') as HTMLInputElement
 
+    if (!strokeColorInput || !strokeWidthInput || !strokeAlphaInput || !fillEnabledInput) {
+      throw new Error('ObjectEditPanel: style input elements missing')
+    }
+
+    const strokeWidth = parseInt(strokeWidthInput.value || '2', 10)
+    const strokeAlpha = parseFloat(strokeAlphaInput.value || '1.0')
+    const hasFill = fillEnabledInput.checked
+
+    let fillColor: string | undefined
+    let fillAlpha: number | undefined
+
+    if (hasFill && fillColorInput && fillAlphaInput) {
+      fillColor = fillColorInput.value || '#ffffff'
+      fillAlpha = parseFloat(fillAlphaInput.value || '0.5')
+    }
+
     return {
-      strokeColor: strokeColorInput?.value ?? '#0066cc',
-      strokeWidth: parseInt(strokeWidthInput?.value ?? '2', 10),
-      strokeAlpha: parseFloat(strokeAlphaInput?.value ?? '1.0'),
-      fillColor: fillColorInput?.value,
-      fillAlpha: parseFloat(fillAlphaInput?.value ?? '0.3'),
-      hasFill: fillEnabledInput?.checked ?? false
+      strokeColor: strokeColorInput.value || '#000000',
+      strokeWidth,
+      strokeAlpha,
+      fillColor,
+      fillAlpha,
+      hasFill
     }
   }
 

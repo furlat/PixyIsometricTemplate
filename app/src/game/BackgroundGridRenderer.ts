@@ -113,7 +113,7 @@ export class BackgroundGridRenderer {
       
       console.log(`BackgroundGridRenderer: Right-click at vertex (${vertexCoord.x}, ${vertexCoord.y})`)
       
-      // Convert to pixeloid coordinates and handle as right-click
+      // ✅ STANDARDIZED COORDINATE TRANSFORM: vertex + navigation offset = pixeloid
       const pixeloidCoord = {
         x: vertexCoord.x + gameStore.navigation.offset.x,
         y: vertexCoord.y + gameStore.navigation.offset.y
@@ -196,7 +196,7 @@ export class BackgroundGridRenderer {
    * Clean separation: BackgroundGridRenderer captures events, InputManager processes them
    */
   private handleGeometryInput(eventType: 'down' | 'up' | 'move', vertexCoord: VertexCoordinate, event: any): void {
-    // Convert vertex coordinates to pixeloid coordinates
+    // ✅ STANDARDIZED COORDINATE TRANSFORM: vertex + navigation offset = pixeloid
     const pixeloidCoord = {
       x: vertexCoord.x + gameStore.navigation.offset.x,
       y: vertexCoord.y + gameStore.navigation.offset.y

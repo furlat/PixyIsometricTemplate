@@ -352,14 +352,23 @@ export const createGeometricObject = (
   // ✅ FIXED: Direct property calculation (no circular dependency)
   let properties: GeometryProperties
   
-  // Calculate properties directly from params (no reverse engineering needed)
+  // ✅ STRICT AUTHORITY: NO FALLBACKS - vertices MUST be valid
   switch (params.type) {
     case 'point':
-      properties = { type: 'point', center: params.vertices[0] || { x: 0, y: 0 } }
+      if (!params.vertices[0]) {
+        throw new Error('Point geometry requires center vertex - missing vertices[0]')
+      }
+      properties = { type: 'point', center: params.vertices[0] }
       break
     case 'line':
-      const start = params.vertices[0] || { x: 0, y: 0 }
-      const end = params.vertices[1] || { x: 0, y: 0 }
+      if (!params.vertices[0]) {
+        throw new Error('Line geometry requires start vertex - missing vertices[0]')
+      }
+      if (!params.vertices[1]) {
+        throw new Error('Line geometry requires end vertex - missing vertices[1]')
+      }
+      const start = params.vertices[0]
+      const end = params.vertices[1]
       const dx = end.x - start.x
       const dy = end.y - start.y
       properties = {
@@ -372,8 +381,14 @@ export const createGeometricObject = (
       }
       break
     case 'circle':
-      const center = params.vertices[0] || { x: 0, y: 0 }
-      const radiusPoint = params.vertices[1] || { x: 1, y: 0 }
+      if (!params.vertices[0]) {
+        throw new Error('Circle geometry requires center vertex - missing vertices[0]')
+      }
+      if (!params.vertices[1]) {
+        throw new Error('Circle geometry requires radius point vertex - missing vertices[1]')
+      }
+      const center = params.vertices[0]
+      const radiusPoint = params.vertices[1]
       const radius = Math.sqrt(Math.pow(radiusPoint.x - center.x, 2) + Math.pow(radiusPoint.y - center.y, 2))
       properties = {
         type: 'circle',
@@ -385,8 +400,14 @@ export const createGeometricObject = (
       }
       break
     case 'rectangle':
-      const v1 = params.vertices[0] || { x: 0, y: 0 }
-      const v2 = params.vertices[1] || { x: 1, y: 1 }
+      if (!params.vertices[0]) {
+        throw new Error('Rectangle geometry requires first corner vertex - missing vertices[0]')
+      }
+      if (!params.vertices[1]) {
+        throw new Error('Rectangle geometry requires opposite corner vertex - missing vertices[1]')
+      }
+      const v1 = params.vertices[0]
+      const v2 = params.vertices[1]
       const topLeft = { x: Math.min(v1.x, v2.x), y: Math.min(v1.y, v2.y) }
       const bottomRight = { x: Math.max(v1.x, v2.x), y: Math.max(v1.y, v2.y) }
       const width = bottomRight.x - topLeft.x
@@ -403,10 +424,22 @@ export const createGeometricObject = (
       }
       break
     case 'diamond':
-      const west = params.vertices[0] || { x: 0, y: 0 }
-      const north = params.vertices[1] || { x: 0, y: -1 }
-      const east = params.vertices[2] || { x: 1, y: 0 }
-      const south = params.vertices[3] || { x: 0, y: 1 }
+      if (!params.vertices[0]) {
+        throw new Error('Diamond geometry requires west vertex - missing vertices[0]')
+      }
+      if (!params.vertices[1]) {
+        throw new Error('Diamond geometry requires north vertex - missing vertices[1]')
+      }
+      if (!params.vertices[2]) {
+        throw new Error('Diamond geometry requires east vertex - missing vertices[2]')
+      }
+      if (!params.vertices[3]) {
+        throw new Error('Diamond geometry requires south vertex - missing vertices[3]')
+      }
+      const west = params.vertices[0]
+      const north = params.vertices[1]
+      const east = params.vertices[2]
+      const south = params.vertices[3]
       const diamondWidth = east.x - west.x
       const diamondHeight = south.y - north.y
       properties = {

@@ -61,57 +61,24 @@ export class GeometryPropertyCalculators {
   // CIRCLE CALCULATIONS (Fixed!)
   // ================================
   static calculateCircleProperties(vertices: PixeloidCoordinate[]): CircleProperties {
-    if (vertices.length < 2) {
-      throw new Error('Circle requires at least 2 vertices')
+    // ✅ STRICT AUTHORITY: Only 2-vertex format supported [center, radiusPoint]
+    if (vertices.length !== 2) {
+      throw new Error('Circle requires exactly 2 vertices - [center, radiusPoint]. Multi-vertex circumference format not supported.')
     }
     
-    // Handle both representations:
-    // - 2 vertices: [center, radiusPoint]  
-    // - 8+ vertices: circumference points
+    // Standard 2-vertex format: [center, radiusPoint]
+    const center = vertices[0]
+    const radiusPoint = vertices[1]
     
-    let center: PixeloidCoordinate
-    let radius: number
+    // Calculate radius from center to radius point
+    const radius = Math.sqrt(
+      Math.pow(radiusPoint.x - center.x, 2) +
+      Math.pow(radiusPoint.y - center.y, 2)
+    )
     
-    if (vertices.length === 2) {
-      // Creation format: [center, radiusPoint]
-      center = vertices[0]
-      const radiusPoint = vertices[1]
-      radius = Math.sqrt(
-        Math.pow(radiusPoint.x - center.x, 2) + 
-        Math.pow(radiusPoint.y - center.y, 2)
-      )
-    } else {
-      // Circumference format: Use geometric center calculation
-      // For circle: center is equidistant from all circumference points
-      
-      // Use first three points to calculate true center (circumcenter)
-      const p1 = vertices[0]
-      const p2 = vertices[Math.floor(vertices.length / 4)]      // 90° apart
-      const p3 = vertices[Math.floor(vertices.length / 2)]      // 180° apart
-      
-      // Calculate circumcenter from three points
-      const ax = p1.x, ay = p1.y
-      const bx = p2.x, by = p2.y
-      const cx = p3.x, cy = p3.y
-      
-      const d = 2 * (ax * (by - cy) + bx * (cy - ay) + cx * (ay - by))
-      
-      if (Math.abs(d) < 0.001) {
-        // Fallback to centroid if points are nearly collinear
-        const sumX = vertices.reduce((sum, v) => sum + v.x, 0)
-        const sumY = vertices.reduce((sum, v) => sum + v.y, 0)
-        center = { x: sumX / vertices.length, y: sumY / vertices.length }
-      } else {
-        const ux = ((ax*ax + ay*ay) * (by - cy) + (bx*bx + by*by) * (cy - ay) + (cx*cx + cy*cy) * (ay - by)) / d
-        const uy = ((ax*ax + ay*ay) * (cx - bx) + (bx*bx + by*by) * (ax - cx) + (cx*cx + cy*cy) * (bx - ax)) / d
-        center = { x: ux, y: uy }
-      }
-      
-      // Calculate radius from true center to any circumference point
-      radius = Math.sqrt(
-        Math.pow(vertices[0].x - center.x, 2) +
-        Math.pow(vertices[0].y - center.y, 2)
-      )
+    // ✅ STRICT AUTHORITY: No fallbacks, no alternative calculations
+    if (radius <= 0) {
+      throw new Error('Circle radius must be greater than 0 - center and radiusPoint cannot be the same')
     }
     
     return {

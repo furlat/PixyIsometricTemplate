@@ -12,18 +12,20 @@ export class GeometryVertexGenerators {
   // ================================
   // CIRCLE VERTEX GENERATION
   // ================================
-  static generateCircleVertices(center: PixeloidCoordinate, radius: number, segments: number = 8): PixeloidCoordinate[] {
-    const vertices: PixeloidCoordinate[] = []
-    
-    for (let i = 0; i < segments; i++) {
-      const angle = (i * Math.PI * 2) / segments
-      vertices.push({
-        x: center.x + Math.cos(angle) * radius,
-        y: center.y + Math.sin(angle) * radius
-      })
+  static generateCircleVertices(center: PixeloidCoordinate, radius: number): PixeloidCoordinate[] {
+    // ✅ STRICT AUTHORITY: Only 2-vertex format [center, radiusPoint]
+    if (radius <= 0) {
+      throw new Error('Circle radius must be greater than 0')
     }
     
-    return vertices
+    // Generate standard 2-vertex format: [center, radiusPoint]
+    // Place radiusPoint to the right of center for consistency
+    const radiusPoint: PixeloidCoordinate = {
+      x: center.x + radius,
+      y: center.y
+    }
+    
+    return [center, radiusPoint]
   }
   
   // ================================
@@ -188,8 +190,8 @@ export class GeometryVertexGenerators {
         }
         break
       case 'circle':
-        if (vertices.length < 3) {
-          console.warn(`Invalid circle: should have at least 3 vertices, got ${vertices.length}`)
+        if (vertices.length !== 2) {
+          console.warn(`Invalid circle: should have exactly 2 vertices [center, radiusPoint], got ${vertices.length}`)
           return false
         }
         break

@@ -1,15 +1,16 @@
 /**
- * InputManager - Safe Input Detection System
- * 
- * SAFETY-VERIFIED: Circle bug prevention applied
- * - Extract input detection ONLY (no property calculation)
+ * InputManager - Unified Drawing System with Delayed Preview Creation
+ *
+ * UNIFIED SOLUTION: Fixes all drawing issues through single geometry generator
+ * - Delayed preview creation (no preview until movement detected)
+ * - UnifiedGeometryGenerator for consistent geometry generation
  * - ALWAYS use PreviewSystem for object operations
- * - NO reverse engineering (vertices → properties)
- * - Single creation path (form data → PreviewSystem → GeometryHelper)
+ * - Single creation path for both drawing and editing
  */
 
 import { gameStore, gameStore_methods } from '../store/game-store'
 import { PreviewSystem } from '../store/systems/PreviewSystem'
+import { UnifiedGeometryGenerator } from '../store/helpers/UnifiedGeometryGenerator'
 import type {
   PixeloidCoordinate,
   GeometricObject,
@@ -53,16 +54,22 @@ export class InputManager {
   }
   
   public handleMouseMove(coord: PixeloidCoordinate): void {
-    // ✅ SAFE: Movement detection only
+    // ✅ UNIFIED: Movement detection only
     const dragAction = this.dragDetector.handleMouseMove(coord)
     
-    // ✅ SAFE: Drawing preview via PreviewSystem
+    // ✅ UNIFIED: Delayed preview creation on movement
     if (gameStore.drawing.isDrawing) {
-      const formData = this.convertCoordToFormData(coord, gameStore.drawing.mode)
-      PreviewSystem.updatePreview(gameStore, { 
-        operation: 'create', 
-        formData: formData 
-      })
+      const startPoint = gameStore.drawing.startPoint
+      const hasMovement = this.hasMovedFromStartPoint(coord, startPoint)
+      
+      if (hasMovement) {
+        // Create or update preview with UnifiedGeometryGenerator
+        if (!gameStore.preview.isActive) {
+          this.startPreviewFromMovement(coord)
+        } else {
+          this.updatePreviewFromMovement(coord)
+        }
+      }
     }
     
     // ✅ SAFE: Drag updates via existing store methods
@@ -72,7 +79,7 @@ export class InputManager {
   }
   
   public handleMouseUp(coord: PixeloidCoordinate): void {
-    // ✅ SAFE: Click completion detection
+    // ✅ UNIFIED: Click completion detection
     const clickResult = this.clickDetector.handleMouseUp(coord)
     
     console.log('InputManager: Mouse up', { coord, clickResult })
@@ -83,9 +90,25 @@ export class InputManager {
       gameStore_methods.updateDragPosition(coord)
     }
     
-    // ✅ SAFE: Drawing completion via PreviewSystem
+    // ✅ UNIFIED: Drawing completion via PreviewSystem
     if (gameStore.drawing.isDrawing && clickResult === 'click') {
-      this.finishDrawingViaPreview()
+      const startPoint = gameStore.drawing.startPoint
+      const hasMovement = this.hasMovedFromStartPoint(coord, startPoint)
+      
+      if (hasMovement && gameStore.preview.isActive) {
+        // Finalize drawing with preview
+        PreviewSystem.commitPreview(gameStore)
+      } else {
+        // Handle click-without-drag based on mode
+        this.handleClickWithoutDrag(coord)
+      }
+      
+      // ✅ CORRECT BEHAVIOR: Stay in drawing mode but stop drawing state
+      // Reset drawing state (isDrawing=false, startPoint=null) but keep mode
+      gameStore.drawing.isDrawing = false
+      gameStore.drawing.startPoint = null
+      gameStore.drawing.currentPoint = null
+      // DON'T reset mode - stay in same shape mode for next click
     }
   }
   
@@ -114,7 +137,7 @@ export class InputManager {
   }
   
   private handleDrawingMode(hitObjectId: string | null, coord: PixeloidCoordinate, clickType: string, _event: FederatedMouseEvent | MouseEvent): void {
-    // ✅ SAFE: Double-click exits drawing mode
+    // ✅ UNIFIED: Double-click exits drawing mode
     if (clickType === 'double-click' && hitObjectId) {
       gameStore_methods.setDrawingMode('none')
       gameStore_methods.selectObject(hitObjectId)
@@ -122,10 +145,9 @@ export class InputManager {
       return
     }
     
-    // ✅ SAFE: Drawing via PreviewSystem (NEVER direct object creation)
-    if (!gameStore.preview.isActive) {
-      this.startDrawingViaPreview(coord)
-    }
+    // ✅ UNIFIED: Set startPoint only, NO immediate preview creation
+    gameStore_methods.startDrawing(coord)
+    console.log('InputManager: Drawing started, waiting for movement...', gameStore.drawing.mode)
   }
   
   private handleContextMenu(objectId: string, coord: PixeloidCoordinate): void {
@@ -133,137 +155,91 @@ export class InputManager {
     console.log('InputManager: Context menu for object', objectId, 'at', coord)
   }
   
-  // ===== SAFE PREVIEWSYSTEM INTEGRATION =====
-  private startDrawingViaPreview(coord: PixeloidCoordinate): void {
-    // ✅ SAFE: Always use PreviewSystem for object operations
-    const formData = this.convertCoordToFormData(coord, gameStore.drawing.mode)
+  // ===== UNIFIED PREVIEWSYSTEM INTEGRATION =====
+  private startPreviewFromMovement(coord: PixeloidCoordinate): void {
+    // ✅ UNIFIED: Create preview with UnifiedGeometryGenerator
+    const startPoint = gameStore.drawing.startPoint
+    const formData = this.generateFormDataFromCoordinates(startPoint!, coord, gameStore.drawing.mode)
     
     PreviewSystem.startPreview(gameStore, 'create')
-    PreviewSystem.updatePreview(gameStore, { 
-      operation: 'create', 
-      formData: formData 
+    PreviewSystem.updatePreview(gameStore, {
+      operation: 'create',
+      formData: formData
     })
     
-    // ✅ SAFE: Update drawing state via existing store methods
-    gameStore_methods.startDrawing(coord)
-    
-    console.log('InputManager: Started drawing via PreviewSystem', gameStore.drawing.mode)
+    console.log('InputManager: Started preview from movement', gameStore.drawing.mode)
   }
   
-  private finishDrawingViaPreview(): void {
-    // ✅ SAFE: Commit via PreviewSystem (uses CORRECT calculation paths)
+  private updatePreviewFromMovement(coord: PixeloidCoordinate): void {
+    // ✅ UNIFIED: Update preview with UnifiedGeometryGenerator
+    const startPoint = gameStore.drawing.startPoint
+    const formData = this.generateFormDataFromCoordinates(startPoint!, coord, gameStore.drawing.mode)
+    
+    PreviewSystem.updatePreview(gameStore, {
+      operation: 'create',
+      formData: formData
+    })
+  }
+  
+  private handleClickWithoutDrag(coord: PixeloidCoordinate): void {
+    if (gameStore.drawing.mode === 'point') {
+      // Points can be created with single click
+      this.createPointAtPosition(coord)
+    } else {
+      // Other shapes require dragging - just cancel
+      console.log('InputManager: Drag required for', gameStore.drawing.mode, '- canceling')
+    }
+  }
+  
+  private createPointAtPosition(coord: PixeloidCoordinate): void {
+    // ✅ UNIFIED: Create point immediately using UnifiedGeometryGenerator
+    const formData = this.generateFormDataFromCoordinates(coord, coord, 'point')
+    
+    PreviewSystem.startPreview(gameStore, 'create')
+    PreviewSystem.updatePreview(gameStore, {
+      operation: 'create',
+      formData: formData
+    })
     PreviewSystem.commitPreview(gameStore)
     
-    // ✅ SAFE: Clear drawing state via existing store methods  
-    gameStore_methods.setDrawingMode('none')
-    
-    console.log('InputManager: Finished drawing via PreviewSystem')
+    console.log('InputManager: Point created at', coord)
   }
   
-  // ===== SAFE COORDINATE CONVERSION (NO PROPERTY CALCULATION) =====
-  private convertCoordToFormData(coord: PixeloidCoordinate, mode: DrawingMode): ObjectEditFormData {
-    // ✅ SAFE: Simple coordinate format conversion only (no property calculation)
-    switch (mode) {
-      case 'point':
-        return {
-          point: { centerX: coord.x, centerY: coord.y },
-          style: {
-            strokeColor: '#000000',
-            strokeWidth: 2,
-            strokeAlpha: 1.0,
-            hasFill: false
-          },
-          isVisible: true
-        }
-        
-      case 'circle':
-        return {
-          circle: {
-            centerX: coord.x,
-            centerY: coord.y,
-            radius: 10  // Default radius, not calculated
-          },
-          style: {
-            strokeColor: '#000000',
-            strokeWidth: 2,
-            strokeAlpha: 1.0,
-            fillColor: '#ffffff',
-            fillAlpha: 0.5,
-            hasFill: true
-          },
-          isVisible: true
-        }
-        
-      case 'line':
-        const startPoint = gameStore.drawing.startPoint || coord
-        return {
-          line: {
-            startX: startPoint.x,
-            startY: startPoint.y,
-            endX: coord.x,
-            endY: coord.y
-          },
-          style: {
-            strokeColor: '#000000',
-            strokeWidth: 2,
-            strokeAlpha: 1.0,
-            hasFill: false
-          },
-          isVisible: true
-        }
-        
-      case 'rectangle':
-        const rectStartPoint = gameStore.drawing.startPoint || coord
-        return {
-          rectangle: {
-            centerX: (rectStartPoint.x + coord.x) / 2,
-            centerY: (rectStartPoint.y + coord.y) / 2,
-            width: Math.abs(coord.x - rectStartPoint.x),
-            height: Math.abs(coord.y - rectStartPoint.y)
-          },
-          style: {
-            strokeColor: '#000000',
-            strokeWidth: 2,
-            strokeAlpha: 1.0,
-            fillColor: '#ffffff',
-            fillAlpha: 0.5,
-            hasFill: true
-          },
-          isVisible: true
-        }
-        
-      case 'diamond':
-        const diamondStartPoint = gameStore.drawing.startPoint || coord
-        return {
-          diamond: {
-            centerX: (diamondStartPoint.x + coord.x) / 2,
-            centerY: (diamondStartPoint.y + coord.y) / 2,
-            width: Math.abs(coord.x - diamondStartPoint.x),
-            height: Math.abs(coord.y - diamondStartPoint.y)
-          },
-          style: {
-            strokeColor: '#000000',
-            strokeWidth: 2,
-            strokeAlpha: 1.0,
-            fillColor: '#ffffff',
-            fillAlpha: 0.5,
-            hasFill: true
-          },
-          isVisible: true
-        }
-        
-      default:
-        return {
-          point: { centerX: coord.x, centerY: coord.y },
-          style: {
-            strokeColor: '#000000',
-            strokeWidth: 2,
-            strokeAlpha: 1.0,
-            hasFill: false
-          },
-          isVisible: true
-        }
+  // ===== UNIFIED GEOMETRY GENERATION =====
+  private generateFormDataFromCoordinates(
+    startPoint: PixeloidCoordinate,
+    endPoint: PixeloidCoordinate,
+    mode: DrawingMode
+  ): ObjectEditFormData {
+    // ✅ UNIFIED: Use UnifiedGeometryGenerator for all geometry creation
+    return UnifiedGeometryGenerator.generateFormData({
+      type: mode,
+      startPoint: startPoint,
+      endPoint: endPoint,
+      style: this.getDefaultStyle(),
+      isVisible: true
+    })
+  }
+  
+  private getDefaultStyle() {
+    // ✅ UNIFIED: Get default style from store or use fallback
+    return {
+      strokeColor: `#${gameStore.defaultStyle.color.toString(16).padStart(6, '0')}`,
+      strokeWidth: gameStore.defaultStyle.strokeWidth,
+      strokeAlpha: gameStore.defaultStyle.strokeAlpha,
+      fillColor: gameStore.defaultStyle.fillEnabled ? `#${gameStore.defaultStyle.fillColor.toString(16).padStart(6, '0')}` : undefined,
+      fillAlpha: gameStore.defaultStyle.fillAlpha,
+      hasFill: gameStore.defaultStyle.fillEnabled
     }
+  }
+  
+  private hasMovedFromStartPoint(
+    current: PixeloidCoordinate,
+    start: PixeloidCoordinate | null,
+    threshold: number = 2
+  ): boolean {
+    if (!start) return false
+    return UnifiedGeometryGenerator.hasMovementBetweenPoints(start, current, threshold)
   }
   
   // ===== KEYBOARD INTEGRATION =====
@@ -725,13 +701,20 @@ class KeyboardHandler {
   }
   
   public handleEscape(): void {
-    // Cancel any active operations
-    if (gameStore.drawing.isDrawing) {
+    // ✅ ESC PRIORITY 1: Close edit panel if open
+    if (gameStore.ui.isEditPanelOpen) {
+      gameStore_methods.clearSelectionEnhanced() // This closes panel
+      return // STOP HERE
+    }
+    
+    // ✅ ESC PRIORITY 2: Cancel drawing and reset mode
+    if (gameStore.drawing.isDrawing || gameStore.drawing.mode !== 'none') {
       gameStore_methods.cancelDrawing()
+      gameStore_methods.setDrawingMode('none')  // Reset to none on ESC
+      return // STOP HERE
     }
-    if (gameStore.dragging.isDragging) {
-      gameStore_methods.cancelDragging()
-    }
+    
+    // ✅ ESC PRIORITY 3: Clear selection (fallback)
     gameStore_methods.clearSelectionEnhanced()
   }
   

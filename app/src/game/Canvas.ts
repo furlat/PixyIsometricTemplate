@@ -24,7 +24,11 @@ export class Phase3BCanvas {
   private geometryLayer: Container
   private mouseLayer: Container
   
-  constructor(app: Application, inputManager?: InputManager) {
+  constructor(app: Application, inputManager: InputManager) {
+    if (!inputManager) {
+      throw new Error('Phase3BCanvas requires InputManager - no fallback allowed')
+    }
+    
     this.app = app
     console.log('Phase3BCanvas: Initializing with mesh-first architecture')
     
@@ -37,8 +41,8 @@ export class Phase3BCanvas {
     this.backgroundGridRenderer = new BackgroundGridRenderer()
     this.mouseHighlightShader = new MouseHighlightShader(this.backgroundGridRenderer.getMeshManager())
     
-    // ✅ Use provided InputManager or create new one (backward compatibility)
-    this.inputManager = inputManager || new InputManager()
+    // ✅ SINGLE INSTANCE ONLY - NO FALLBACKS
+    this.inputManager = inputManager
     this.geometryRenderer = new GeometryRenderer()
     
     // Setup layers

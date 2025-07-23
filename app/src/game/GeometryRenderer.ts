@@ -317,7 +317,10 @@ class CommonShapeRenderer {
   // Eliminates duplication between main object rendering and preview rendering
   
   public renderPoint(vertices: PixeloidCoordinate[], context: RenderContext): void {
-    if (!vertices || vertices.length === 0) return
+    // ✅ STRICT AUTHORITY: NO SILENT FAILURES
+    if (!vertices || vertices.length === 0) {
+      throw new Error('Point rendering requires vertices - missing vertices array')
+    }
     
     const { graphics, samplingPos, zoomFactor, style, alpha = 1 } = context
     const { x, y } = this.transformCoordinate(vertices[0], samplingPos, zoomFactor)
@@ -325,15 +328,21 @@ class CommonShapeRenderer {
     const pointRadius = 2 * zoomFactor
     graphics.circle(x, y, pointRadius)
     
-    // ✅ CORRECT: Use actual style structure from ecs-data-layer.ts
+    // ✅ STRICT AUTHORITY: Complete style required - NO FALLBACKS
+    if (style.strokeAlpha === undefined) {
+      throw new Error('Point rendering requires complete style - missing strokeAlpha')
+    }
     graphics.fill({
       color: style.color,
-      alpha: (style.strokeAlpha || 1) * alpha
+      alpha: style.strokeAlpha * alpha
     })
   }
   
   public renderLine(vertices: PixeloidCoordinate[], context: RenderContext): void {
-    if (!vertices || vertices.length < 2) return
+    // ✅ STRICT AUTHORITY: NO SILENT FAILURES
+    if (!vertices || vertices.length < 2) {
+      throw new Error('Line rendering requires at least 2 vertices')
+    }
     
     const { graphics, samplingPos, zoomFactor, style, alpha = 1 } = context
     const start = this.transformCoordinate(vertices[0], samplingPos, zoomFactor)
@@ -345,14 +354,17 @@ class CommonShapeRenderer {
   }
   
   public renderCircle(vertices: PixeloidCoordinate[], context: RenderContext): void {
-    if (!vertices || vertices.length < 2) return
+    // ✅ STRICT AUTHORITY: NO SILENT FAILURES
+    if (!vertices || vertices.length < 2) {
+      throw new Error('Circle rendering requires at least 2 vertices - center and radius point')
+    }
     
     const { graphics, samplingPos, zoomFactor, style, alpha = 1 } = context
     const center = this.transformCoordinate(vertices[0], samplingPos, zoomFactor)
     const radiusPoint = this.transformCoordinate(vertices[1], samplingPos, zoomFactor)
     
     const radius = Math.sqrt(
-      Math.pow(radiusPoint.x - center.x, 2) + 
+      Math.pow(radiusPoint.x - center.x, 2) +
       Math.pow(radiusPoint.y - center.y, 2)
     )
     
@@ -362,14 +374,17 @@ class CommonShapeRenderer {
   }
   
   public renderRectangle(vertices: PixeloidCoordinate[], context: RenderContext): void {
-    if (!vertices || vertices.length < 2) return
+    // ✅ STRICT AUTHORITY: NO SILENT FAILURES
+    if (!vertices || vertices.length < 2) {
+      throw new Error('Rectangle rendering requires at least 2 vertices - opposite corners')
+    }
     
     const { graphics, samplingPos, zoomFactor, style, alpha = 1 } = context
     const v1 = this.transformCoordinate(vertices[0], samplingPos, zoomFactor)
     const v2 = this.transformCoordinate(vertices[1], samplingPos, zoomFactor)
     
     const x = Math.min(v1.x, v2.x)
-    const y = Math.min(v1.y, v2.y) 
+    const y = Math.min(v1.y, v2.y)
     const width = Math.abs(v2.x - v1.x)
     const height = Math.abs(v2.y - v1.y)
     
@@ -379,7 +394,10 @@ class CommonShapeRenderer {
   }
   
   public renderDiamond(vertices: PixeloidCoordinate[], context: RenderContext): void {
-    if (!vertices || vertices.length < 4) return
+    // ✅ STRICT AUTHORITY: NO SILENT FAILURES
+    if (!vertices || vertices.length < 4) {
+      throw new Error('Diamond rendering requires 4 vertices - west, north, east, south')
+    }
     
     const { graphics, samplingPos, zoomFactor, style, alpha = 1 } = context
     const transformedVertices = vertices.map(v => this.transformCoordinate(v, samplingPos, zoomFactor))
@@ -395,21 +413,30 @@ class CommonShapeRenderer {
   }
   
   private applyFill(graphics: Graphics, style: GeometricObjectStyle, alpha: number = 1): void {
-    // ✅ CORRECT: Use actual style properties from ecs-data-layer.ts
+    // ✅ STRICT AUTHORITY: Complete style required - NO FALLBACKS
     if (style.fillColor !== undefined) {
+      if (style.fillAlpha === undefined) {
+        throw new Error('Fill rendering requires complete style - missing fillAlpha')
+      }
       graphics.fill({
         color: style.fillColor,
-        alpha: (style.fillAlpha || 0.5) * alpha
+        alpha: style.fillAlpha * alpha
       })
     }
   }
   
   private applyStroke(graphics: Graphics, style: GeometricObjectStyle, zoomFactor: number, alpha: number = 1): void {
-    // ✅ CORRECT: Use actual style properties from ecs-data-layer.ts
+    // ✅ STRICT AUTHORITY: Complete style required - NO FALLBACKS
+    if (style.strokeWidth === undefined) {
+      throw new Error('Stroke rendering requires complete style - missing strokeWidth')
+    }
+    if (style.strokeAlpha === undefined) {
+      throw new Error('Stroke rendering requires complete style - missing strokeAlpha')
+    }
     graphics.stroke({
-      width: (style.strokeWidth || 1) * zoomFactor,
+      width: style.strokeWidth * zoomFactor,
       color: style.color,
-      alpha: (style.strokeAlpha || 1) * alpha
+      alpha: style.strokeAlpha * alpha
     })
   }
   
@@ -452,13 +479,23 @@ class PreviewRenderingSystem {
     const samplingPos = gameStore.navigation.offset  // ✅ From GameStoreData.navigation
     const zoomFactor = 1 // Fixed for Phase 3
     
-    // Create render context for preview with style defaults
+    // ✅ STRICT AUTHORITY: Complete preview style required - NO FALLBACKS
+    if (previewStyle.color === undefined) {
+      throw new Error('Preview rendering requires complete style - missing color')
+    }
+    if (previewStyle.strokeWidth === undefined) {
+      throw new Error('Preview rendering requires complete style - missing strokeWidth')
+    }
+    if (previewStyle.strokeAlpha === undefined) {
+      throw new Error('Preview rendering requires complete style - missing strokeAlpha')
+    }
+    
     const completeStyle: GeometricObjectStyle = {
-      color: previewStyle.color || gameStore.defaultStyle.color,
-      strokeWidth: previewStyle.strokeWidth || gameStore.defaultStyle.strokeWidth,
-      strokeAlpha: previewStyle.strokeAlpha || gameStore.defaultStyle.strokeAlpha,
-      fillColor: previewStyle.fillColor || gameStore.defaultStyle.fillColor,
-      fillAlpha: previewStyle.fillAlpha || gameStore.defaultStyle.fillAlpha
+      color: previewStyle.color,
+      strokeWidth: previewStyle.strokeWidth,
+      strokeAlpha: previewStyle.strokeAlpha,
+      fillColor: previewStyle.fillColor,
+      fillAlpha: previewStyle.fillAlpha
     }
     
     const context: RenderContext = {

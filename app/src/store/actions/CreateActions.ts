@@ -13,8 +13,24 @@ export const CreateActions = {
    * Create a new object from parameters (CORRECTED)
    */
   createObject(store: GameStoreData, params: CreateObjectParams): string {
-    // Generate vertices using unified helper
-    const vertices = params.vertices || GeometryHelper.generateVertices(params.type, params.properties)
+    // ✅ STRICT AUTHORITY: Complete params required - NO FALLBACKS
+    if (!params.vertices) {
+      throw new Error('Object creation requires complete vertices - missing vertices')
+    }
+    if (params.style?.color === undefined) {
+      throw new Error('Object creation requires complete style - missing color')
+    }
+    if (params.style?.strokeWidth === undefined) {
+      throw new Error('Object creation requires complete style - missing strokeWidth')
+    }
+    if (params.style?.strokeAlpha === undefined) {
+      throw new Error('Object creation requires complete style - missing strokeAlpha')
+    }
+    if (!params.properties) {
+      throw new Error('Object creation requires complete properties - missing properties')
+    }
+    
+    const vertices = params.vertices
     
     // CORRECTED: Use real GeometricObject structure from ecs-data-layer
     const newObject: GeometricObject = {
@@ -23,15 +39,15 @@ export const CreateActions = {
       vertices: vertices,
       bounds: GeometryHelper.calculateBounds(vertices),
       style: {
-        color: params.style?.color || store.defaultStyle.color,
-        strokeWidth: params.style?.strokeWidth || store.defaultStyle.strokeWidth,
-        strokeAlpha: params.style?.strokeAlpha || store.defaultStyle.strokeAlpha,
+        color: params.style.color,
+        strokeWidth: params.style.strokeWidth,
+        strokeAlpha: params.style.strokeAlpha,
         fillColor: params.style?.fillColor,
         fillAlpha: params.style?.fillAlpha
       },
       isVisible: true,
       createdAt: Date.now(),
-      properties: params.properties || GeometryHelper.calculateProperties(params.type, vertices)
+      properties: params.properties
     }
     
     // Add to store

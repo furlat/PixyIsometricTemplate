@@ -63,13 +63,24 @@ export const PreviewSystem = {
           const vertices = this.generateVerticesFromFormData(data.formData)
           const properties = this.generatePropertiesFromFormData(data.formData)
           
+          // ✅ STRICT AUTHORITY: Complete form data required - NO FALLBACKS
+          if (!data.formData.style.strokeColor) {
+            throw new Error('Preview requires complete style - missing strokeColor')
+          }
+          if (data.formData.style.strokeWidth === undefined) {
+            throw new Error('Preview requires complete style - missing strokeWidth')
+          }
+          if (data.formData.style.strokeAlpha === undefined) {
+            throw new Error('Preview requires complete style - missing strokeAlpha')
+          }
+          
           store.preview.previewData = {
             previewProperties: properties,
             previewVertices: vertices,
             previewStyle: {
-              color: parseInt(data.formData.style.strokeColor.replace('#', ''), 16) || store.defaultStyle.color,
-              strokeWidth: data.formData.style.strokeWidth || store.defaultStyle.strokeWidth,
-              strokeAlpha: data.formData.style.strokeAlpha || store.defaultStyle.strokeAlpha,
+              color: parseInt(data.formData.style.strokeColor.replace('#', ''), 16),
+              strokeWidth: data.formData.style.strokeWidth,
+              strokeAlpha: data.formData.style.strokeAlpha,
               fillColor: data.formData.style.fillColor ? parseInt(data.formData.style.fillColor.replace('#', ''), 16) : undefined,
               fillAlpha: data.formData.style.fillAlpha
             },
@@ -103,9 +114,13 @@ export const PreviewSystem = {
         
       case 'resize':
         if (store.preview.previewData && data.dimensions) {
+          if (!store.preview.originalObject?.type) {
+            throw new Error('PreviewSystem: originalObject type missing - preview corrupted')
+          }
+          
           // Use SAME geometry generation as actual operations
           const vertices = GeometryHelper.generateVertices(
-            store.preview.originalObject?.type || 'point', 
+            store.preview.originalObject.type,
             data.dimensions
           )
           store.preview.previewData.previewVertices = vertices
@@ -146,9 +161,25 @@ export const PreviewSystem = {
         vertices: store.preview.previewData.previewVertices,
         bounds: store.preview.previewData.previewBounds!,
         style: {
-          color: store.preview.previewData.previewStyle.color || store.defaultStyle.color,
-          strokeWidth: store.preview.previewData.previewStyle.strokeWidth || store.defaultStyle.strokeWidth,
-          strokeAlpha: store.preview.previewData.previewStyle.strokeAlpha || store.defaultStyle.strokeAlpha,
+          // ✅ STRICT AUTHORITY: Complete preview style required - NO FALLBACKS
+          color: (() => {
+            if (store.preview.previewData.previewStyle.color === undefined) {
+              throw new Error('Commit preview requires complete style - missing color')
+            }
+            return store.preview.previewData.previewStyle.color
+          })(),
+          strokeWidth: (() => {
+            if (store.preview.previewData.previewStyle.strokeWidth === undefined) {
+              throw new Error('Commit preview requires complete style - missing strokeWidth')
+            }
+            return store.preview.previewData.previewStyle.strokeWidth
+          })(),
+          strokeAlpha: (() => {
+            if (store.preview.previewData.previewStyle.strokeAlpha === undefined) {
+              throw new Error('Commit preview requires complete style - missing strokeAlpha')
+            }
+            return store.preview.previewData.previewStyle.strokeAlpha
+          })(),
           fillColor: store.preview.previewData.previewStyle.fillColor,
           fillAlpha: store.preview.previewData.previewStyle.fillAlpha
         },
@@ -286,6 +317,21 @@ export const PreviewSystem = {
         midpoint: { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 },
         length: Math.sqrt(dx * dx + dy * dy),
         angle: Math.atan2(dy, dx)
+      }
+    }
+    
+    if (formData.diamond) {
+      return {
+        type: 'diamond',
+        center: { x: formData.diamond.centerX, y: formData.diamond.centerY },
+        west: { x: formData.diamond.centerX - formData.diamond.width / 2, y: formData.diamond.centerY },
+        north: { x: formData.diamond.centerX, y: formData.diamond.centerY - formData.diamond.height / 2 },
+        east: { x: formData.diamond.centerX + formData.diamond.width / 2, y: formData.diamond.centerY },
+        south: { x: formData.diamond.centerX, y: formData.diamond.centerY + formData.diamond.height / 2 },
+        width: formData.diamond.width,
+        height: formData.diamond.height,
+        area: (formData.diamond.width * formData.diamond.height) / 2,
+        perimeter: 2 * Math.sqrt((formData.diamond.width/2) * (formData.diamond.width/2) + (formData.diamond.height/2) * (formData.diamond.height/2))
       }
     }
     

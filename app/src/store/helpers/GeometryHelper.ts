@@ -97,6 +97,21 @@ export class GeometryHelper {
       case 'line':
         return { startPoint, endPoint }
         
+      case 'diamond':
+        // DIAMOND CONSTRAINT: startPoint = west vertex, endPoint = drag for width
+        // Width from drag, Height = width/2 (isometric), Y stays same as west vertex
+        const width = Math.abs(endPoint.x - startPoint.x)
+        const height = width / 2  // Isometric constraint: height = width/2
+        const diamondCenter = {
+          x: startPoint.x + (width / 2),  // West vertex X + half width
+          y: startPoint.y                 // Same Y as west vertex
+        }
+        return {
+          center: diamondCenter,
+          width: width,
+          height: height
+        }
+        
       default:
         throw new Error(`Drawing properties not implemented for ${mode}`)
     }
@@ -133,15 +148,24 @@ export class GeometryHelper {
         }
         
       case 'point':
-        const center = vertices[0] || { x: 0, y: 0 }
+        if (!vertices[0]) {
+          throw new Error('Point properties calculation requires center vertex - missing vertices[0]')
+        }
+        const center = vertices[0]
         return {
           type: 'point',
           center: center
         }
         
       case 'line':
-        const start = vertices[0] || { x: 0, y: 0 }
-        const end = vertices[1] || { x: 0, y: 0 }
+        if (!vertices[0]) {
+          throw new Error('Line properties calculation requires start vertex - missing vertices[0]')
+        }
+        if (!vertices[1]) {
+          throw new Error('Line properties calculation requires end vertex - missing vertices[1]')
+        }
+        const start = vertices[0]
+        const end = vertices[1]
         const dx = end.x - start.x
         const dy = end.y - start.y
         return {
@@ -154,10 +178,22 @@ export class GeometryHelper {
         }
         
       case 'diamond':
-        const west = vertices[0] || { x: -1, y: 0 }
-        const north = vertices[1] || { x: 0, y: -1 }
-        const east = vertices[2] || { x: 1, y: 0 }
-        const south = vertices[3] || { x: 0, y: 1 }
+        if (!vertices[0]) {
+          throw new Error('Diamond properties calculation requires west vertex - missing vertices[0]')
+        }
+        if (!vertices[1]) {
+          throw new Error('Diamond properties calculation requires north vertex - missing vertices[1]')
+        }
+        if (!vertices[2]) {
+          throw new Error('Diamond properties calculation requires east vertex - missing vertices[2]')
+        }
+        if (!vertices[3]) {
+          throw new Error('Diamond properties calculation requires south vertex - missing vertices[3]')
+        }
+        const west = vertices[0]
+        const north = vertices[1]
+        const east = vertices[2]
+        const south = vertices[3]
         const diamondCenter = { x: (west.x + east.x) / 2, y: (north.y + south.y) / 2 }
         const diamondWidth = east.x - west.x
         const diamondHeight = south.y - north.y
@@ -181,29 +217,25 @@ export class GeometryHelper {
   // ==========================================
   
   private static generateCircleVertices(center: PixeloidCoordinate, radius: number): PixeloidCoordinate[] {
-    const segments = 32
-    const vertices: PixeloidCoordinate[] = []
-    
-    for (let i = 0; i < segments; i++) {
-      const angle = (i / segments) * 2 * Math.PI
-      vertices.push({
-        x: center.x + Math.cos(angle) * radius,
-        y: center.y + Math.sin(angle) * radius
-      })
+    // ✅ FIXED: Store only 2 vertices - center + radiusPoint
+    // Renderer expects [center, radiusPoint] to calculate radius distance
+    const radiusPoint = {
+      x: center.x + radius,
+      y: center.y
     }
     
-    return vertices
+    return [center, radiusPoint]
   }
   
   private static generateRectangleVertices(center: PixeloidCoordinate, width: number, height: number): PixeloidCoordinate[] {
     const halfWidth = width / 2
     const halfHeight = height / 2
     
+    // ✅ FIXED: Store only 2 vertices - opposite corners
+    // Renderer expects [corner1, corner2] to calculate min/max/width/height
     return [
       { x: center.x - halfWidth, y: center.y - halfHeight }, // top-left
-      { x: center.x + halfWidth, y: center.y - halfHeight }, // top-right
-      { x: center.x + halfWidth, y: center.y + halfHeight }, // bottom-right
-      { x: center.x - halfWidth, y: center.y + halfHeight }  // bottom-left
+      { x: center.x + halfWidth, y: center.y + halfHeight }  // bottom-right
     ]
   }
   
@@ -215,11 +247,13 @@ export class GeometryHelper {
     const halfWidth = width / 2
     const halfHeight = height / 2
     
+    // ✅ FIXED: Correct vertex order [west, north, east, south]
+    // Properties calculation expects this order (lines 178-181)
     return [
-      { x: center.x, y: center.y - halfHeight },      // top
-      { x: center.x + halfWidth, y: center.y },       // right
-      { x: center.x, y: center.y + halfHeight },      // bottom
-      { x: center.x - halfWidth, y: center.y }        // left
+      { x: center.x - halfWidth, y: center.y },       // west (left)
+      { x: center.x, y: center.y - halfHeight },      // north (top)
+      { x: center.x + halfWidth, y: center.y },       // east (right)
+      { x: center.x, y: center.y + halfHeight }       // south (bottom)
     ]
   }
 }

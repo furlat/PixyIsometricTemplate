@@ -8,6 +8,17 @@
 import type { GameStoreData, GeometricObject, PixeloidCoordinate } from '../../types'  // CORRECTED imports
 import { GeometryHelper } from '../helpers/GeometryHelper'
 
+// ✅ STRICT AUTHORITY: Coordinate validation utility
+const isValidCoordinate = (coord: PixeloidCoordinate): boolean => {
+  return (
+    coord &&
+    typeof coord.x === 'number' &&
+    typeof coord.y === 'number' &&
+    isFinite(coord.x) &&
+    isFinite(coord.y)
+  )
+}
+
 export const EditActions = {
   /**
    * Remove object from store (CORRECTED)
@@ -274,6 +285,17 @@ export const cancelDragging = (store: GameStoreData): void => {
 }
 
 export const startDragging = (store: GameStoreData, objectId: string, position: PixeloidCoordinate): void => {
+  // ✅ STRICT AUTHORITY: Validate coordinates before using
+  if (!isValidCoordinate(position)) {
+    throw new Error(`Invalid drag start position: ${JSON.stringify(position)}`)
+  }
+  
+  // ✅ STRICT AUTHORITY: Validate object exists
+  const objectExists = store.objects.some(obj => obj.id === objectId)
+  if (!objectExists) {
+    throw new Error(`Cannot start dragging - object ${objectId} not found`)
+  }
+  
   store.dragging.isDragging = true
   store.dragging.draggedObjectId = objectId
   store.dragging.dragStartPosition = position
@@ -282,6 +304,11 @@ export const startDragging = (store: GameStoreData, objectId: string, position: 
 }
 
 export const updateDragPosition = (store: GameStoreData, position: PixeloidCoordinate): void => {
+  // ✅ STRICT AUTHORITY: Validate coordinates before using
+  if (!isValidCoordinate(position)) {
+    throw new Error(`Invalid drag position: ${JSON.stringify(position)}`)
+  }
+  
   if (store.dragging.isDragging) {
     store.dragging.currentDragPosition = position
   }
