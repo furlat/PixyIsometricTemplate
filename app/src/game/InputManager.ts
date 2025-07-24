@@ -681,6 +681,10 @@ class KeyboardHandler {
   private keysPressed: Set<string> = new Set()
   private keyEventListeners: Array<() => void> = []
   
+  // ✅ UX ISSUE D: Smooth WASD navigation system (using requestAnimationFrame)
+  private wasdAnimationId: number | null = null
+  private readonly WASD_KEYS = new Set(['w', 'a', 's', 'd'])
+  
   public initialize(): void {
     this.setupGlobalHandlers()
   }
@@ -708,13 +712,28 @@ class KeyboardHandler {
   private handleKeyDown(event: KeyboardEvent): void {
     const key = event.key.toLowerCase()
     
-    // Navigation shortcuts
-    if (['w', 'a', 's', 'd'].includes(key)) {
-      this.handleWASD(key as 'w'|'a'|'s'|'d')
+    // ✅ UX ISSUE D: Smooth WASD navigation - start smooth movement loop
+    if (this.WASD_KEYS.has(key)) {
+      this.startSmoothWASDMovement()
       event.preventDefault()
     }
     
-    // Action shortcuts
+    // ✅ UX ISSUE C: Direct copy/paste keys (C/V without Ctrl)
+    // Only if not typing in input fields
+    if (!this.isTypingInInputField()) {
+      switch (key) {
+        case 'c':
+          this.handleCopy()
+          event.preventDefault()
+          break
+        case 'v':
+          this.handlePaste()
+          event.preventDefault()
+          break
+      }
+    }
+    
+    // Action shortcuts (keep Ctrl+C/V as backup for familiarity)
     if (event.ctrlKey || event.metaKey) {
       switch (key) {
         case 'c':
@@ -762,22 +781,74 @@ class KeyboardHandler {
     }
   }
   
-  // ✅ SAFE: Navigation via existing store methods
-  public handleWASD(key: 'w'|'a'|'s'|'d'): void {
-    const moveAmount = gameStore.navigation.moveAmount  // ✅ FIXED: Use store value
+  // ✅ UX ISSUE D: Smooth diagonal WASD navigation system
+  
+  /**
+   * Start smooth WASD movement loop if not already running
+   */
+  private startSmoothWASDMovement(): void {
+    if (this.wasdAnimationId !== null) {
+      return // Already running
+    }
     
-    // ✅ FIXED: Pass deltas instead of absolute coordinates
+    console.log('KeyboardHandler: Starting smooth WASD movement with requestAnimationFrame')
+    this.updateSmoothWASDMovement()
+  }
+  
+  /**
+   * Stop smooth WASD movement loop
+   */
+  private stopSmoothWASDMovement(): void {
+    if (this.wasdAnimationId !== null) {
+      window.cancelAnimationFrame(this.wasdAnimationId)
+      this.wasdAnimationId = null
+      console.log('KeyboardHandler: Stopped smooth WASD movement')
+    }
+  }
+  
+  /**
+   * Update smooth WASD movement - handles diagonal movement using requestAnimationFrame
+   */
+  private updateSmoothWASDMovement(): void {
+    // Check if any WASD keys are still pressed
+    const activeWASDKeys = Array.from(this.keysPressed).filter(key => this.WASD_KEYS.has(key))
+    
+    if (activeWASDKeys.length === 0) {
+      // No WASD keys pressed - stop the loop
+      this.stopSmoothWASDMovement()
+      return
+    }
+    
+    // Calculate diagonal movement
+    const moveAmount = gameStore.navigation.moveAmount
     let deltaX = 0
     let deltaY = 0
     
-    switch (key) {
-      case 'w': deltaY = -moveAmount; break
-      case 's': deltaY = +moveAmount; break
-      case 'a': deltaX = -moveAmount; break
-      case 'd': deltaX = +moveAmount; break
+    // ✅ DIAGONAL SUPPORT: Process all pressed WASD keys simultaneously
+    for (const key of activeWASDKeys) {
+      switch (key) {
+        case 'w': deltaY -= moveAmount; break
+        case 's': deltaY += moveAmount; break
+        case 'a': deltaX -= moveAmount; break
+        case 'd': deltaX += moveAmount; break
+      }
     }
     
-    gameStore_methods.updateNavigationOffset(deltaX, deltaY)
+    // ✅ SMOOTH MOVEMENT: Apply movement via store
+    if (deltaX !== 0 || deltaY !== 0) {
+      gameStore_methods.updateNavigationOffset(deltaX, deltaY)
+    }
+    
+    // ✅ REQUESTANIMATIONFRAME: Schedule next frame
+    this.wasdAnimationId = window.requestAnimationFrame(() => {
+      this.updateSmoothWASDMovement()
+    })
+  }
+  
+  // ✅ LEGACY: Keep old handleWASD for backward compatibility
+  public handleWASD(key: 'w'|'a'|'s'|'d'): void {
+    // This method is now unused but kept for compatibility
+    console.warn('KeyboardHandler: handleWASD called directly - using smooth movement instead')
   }
   
   public handleSpacebar(): void {
@@ -853,6 +924,20 @@ class KeyboardHandler {
     console.log('KeyboardHandler: Toggled geometry panel (F3)')
   }
   
+  /**
+   * ✅ UX ISSUE C: Check if user is typing in input field to prevent conflicts
+   */
+  private isTypingInInputField(): boolean {
+    const activeElement = document.activeElement
+    if (!activeElement) return false
+    
+    return (
+      activeElement.tagName === 'INPUT' ||
+      activeElement.tagName === 'TEXTAREA' ||
+      (activeElement as HTMLElement).contentEditable === 'true'
+    )
+  }
+  
   // ===== STATE ACCESS =====
   public isKeyPressed(key: string): boolean {
     return this.keysPressed.has(key.toLowerCase())
@@ -865,7 +950,13 @@ class KeyboardHandler {
   public getState(): any {
     return {
       keysPressed: this.getPressedKeys(),
-      moveAmount: gameStore.navigation.moveAmount  // ✅ FIXED: Use store value
+      moveAmount: gameStore.navigation.moveAmount,  // ✅ FIXED: Use store value
+      // ✅ UX ISSUE D: Smooth WASD navigation state (requestAnimationFrame)
+      smoothWASD: {
+        isActive: this.wasdAnimationId !== null,
+        usingRequestAnimationFrame: true,
+        activeWASDKeys: Array.from(this.keysPressed).filter(key => this.WASD_KEYS.has(key))
+      }
     }
   }
   
@@ -874,6 +965,9 @@ class KeyboardHandler {
   }
   
   public destroy(): void {
+    // ✅ UX ISSUE D: Clean up smooth WASD movement
+    this.stopSmoothWASDMovement()
+    
     // Remove all event listeners
     this.keyEventListeners.forEach(cleanup => cleanup())
     this.keyEventListeners = []

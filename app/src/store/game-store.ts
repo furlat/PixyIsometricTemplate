@@ -117,7 +117,7 @@ export const gameStore = proxy<GameStoreData>({
   navigation: {
     offset: { x: 0, y: 0 },
     isDragging: false,
-    moveAmount: 1
+    moveAmount: 5  // ✅ FASTER: Increased from 1 to 5 for smooth 60 FPS movement
   },
   
   mesh: {

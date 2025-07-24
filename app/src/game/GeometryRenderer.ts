@@ -87,6 +87,10 @@ export class GeometryRenderer {
     graphics.clear()
     graphics.position.set(0, 0)
     
+    // ✅ UX ISSUE A: Check if object is being dragged for transparency effect
+    const isDraggedObject = gameStore.dragging.isDragging &&
+                           gameStore.dragging.draggedObjectId === obj.id
+    
     // ✅ CORRECT: Get rendering context from our actual store
     const samplingPos = gameStore.navigation.offset  // ✅ From GameStoreData.navigation
     const zoomFactor = 1 // Fixed for Phase 3
@@ -94,7 +98,8 @@ export class GeometryRenderer {
       graphics,
       samplingPos,
       zoomFactor,
-      style: obj.style  // ✅ Uses actual GeometricObject.style structure
+      style: obj.style,  // ✅ Uses actual GeometricObject.style structure
+      alpha: isDraggedObject ? 0.2 : 1.0  // ✅ 20% opacity for dragged objects (ghost effect)
     }
     
     // ✅ COMMON RENDERING: Use shared shape renderer
